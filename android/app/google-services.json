@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "741598359678",
+    "firebase_url": "https://crik-runs-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "crik-runs",
+    "storage_bucket": "crik-runs.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:741598359678:android:561a77b7b71588b562e82f",
+        "android_client_info": {
+          "package_name": "com.cricketscorer"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "741598359678-437lohh6nt0eqcsqiph0f366b5f6mhdq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cricketscorer",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "741598359678-suqjlv4facr6shuelienri2hvmjkjue7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAWOSVMDWDvWR4V92ENjj1DItyC30ms2Jw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "741598359678-suqjlv4facr6shuelienri2hvmjkjue7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
