@@ -7,6 +7,7 @@ import { getMyTeams } from '../../utils/firebase';
 import { Team, Player } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import AppIcon from '../../components/AppIcon';
 
 export default function TeamDetailScreen({ route, navigation }: any) {
   const { teamId } = route.params;
@@ -60,15 +61,15 @@ export default function TeamDetailScreen({ route, navigation }: any) {
       {/* Key Players */}
       <View style={styles.keyRow}>
         <View style={styles.keyBox}>
-          <Text style={styles.keyIcon}>👑</Text>
+          <AppIcon emoji="👑" size={24} color={COLORS.yellow} />
           <Text style={styles.keyLabel}>Captain</Text>
           <Text style={styles.keyValue}>{captain?.name ?? 'Not set'}</Text>
-        </View>
+       </View>
         <View style={styles.keyBox}>
-          <Text style={styles.keyIcon}>🧤</Text>
-          <Text style={styles.keyLabel}>Wicket Keeper</Text>
-          <Text style={styles.keyValue}>{wk?.name ?? 'Not set'}</Text>
-        </View>
+        <AppIcon emoji="🧤" size={24} color={COLORS.blue} />
+        <Text style={styles.keyLabel}>Wicket Keeper</Text>
+        <Text style={styles.keyValue}>{wk?.name ?? 'Not set'}</Text>
+      </View>
       </View>
 
       {/* Player List */}

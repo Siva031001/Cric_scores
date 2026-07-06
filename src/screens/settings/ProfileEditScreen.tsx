@@ -5,6 +5,7 @@ import { getUserProfile, saveUserProfile } from '../../utils/firebase';
 import { PlayerRole, BattingStyle } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import AppIcon from '../../components/AppIcon';
 
 const ROLES: PlayerRole[] = ['Batter', 'Bowler', 'Wicket Keeper', 'All Rounder'];
 const BATTING_STYLES: BattingStyle[] = ['Right Hand', 'Left Hand'];
@@ -66,13 +67,14 @@ export default function ProfileEditScreen({ navigation }: any) {
           <TouchableOpacity style={styles.photoCircle} onPress={pickPhoto}>
             {photo ? <Image source={{ uri: photo }} style={styles.photoImg} /> : (
               <View style={styles.photoPlaceholder}>
-                <Text style={styles.photoPlus}>📷</Text>
+                <AppIcon emoji="📷" size={26} color={COLORS.textSecondary} />
                 <Text style={styles.photoLabel}>Add Photo</Text>
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={pickPhoto}>
-            <Text style={styles.changePhoto}>📷 Change Photo</Text>
+          <TouchableOpacity onPress={pickPhoto} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <AppIcon emoji="📷" size={14} color={COLORS.primary} />
+            <Text style={styles.changePhoto}>Change Photo</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.form}>
@@ -103,7 +105,7 @@ export default function ProfileEditScreen({ navigation }: any) {
           <Text style={styles.label}>Country</Text>
           <TouchableOpacity style={styles.dropdownBtn} onPress={() => setShowCountry(true)}>
             <Text style={styles.dropdownText}>{country}</Text>
-            <Text style={styles.dropdownArrow}>▼</Text>
+            <AppIcon emoji="▼" size={12} color={COLORS.primary} />
           </TouchableOpacity>
           <TouchableOpacity style={[styles.saveBtn, saving && styles.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
             <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
@@ -125,7 +127,7 @@ export default function ProfileEditScreen({ navigation }: any) {
                   style={[styles.countryRow, country === item && styles.countryRowActive]}
                   onPress={() => { setCountry(item); setShowCountry(false); }}>
                   <Text style={[styles.countryText, country === item && styles.countryTextActive]}>{item}</Text>
-                  {country === item && <Text style={{ color: COLORS.primary, fontSize: 16 }}>✓</Text>}
+                  {country === item && <AppIcon emoji="✓" size={16} color={COLORS.primary} />}
                 </TouchableOpacity>
               )}
             />

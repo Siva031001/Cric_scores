@@ -77,3 +77,4 @@ share_files/
 CricketScorer/
 # Firebase Admin SDK private key
 server/serviceAccountKey.json
+admin/dist/

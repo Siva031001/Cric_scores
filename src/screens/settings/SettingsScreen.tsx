@@ -4,6 +4,7 @@ import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 import { deleteAccount } from '../../utils/firebase';
 import auth from '@react-native-firebase/auth';
+import AppIcon from '../../components/AppIcon';
 
 export default function SettingsScreen({ navigation }: any) {
   const handleLogout = () => {
@@ -57,16 +58,20 @@ export default function SettingsScreen({ navigation }: any) {
       <Header title="Settings" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content}>
         {items.map((item: any, i) => (
-          <TouchableOpacity key={i} style={[styles.item, item.danger && styles.dangerItem, item.warning && styles.warningItem]} onPress={item.onPress}>
+            <TouchableOpacity key={i} style={[styles.item, item.danger && styles.dangerItem, item.warning && styles.warningItem]} onPress={item.onPress}>
             <View style={styles.itemIcon}>
-              <Text style={styles.itemIconText}>{item.icon}</Text>
+            <AppIcon
+              emoji={item.icon}
+              size={20}
+              color={item.danger ? COLORS.red : item.warning ? COLORS.orange : COLORS.text}
+            />
             </View>
             <View style={styles.itemInfo}>
               <Text style={[styles.itemLabel, item.danger && styles.dangerText, item.warning && styles.warningText]}>{item.label}</Text>
-              {item.sublabel && <Text style={styles.itemSub}>{item.sublabel}</Text>}
+                {item.sublabel && <Text style={styles.itemSub}>{item.sublabel}</Text>}
             </View>
-            <Text style={styles.arrow}>›</Text>
-          </TouchableOpacity>
+              <AppIcon emoji="›" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
         ))}
         <Text style={styles.version}>Cricket Scorer v1.0.0</Text>
       </ScrollView>

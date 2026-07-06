@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput,
 import { useFocusEffect } from '@react-navigation/native';
 import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import AppIcon from '../../components/AppIcon';
 
 export default function HomeScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
@@ -86,14 +87,14 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <Text style={st.settingsIcon}>⚙️</Text>
+          <AppIcon emoji="⚙️" size={24} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
       <View style={st.searchBox}>
-        <Text style={st.searchIcon}>🔍</Text>
+        <AppIcon emoji="🔍" size={16} color={COLORS.textSecondary} />
         <TextInput style={st.searchInput} placeholder="Search team, player, venue..." placeholderTextColor={COLORS.textMuted} value={search} onChangeText={handleSearch} />
-        {search !== '' && <TouchableOpacity onPress={() => { setSearch(''); setSearchResults([]); setSearching(false); }}><Text style={st.clearBtn}>✕</Text></TouchableOpacity>}
+        {search !== '' && <TouchableOpacity onPress={() => { setSearch(''); setSearchResults([]); setSearching(false); }}><AppIcon emoji="✕" size={16} color={COLORS.textSecondary} /></TouchableOpacity>}
       </View>
 
       {searching && (
@@ -106,7 +107,7 @@ export default function HomeScreen({ navigation }: any) {
                   if (item.type === 'team') navigation.navigate('TeamDetail', { teamId: item.data.id });
                   else navigation.navigate('Scorecard', { matchId: item.data.id });
                 }}>
-                  <Text style={st.searchResultIcon}>{item.type === 'team' ? '👥' : '🏏'}</Text>
+                  <AppIcon emoji={item.type === 'team' ? '👥' : '🏏'} size={22} color={COLORS.text} />
                   <View style={{ flex: 1 }}>
                     <Text style={st.searchResultTitle}>{item.type === 'team' ? item.data.name : item.data.team1 + ' vs ' + item.data.team2}</Text>
                     <Text style={st.searchResultSub}>{item.type === 'team' ? (item.data.players?.length ?? 0) + ' players' : item.data.venue ?? 'Match'}</Text>
@@ -122,7 +123,10 @@ export default function HomeScreen({ navigation }: any) {
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
           {liveMatches.length > 0 && (
             <View style={st.liveSection}>
-              <Text style={st.liveSectionTitle}>🔴 Live Matches</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <AppIcon emoji="🔴" size={13} color={COLORS.red} />
+                <Text style={[st.liveSectionTitle, { marginBottom: 0 }]}>Live Matches</Text>
+              </View>
               {liveMatches.map((m: any) => (
                 <TouchableOpacity key={m.id} style={st.liveCard} onPress={() => navigation.navigate('Scoring', { matchId: m.id })}>
                   <Text style={st.liveTeams}>{m.team1} vs {m.team2}</Text>
@@ -134,19 +138,19 @@ export default function HomeScreen({ navigation }: any) {
           )}
           <TouchableOpacity style={st.featuredBtn} onPress={() => navigation.navigate('NewMatch')}>
             <View style={st.featuredLeft}>
-              <Text style={st.featuredIcon}>🏏</Text>
-              <View>
-                <Text style={st.featuredTitle}>Start New Match</Text>
-                <Text style={st.featuredSub}>Score and track live</Text>
-              </View>
+              <AppIcon emoji="🏏" size={32} color="#fff" />
+            <View>
+              <Text style={st.featuredTitle}>Start New Match</Text>
+              <Text style={st.featuredSub}>Score and track live</Text>
             </View>
-            <Text style={st.featuredArrow}>→</Text>
+          </View>
+              <AppIcon emoji="→" size={22} color="#fff" />
           </TouchableOpacity>
           <View style={st.grid}>
             {MENU.map(item => (
               <TouchableOpacity key={item.id} style={st.menuCard} onPress={() => navigation.navigate(item.screen)}>
                 <View style={[st.iconBox, { backgroundColor: item.color + '22' }]}>
-                  <Text style={st.menuIcon}>{item.icon}</Text>
+                  <AppIcon emoji={item.icon} size={22} color={item.color} />
                 </View>
                 <Text style={st.menuLabel}>{item.label}</Text>
                 <Text style={st.menuSub}>{item.sub}</Text>

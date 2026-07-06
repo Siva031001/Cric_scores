@@ -5,6 +5,7 @@ import { saveTeam, updateTeam, getMyTeams, formatPlayerName, formatTeamName, ens
 import { Player } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import AppIcon from '../../components/AppIcon';
 
 const ROLES = ['Batter', 'Bowler', 'Wicket Keeper', 'All Rounder'];
 const BAT_STYLES = ['Right Hand', 'Left Hand'];
@@ -206,10 +207,10 @@ export default function CreateTeamScreen({ route, navigation }: any) {
         <TouchableOpacity style={styles.logoCircle} onPress={pickLogo}>
           {logo ? <Image source={{ uri: logo }} style={styles.logoImg} /> : (
             <View style={styles.logoPlaceholder}>
-              <Text style={styles.cameraIcon}>📷</Text>
-              <Text style={styles.logoLabel}>Add Logo</Text>
-            </View>
-          )}
+            <AppIcon emoji="📷" size={22} color={COLORS.text} />
+            <Text style={styles.logoLabel}>Add Logo</Text>
+            </View> 
+             )}
         </TouchableOpacity>
         <View style={styles.topRight}>
           <TextInput style={styles.teamNameInput} placeholder="Team Name *" placeholderTextColor={COLORS.textMuted} defaultValue={teamNameDisplay} onChangeText={text => { teamNameRef.current = text; }} onEndEditing={e => setTeamNameDisplay(e.nativeEvent.text)} autoCorrect={false} autoCapitalize="words" />

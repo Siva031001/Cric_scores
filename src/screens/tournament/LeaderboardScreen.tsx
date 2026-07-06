@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-nat
 import { subscribeToTournament } from "../../utils/firebase";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
+import AppIcon from "../../components/AppIcon";
 
 export default function LeaderboardScreen({ route, navigation }: any) {
   const { tournamentId } = route.params ?? {};
@@ -39,7 +40,7 @@ export default function LeaderboardScreen({ route, navigation }: any) {
   );
 
   const medalFor = (i: number) =>
-    i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : String(i + 1);
+    i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
 
   return (
     <View style={s.container}>
@@ -50,7 +51,7 @@ export default function LeaderboardScreen({ route, navigation }: any) {
 
       {teams.length === 0 ? (
         <View style={s.empty}>
-          <Text style={s.emptyIcon}>🏅</Text>
+          <AppIcon emoji="🏅" size={52} color={COLORS.textMuted} />
           <Text style={s.emptyTitle}>No Teams Yet</Text>
           <Text style={s.emptySub}>Add teams and complete matches to see the points table</Text>
         </View>
@@ -81,9 +82,13 @@ export default function LeaderboardScreen({ route, navigation }: any) {
                   i % 2 === 1 && s.rowAlt,
                 ]}
               >
-                <Text style={[s.cell, s.rankCell, isFirst && s.rankFirst]}>
-                  {medalFor(i)}
-                </Text>
+                <View style={[s.cell, s.rankCell]}>
+                  {medalFor(i) ? (
+                <AppIcon emoji={medalFor(i)!} size={isFirst ? 20 : 16} color={COLORS.text} />
+                    ) : (
+                <Text style={[s.cell, s.rankCell]}>{i + 1}</Text>
+                    )}
+                </View>
                 <View style={s.nameCell}>
                   <Text style={[s.teamName, isFirst && { color: COLORS.yellow }]} numberOfLines={1}>
                     {team.teamName ?? team.teamId ?? "—"}

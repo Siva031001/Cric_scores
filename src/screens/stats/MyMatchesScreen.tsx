@@ -167,6 +167,41 @@ export default function MyMatchesScreen({ navigation }: any) {
         </View>
       </View>
 
+      {matches.length > 0 && (() => {
+        const formResults = matches
+          .filter((m: any) => m.status === 'completed')
+          .slice(0, 5)
+          .map((m: any) => {
+            const w = m.winner ?? '';
+            const isPlayerTeam1 = (m.team1Players ?? []).some((p: any) => p.globalPlayerId === myPlayerId);
+            const won = w.includes((isPlayerTeam1 ? m.team1 : m.team2) + ' won');
+            const lost = w.includes((isPlayerTeam1 ? m.team2 : m.team1) + ' won');
+            if (w.toLowerCase().includes('tied')) return 'T';
+            if (won) return 'W';
+            if (lost) return 'L';
+            return null;
+          })
+          .filter(Boolean);
+        if (formResults.length === 0) return null;
+        return (
+          <View style={s.formCard}>
+            <Text style={s.formLabel}>RECENT FORM</Text>
+            <View style={s.formRow}>
+              {formResults.map((r: any, i: number) => (
+                <View key={i} style={[
+                  s.formPill,
+                  r === 'W' && { backgroundColor: COLORS.primary },
+                  r === 'L' && { backgroundColor: COLORS.red },
+                  r === 'T' && { backgroundColor: COLORS.orange },
+                ]}>
+                  <Text style={s.formPillTxt}>{r}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      })()}
+
       <View style={s.tabs}>
         {TABS.map(t => (
           <TouchableOpacity
@@ -297,6 +332,11 @@ const s = StyleSheet.create({
   profileAvatarTxt: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   profileName: { color: COLORS.text, fontSize: 16, fontWeight: 'bold' },
   profileSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
+  formCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, margin: SPACING.lg, marginBottom: 0, borderWidth: 1, borderColor: COLORS.border },
+  formLabel: { color: COLORS.textMuted, fontSize: 10, fontWeight: 'bold', letterSpacing: 1.2, marginBottom: 10 },
+  formRow: { flexDirection: 'row', gap: 9 },
+  formPill: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center' },
+  formPillTxt: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.border },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },

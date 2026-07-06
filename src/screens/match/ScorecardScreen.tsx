@@ -419,38 +419,17 @@ export default function ScorecardScreen({ route, navigation }: any) {
 
         {/* Action Buttons */}
         {match.status === "live" && match.currentInnings === 1 && ((match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers) && (
-          <>
-            <TouchableOpacity style={[s.shareBtn, {backgroundColor: COLORS.primary, marginTop: 0}]}
-                onPress={async () => {
-                await updateMatch(matchId, {
-        currentInnings: 2,
-        innings2: {
-          ...(match.innings2 ?? {}),
-          strikerId: -1,
-          nonStrikerId: -1,
-          currentBowlerId: -1,
-        },
-      });
-              // goBack() returns to the EXISTING ScoringScreen already in the stack.
-              // That screen's useEffect handles opener selection and fires the alert.
-              // replace("Scoring") was creating a second ScoringScreen instance —
-              // both instances subscribed to Firebase and both opened the picker.
-                navigation.goBack();
-                }}>
-             <Text style={s.shareBtnTxt}>Start 2nd Innings</Text>
-             </TouchableOpacity>
-            <TouchableOpacity style={[s.shareBtn, { backgroundColor: COLORS.card2, marginTop: 0, borderWidth: 1, borderColor: COLORS.border }]}
-              onPress={() => navigation.goBack()}>
-              <Text style={[s.shareBtnTxt, { color: COLORS.text }]}>Back to Scoring</Text>
-            </TouchableOpacity>
-          </>
-        )}
-        {match.status === "live" && match.currentInnings === 1 && !((match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers) && (
-          <TouchableOpacity style={[s.shareBtn, { backgroundColor: COLORS.red, marginTop: 0 }]}
-            onPress={() => navigation.goBack()}>
-            <Text style={s.shareBtnTxt}>Back to Scoring</Text>
-          </TouchableOpacity>
-        )}
+  <TouchableOpacity style={[s.shareBtn, {backgroundColor: COLORS.primary, marginTop: 0}]}
+      onPress={() => navigation.goBack()}>
+     <Text style={s.shareBtnTxt}>Back to Scoring — Start 2nd Innings There</Text>
+  </TouchableOpacity>
+)}
+{match.status === "live" && match.currentInnings === 1 && !((match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers) && (
+  <TouchableOpacity style={[s.shareBtn, { backgroundColor: COLORS.red, marginTop: 0 }]}
+    onPress={() => navigation.goBack()}>
+    <Text style={s.shareBtnTxt}>Back to Scoring</Text>
+  </TouchableOpacity>
+)}
         {match.status === "live" && match.currentInnings === 2 && (
           <TouchableOpacity style={[s.shareBtn, { backgroundColor: COLORS.red, marginTop: 0 }]}
             onPress={() => navigation.goBack()}>

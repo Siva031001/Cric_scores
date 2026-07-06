@@ -4,6 +4,7 @@ import { subscribeToTournament, updateTournament, getMyTeams, getMatchById } fro
 import { Tournament, TournamentTeam, Team } from "../../types/cricket";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
+import AppIcon from "../../components/AppIcon";
 
 const getTodayString = () => { const d = new Date(); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear(); };
 
@@ -208,10 +209,21 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     <View style={styles.container}>
       <Header title={tournament.name} onBack={() => navigation.goBack()} />
       <View style={styles.infoBar}>
-        <Text style={styles.infoText}> {tournament.organisationName}</Text>
-        {tournament.venue ? <Text style={styles.infoText}> {tournament.venue}</Text> : null}
-        <Text style={styles.infoText}>{tournament.ballType === "Leather Ball" ? "" : ""} {tournament.format}</Text>
-      </View>
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+    <AppIcon emoji="🏢" size={12} color={COLORS.textSecondary} />
+    <Text style={styles.infoText}>{tournament.organisationName}</Text>
+  </View>
+  {tournament.venue ? (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <AppIcon emoji="📍" size={12} color={COLORS.textSecondary} />
+      <Text style={styles.infoText}>{tournament.venue}</Text>
+    </View>
+  ) : null}
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+    <AppIcon emoji={tournament.ballType === "Leather Ball" ? "🔴" : "🎾"} size={12} color={COLORS.textSecondary} />
+    <Text style={styles.infoText}>{tournament.format}</Text>
+  </View>
+</View>
       <View style={styles.tabs}>
         {TABS.map((t: any) => (
           <TouchableOpacity key={t.key} style={[styles.tab, tab === t.key && styles.tabActive]} onPress={() => setTab(t.key)}>
@@ -227,17 +239,32 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
               <Text style={styles.addMatchBtnText}>+ Schedule New Match</Text>
             </TouchableOpacity>
             {(tournament.matches ?? []).length === 0 ? (
-              <View style={styles.empty}><Text style={styles.emptyIcon}></Text><Text style={styles.emptyText}>No matches scheduled</Text><Text style={styles.emptyHint}>Add teams first, then schedule matches</Text></View>
+              <View style={styles.empty}><AppIcon emoji="📅" size={48} color={COLORS.textMuted} /><Text style={styles.emptyText}>No matches scheduled</Text><Text style={styles.emptyHint}>Add teams first, then schedule matches</Text></View>
             ) : (
               (tournament.matches ?? []).map((match: any, i: number) => (
                 <View key={i} style={[styles.matchCard, match.status === "live" && styles.matchCardLive, match.status === "completed" && styles.matchCardDone]}>
                   <Text style={styles.matchNumber}>Match {i + 1}</Text>
                   <Text style={styles.matchTeams}>{match.team1} vs {match.team2}</Text>
                   <View style={styles.matchMeta}>
-                    {match.date !== "TBD" && <Text style={styles.matchMetaText}> {match.date}</Text>}
-                    {match.time !== "TBD" && <Text style={styles.matchMetaText}> {match.time}</Text>}
-                    {match.venue !== "TBD" && <Text style={styles.matchMetaText}> {match.venue}</Text>}
-                  </View>
+  {match.date !== "TBD" && (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <AppIcon emoji="📅" size={11} color={COLORS.textSecondary} />
+      <Text style={styles.matchMetaText}>{match.date}</Text>
+    </View>
+  )}
+  {match.time !== "TBD" && (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <AppIcon emoji="⏰" size={11} color={COLORS.textSecondary} />
+      <Text style={styles.matchMetaText}>{match.time}</Text>
+    </View>
+  )}
+  {match.venue !== "TBD" && (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <AppIcon emoji="📍" size={11} color={COLORS.textSecondary} />
+      <Text style={styles.matchMetaText}>{match.venue}</Text>
+    </View>
+  )}
+</View>
                   <View style={styles.matchFooter}>
                     <View style={[styles.statusBadge, match.status === "live" && styles.statusLive, match.status === "completed" && styles.statusDone]}>
                       <Text style={styles.statusText}>{match.status === "completed" ? "Done" : match.status === "live" ? "Live" : "Scheduled"}</Text>

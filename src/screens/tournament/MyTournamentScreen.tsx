@@ -8,6 +8,7 @@ import { Tournament } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 import EmptyState from '../../components/EmptyState';
+import AppIcon from '../../components/AppIcon';
 
 export default function MyTournamentScreen({ navigation }: any) {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -61,14 +62,28 @@ export default function MyTournamentScreen({ navigation }: any) {
                 <View style={[styles.badge,
                   item.status === 'live' && styles.liveBadge,
                   item.status === 'completed' && styles.doneBadge]}>
-                  <Text style={styles.badgeText}>
-                    {item.status === 'live' ? '🔴 LIVE' :
-                     item.status === 'completed' ? '✅ Done' : '📅 Upcoming'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <AppIcon
+                    emoji={item.status === 'live' ? '🔴' : item.status === 'completed' ? '✅' : '📅'}
+                    size={11}
+                    color={item.status === 'live' ? COLORS.red : item.status === 'completed' ? COLORS.primary : COLORS.textSecondary}
+                    />
+                    <Text style={styles.badgeText}>
+                    {item.status === 'live' ? 'LIVE' : item.status === 'completed' ? 'Done' : 'Upcoming'}
+                    </Text>
+                    </View>
                 </View>
               </View>
-              <Text style={styles.cardSub}>🏢 {item.organisationName}</Text>
-              {item.venue ? <Text style={styles.cardSub}>📍 {item.venue}</Text> : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+                    <AppIcon emoji="🏢" size={13} color={COLORS.textSecondary} />
+                    <Text style={[styles.cardSub, { marginBottom: 0 }]}>{item.organisationName}</Text>
+              </View>
+                    {item.venue ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+                <AppIcon emoji="📍" size={13} color={COLORS.textSecondary} />
+                <Text style={[styles.cardSub, { marginBottom: 0 }]}>{item.venue}</Text>
+              </View>
+              ) : null}
               <View style={styles.cardFooter}>
                 <Text style={styles.cardInfo}>
                   {item.teams?.length ?? 0} Teams • {item.matches?.length ?? 0} Matches

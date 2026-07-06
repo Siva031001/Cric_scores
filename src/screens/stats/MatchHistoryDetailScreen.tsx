@@ -231,11 +231,9 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   ];
 
   const COUNTERS = [
-    { n: typeFilteredMatches.length, l: 'Total',  f: 'all' },
-    { n: typeFilteredMatches.filter((m: any) => m.status === 'completed').length, l: 'Done',   f: 'completed' },
-    { n: typeFilteredMatches.filter((m: any) => m.status === 'live').length, l: 'Live',   f: 'live' },
-    { n: typeFilteredMatches.filter((m: any) => m.status === 'paused').length, l: 'Paused', f: 'paused' },
-  ];
+    { n: typeFilteredMatches.length, l: 'Total', f: 'all' },
+    { n: typeFilteredMatches.filter((m: any) => m.status === 'completed').length, l: 'Done', f: 'completed' },
+   ];
 
   const filteredMatches = filter === 'all'
     ? typeFilteredMatches
@@ -280,28 +278,29 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
       <Header title="Match History" onBack={() => navigation.goBack()} rightText="Teams" onRight={() => navigation.navigate('MyTeams')} />
 
       <View style={s.filterBlock}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterScrollRow}>
-          {COUNTERS.map((x: any, i: number) => (
-            <TouchableOpacity key={i} style={[s.filterChip, filter === x.f && s.filterChipActive]} onPress={() => setFilter(x.f)} activeOpacity={0.7}>
-              <Text style={[s.filterChipTxt, filter === x.f && s.filterChipTxtActive]}>{x.l} <Text style={s.filterChipCount}>{x.n}</Text></Text>
-            </TouchableOpacity>
-          ))}
-          <View style={s.filterDivider} />
-          {(['all','tournament','normal'] as const).map(tf => (
-            <TouchableOpacity key={tf} style={[s.filterChip, matchTypeFilter === tf && s.filterChipActive]} onPress={() => setMatchTypeFilter(tf)} activeOpacity={0.7}>
-              <Text style={[s.filterChipTxt, matchTypeFilter === tf && s.filterChipTxtActive]}>
-                {tf === 'all' ? '?? All Types' : tf === 'tournament' ? '?? Tournament' : '?? Normal'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <View style={s.filterDivider} />
-          {([['all','All Time'],['30','30 Days'],['90','90 Days']] as const).map(([k, l]) => (
-            <TouchableOpacity key={k} style={[s.filterChip, dateFilter === k && s.filterChipActive]} onPress={() => setDateFilter(k as DateFilter)} activeOpacity={0.7}>
-              <Text style={[s.filterChipTxt, dateFilter === k && s.filterChipTxtActive]}>{l}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+  <View style={s.filterScrollRow}>
+    {COUNTERS.map((x: any, i: number) => (
+      <TouchableOpacity key={i} style={[s.filterChip, filter === x.f && s.filterChipActive]} onPress={() => setFilter(x.f)} activeOpacity={0.7}>
+        <Text style={[s.filterChipTxt, filter === x.f && s.filterChipTxtActive]}>{x.l} <Text style={s.filterChipCount}>{x.n}</Text></Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.filterScrollRow, { marginTop: 8 }]}>
+    {(['all','tournament','normal'] as const).map(tf => (
+      <TouchableOpacity key={tf} style={[s.filterChip, matchTypeFilter === tf && s.filterChipActive]} onPress={() => setMatchTypeFilter(tf)} activeOpacity={0.7}>
+        <Text style={[s.filterChipTxt, matchTypeFilter === tf && s.filterChipTxtActive]}>
+          {tf === 'all' ? 'All Types' : tf === 'tournament' ? 'Tournament' : 'Normal'}
+        </Text>
+      </TouchableOpacity>
+    ))}
+    <View style={s.filterDivider} />
+    {([['all','All Time'],['30','30 Days'],['90','90 Days']] as const).map(([k, l]) => (
+      <TouchableOpacity key={k} style={[s.filterChip, dateFilter === k && s.filterChipActive]} onPress={() => setDateFilter(k as DateFilter)} activeOpacity={0.7}>
+        <Text style={[s.filterChipTxt, dateFilter === k && s.filterChipTxtActive]}>{l}</Text>
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+</View>
 
       <View style={s.tabs}>
         {TABS.map(t => (
@@ -316,23 +315,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
         {tab === 'overview' && (
           <View>
-            {formResults.length > 0 && (
-              <View style={s.formCard}>
-                <Text style={s.formLabel}>RECENT FORM</Text>
-                <View style={s.formRow}>
-                  {formResults.map((r: string, i: number) => (
-                    <View key={i} style={[
-                      s.formPill,
-                      r === 'W' && { backgroundColor: COLORS.primary },
-                      r === 'L' && { backgroundColor: COLORS.red },
-                      r === 'T' && { backgroundColor: COLORS.orange },
-                    ]}>
-                      <Text style={s.formPillTxt}>{r}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
+            
 
 
             {topPartnerships.length > 0 && (
@@ -345,7 +328,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.partnershipNames}>{p.names}</Text>
-                      <Text style={s.partnershipSub}>vs {p.opponent}{p.date ? ' • ' + p.date : ''}</Text>
+                      <Text style={s.partnershipSub}>vs {p.opponent}{p.date ? ' ï¿½ ' + p.date : ''}</Text>
                     </View>
                     <Text style={s.partnershipRuns}>{p.runs}{p.unbeaten ? '*' : ''} <Text style={s.partnershipBalls}>({p.balls})</Text></Text>
                   </View>

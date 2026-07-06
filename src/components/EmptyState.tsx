@@ -1,6 +1,7 @@
 ﻿import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS, RADIUS } from '../constants/theme';
+import AppIcon from './AppIcon';
 
 interface Props {
   icon: string;
@@ -13,7 +14,7 @@ interface Props {
 export default function EmptyState({ icon, title, subtitle, btnText, onBtn }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.icon}>{icon}</Text>
+      <AppIcon emoji={icon} size={56} color={COLORS.textMuted} style={{ marginBottom: 16 }} />
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
       {btnText && onBtn && (

@@ -4,6 +4,7 @@ import { createTournament } from '../../utils/firebase';
 import { BallType, TournamentTeam, TournamentMatch } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import AppIcon from '../../components/AppIcon';
 
 const getTodayString = () => { const d = new Date(); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); };
 const BALL_TYPES: BallType[] = ['Leather Ball', 'Tennis Ball'];
@@ -141,7 +142,7 @@ export default function CreateTournamentScreen({ navigation }: any) {
             </View>
             {teams.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyIcon}>👥</Text>
+                <AppIcon emoji="👥" size={40} color={COLORS.textMuted} />
                 <Text style={styles.emptyText}>Add at least 2 teams</Text>
               </View>
             ) : (
@@ -176,7 +177,7 @@ export default function CreateTournamentScreen({ navigation }: any) {
             </View>
             {matches.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyIcon}>📅</Text>
+                <AppIcon emoji="📅" size={40} color={COLORS.textMuted} />
                 <Text style={styles.emptyText}>No matches scheduled yet</Text>
               </View>
             ) : (
