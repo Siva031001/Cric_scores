@@ -22,6 +22,9 @@ export interface Player {
   bowlingStyle?: string;
   isCaptain?: boolean;
   isWicketKeeper?: boolean;
+  phoneNumber?: string | null;
+  playerType?: 'registered' | 'guest';
+  globalPlayerId?: string | null;
 }
 
 export interface Team {

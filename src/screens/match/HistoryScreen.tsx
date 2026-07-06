@@ -8,6 +8,7 @@ import { Match } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 import EmptyState from '../../components/EmptyState';
+import AppIcon from '../../components/AppIcon';
 
 export default function HistoryScreen({ navigation }: { navigation: any }) {
   const [matches, setMatches] = useState<Match[]>([]);
@@ -55,7 +56,7 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
       />
 
       <View style={styles.searchBox}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <AppIcon emoji="🔍" size={16} color={COLORS.textSecondary} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by team name or venue..."
@@ -65,7 +66,7 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
         />
         {search !== '' && (
           <TouchableOpacity onPress={() => handleSearch('')}>
-            <Text style={styles.clearBtn}>✕</Text>
+            <AppIcon emoji="✕" size={16} color={COLORS.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -98,13 +99,12 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
                   styles.statusBadge,
                   item.status === 'live' && styles.liveBadge,
                 ]}>
-                  <Text style={styles.statusText}>
-                    {item.status === 'completed'
-                      ? '✅ Done'
-                      : item.status === 'live'
-                      ? '🔴 Live'
-                      : 'Paused'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                         
+                    <AppIcon emoji={item.status === 'completed' ? '✅' : '🔴'} size={10} color={item.status === 'completed' ? COLORS.primary : COLORS.red} />
+                          
+                    <Text style={styles.statusText}>{item.status === 'completed' ? 'Done' : item.status === 'live' ? 'Live' : 'Paused'}</Text>
+                  </View>
                 </View>
               </View>
 
@@ -113,11 +113,17 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
               </Text>
 
               {item.venue ? (
-                <Text style={styles.venue}>📍 {item.venue}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                  <AppIcon emoji="📍" size={11} color={COLORS.textSecondary} />
+                  <Text style={[styles.venue, { marginBottom: 0 }]}>{item.venue}</Text>
+                </View>
               ) : null}
-
+              
               {item.matchDate ? (
-                <Text style={styles.date}>📅 {item.matchDate}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                  <AppIcon emoji="📅" size={11} color={COLORS.textSecondary} />
+                  <Text style={[styles.date, { marginBottom: 0 }]}>{item.matchDate}</Text>
+                </View>
               ) : null}
 
               <View style={styles.scoreRow}>
@@ -131,7 +137,10 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
               </View>
 
               {item.winner ? (
-                <Text style={styles.winner}>🏆 {item.winner}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <AppIcon emoji="🏆" size={12} color={COLORS.yellow} />
+                  <Text style={styles.winner}>{item.winner}</Text>
+                </View>
               ) : null}
             </TouchableOpacity>
           )}

@@ -34,9 +34,6 @@ export const checkPhoneExists = async (phone: string): Promise<boolean> => {
 export const createPinAccount = async (phone: string, pin: string): Promise<string> => {
   const key = normalizePhone(phone);
 
-  // Ensure we have an anonymous Firebase Auth session — reuses your
-  // existing signInAnonymously() pattern so all your other firebase.ts
-  // functions (getCurrentUser, saveTeam, etc.) keep working unchanged.
   let user = auth().currentUser;
   if (!user) {
     const cred = await auth().signInAnonymously();
@@ -59,6 +56,18 @@ export const createPinAccount = async (phone: string, pin: string): Promise<stri
 
   await AsyncStorage.setItem(LOCAL_SESSION_KEY, sessionId);
   await AsyncStorage.setItem(LOCAL_PHONE_KEY, key);
+
+  // Retroactively link any Guest player records created under this phone
+  // number before the account existed, so their match history now
+  // aggregates under this registered account. Failure here must not
+  // block account creation — log and continue.
+  try {
+    const { ensureMyPlayerLinked, retroactivelyLinkGuestPlayers } = require('./firebase');
+    const globalPlayerId = await ensureMyPlayerLinked('');
+    await retroactivelyLinkGuestPlayers(key, globalPlayerId);
+  } catch (e) {
+    console.warn('Retroactive guest-player linking failed:', e);
+  }
 
   return sessionId;
 };

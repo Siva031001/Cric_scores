@@ -69,15 +69,11 @@ export default function ScoringScreen({ route, navigation }: any) {
   }, [matchId]);
 
   useEffect(() => {
-    if (!match) return;
-    // Auto-close the innings-end modal if Firebase already shows currentInnings=2.
-    // This happens when the user went to Scorecard and tapped "Start 2nd Innings"
-    // there — that write flips currentInnings without going through handleNextInnings,
-    // so the modal would otherwise stay open behind the opener picker.
-    if (match.currentInnings === 2 && showInningsEnd) {
-  setShowInningsEnd(false);
+  if (!match) return;
+  if (match.currentInnings === 2 && showInningsEnd) {
+    setShowInningsEnd(false);
   }
-    if (
+  if (
     match.currentInnings === 2 &&
     match.innings2?.strikerId === -1 &&
     !showOpenerSelect &&
@@ -87,7 +83,22 @@ export default function ScoringScreen({ route, navigation }: any) {
     setOpener1Id(null); setOpener2Id(null); setOpener3Id(null);
     setShowOpenerSelect(true);
   }
-  }, [match]);
+  // Re-open the innings-end modal if we return to this screen (e.g. from
+  // Scorecard's "Back to Scoring") and innings 1 is still complete but the
+  // transition to innings 2 never happened. Without this, scoring stays
+  // frozen with no way to proceed.
+  const inn1Complete = (match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers;
+  if (
+    match.currentInnings === 1 &&
+    match.status === "live" &&
+    inn1Complete &&
+    !showInningsEnd &&
+    !openerSelectionDoneRef.current
+  ) {
+    setInningsData(match.innings1);
+    setShowInningsEnd(true);
+  }
+}, [match]);
 
   const getName = (players: any[], id: number) =>
     players?.find((p: any) => p.id === id)?.name ?? ("P" + (id + 1));
@@ -140,7 +151,7 @@ export default function ScoringScreen({ route, navigation }: any) {
 };
 
   // Helper: fire AI summary generation after a match completes.
-  // Non-blocking — errors are caught and logged so a Gemini failure
+  // Non-blocking ï¿½ errors are caught and logged so a Gemini failure
   // never prevents the scorecard from loading or crashes the app.
   const triggerAISummary = (updatedMatch: any) => {
     generateMatchSummary(matchId, updatedMatch).catch((e: any) =>
@@ -173,7 +184,7 @@ export default function ScoringScreen({ route, navigation }: any) {
             winner: result2, matchId, totalOvers: match.totalOvers,
           });
         }
-        // Trigger AI summary — non-blocking
+        // Trigger AI summary ï¿½ non-blocking
         triggerAISummary({ ...match, innings2: updInn, status: "completed", winner: result2 });
         setSaving(false);
         navigation.replace("Scorecard", { matchId });
@@ -264,7 +275,7 @@ export default function ScoringScreen({ route, navigation }: any) {
             winner: chaseWinner, matchId, totalOvers: match.totalOvers,
           });
         }
-        // Trigger AI summary — non-blocking
+        // Trigger AI summary ï¿½ non-blocking
         triggerAISummary({ ...match, innings2: upd, status: "completed", winner: chaseWinner });
         setSaving(false);
         navigation.replace("Scorecard", { matchId });
@@ -286,7 +297,7 @@ export default function ScoringScreen({ route, navigation }: any) {
               winner: result2, matchId, totalOvers: match.totalOvers,
             });
           }
-          // Trigger AI summary — non-blocking
+          // Trigger AI summary ï¿½ non-blocking
           triggerAISummary({ ...match, innings2: upd, status: "completed", winner: result2 });
           setSaving(false);
           navigation.replace("Scorecard", { matchId });
@@ -337,7 +348,7 @@ export default function ScoringScreen({ route, navigation }: any) {
     const msg = "Watch LIVE: " + match.team1 + " vs " + match.team2 +
       "\nMatch ID: " + matchId +
       (streamUrl ? "\nStream: " + streamUrl : "") +
-      "\n\nOpen CricketScorer app ? Live Match ? Enter ID: " + matchId;
+      "\nOpen CricketScorer app â†’ Live Match â†’ Enter ID: " + matchId;
     await Share.share({ message: msg });
   };
 
@@ -369,7 +380,7 @@ export default function ScoringScreen({ route, navigation }: any) {
       const key = match.currentInnings === 1 ? "innings1" : "innings2";
       const inn = match[key];
       const dismissedId = who === "striker" ? inn.strikerId : inn.nonStrikerId;
-      // The partner who was NOT run out — always the "other" batsman at the crease.
+      // The partner who was NOT run out ï¿½ always the "other" batsman at the crease.
       // Recording this correctly (instead of always inn.nonStrikerId) is required so
       // the Best Partnerships feature and Undo replay can tell the two batsmen apart
       // when the NON-STRIKER is the one run out.
@@ -489,7 +500,7 @@ export default function ScoringScreen({ route, navigation }: any) {
   };
 
   const handleNextInnings = async () => {
-    // Synchronous guard — checked before any state update or await so a
+    // Synchronous guard ï¿½ checked before any state update or await so a
     // double-tap cannot fire the body twice. The ref is set immediately
     // (not batched like setState) so the second call sees true and exits.
     if (openerSelectionDoneRef.current) return;
@@ -650,7 +661,7 @@ export default function ScoringScreen({ route, navigation }: any) {
                 <Text style={s.sbRR}>RR {getRunRate(inn?.runs ?? 0, inn?.overs ?? 0, inn?.balls ?? 0)}</Text>
               </View>
             </View>
-            {tgt && <Text style={s.sbTarget}>Need {Math.max(0, tgt - (inn?.runs ?? 0))} off {((match.totalOvers - (inn?.overs ?? 0)) - (inn?.balls ?? 0) / 6).toFixed(1)} ov • RRR: {getRequiredRunRate(tgt, inn?.runs ?? 0, match.totalOvers, inn?.overs ?? 0, inn?.balls ?? 0)}</Text>}
+            {tgt && <Text style={s.sbTarget}>Need {Math.max(0, tgt - (inn?.runs ?? 0))} off {((match.totalOvers - (inn?.overs ?? 0)) - (inn?.balls ?? 0) / 6).toFixed(1)} ov - RRR: {getRequiredRunRate(tgt, inn?.runs ?? 0, match.totalOvers, inn?.overs ?? 0, inn?.balls ?? 0)}</Text>}
           </View>
         </View>
 
@@ -706,7 +717,7 @@ export default function ScoringScreen({ route, navigation }: any) {
 
       {!!matchCompleted && (
         <View style={s.completedBanner}>
-          <Text style={s.completedBannerTxt}>Match Completed — {match.winner ?? "No result"}</Text>
+          <Text style={s.completedBannerTxt}>Match Completed â€”  + {match.winner ?? "No result"}</Text>
           <TouchableOpacity onPress={() => navigation.replace("Scorecard", { matchId })}>
             <Text style={s.completedBannerBtn}>View Scorecard</Text>
           </TouchableOpacity>
@@ -715,7 +726,7 @@ export default function ScoringScreen({ route, navigation }: any) {
 
       {byeMode && (
         <View style={s.modeBanner}>
-          <Text style={s.modeTxt}>{byeMode} — tap a run button</Text>
+          <Text style={s.modeTxt}>{byeMode} ï¿½ tap a run button</Text>
           <TouchableOpacity onPress={() => setByeMode(null)}><Text style={s.modeCancel}>Cancel</Text></TouchableOpacity>
         </View>
       )}
@@ -753,7 +764,7 @@ export default function ScoringScreen({ route, navigation }: any) {
       {showNewBowler && (
         <View style={s.overlay}>
           <View style={s.picker}>
-            <Text style={s.pickerTtl}>Over Complete — New Bowler</Text>
+            <Text style={s.pickerTtl}>Over Complete â€” New Bowler</Text>
             {bolP.filter((p: any) => p.id !== inn?.currentBowlerId).map((p: any) => (
               <TouchableOpacity
                   key={p.id}
@@ -771,7 +782,7 @@ export default function ScoringScreen({ route, navigation }: any) {
       {pendingWicket && (
         <View style={s.overlay}>
           <View style={s.picker}>
-            <Text style={s.pickerTtl}>Wicket — Next Batsman</Text>
+            <Text style={s.pickerTtl}>Wicket â€” Next Batsman</Text>
             {batP.filter((p: any) => {
               const pwInn = postWicketInnRef.current ?? inn;
               const bs = pwInn?.batsmanStats?.[statKey(p.id)];
@@ -801,7 +812,7 @@ export default function ScoringScreen({ route, navigation }: any) {
 
       <Modal visible={showFielder} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>
-          <Text style={s.mTitle}>{wicketType} — Select Fielder</Text>
+          <Text style={s.mTitle}>{wicketType} â€” Select Fielder</Text>
           <ScrollView style={{maxHeight: 300}}>
             {bolP.map((p: any) => (
               <TouchableOpacity key={p.id} style={s.pickerRow} onPress={() => handleCatchOrStumpFielder(p.name)}>
@@ -879,7 +890,7 @@ export default function ScoringScreen({ route, navigation }: any) {
             You can Undo last ball before proceeding
           </Text>
           <TouchableOpacity style={s.cancelBtn} onPress={() => setShowInningsEnd(false)}>
-            <Text style={[s.cancelTxt, {color: COLORS.orange}]}>Undo Last Ball — Stay Here</Text>
+            <Text style={[s.cancelTxt, {color: COLORS.orange}]}>Undo Last Ball ï¿½ Stay Here</Text>
           </TouchableOpacity>
           {match.currentInnings === 1 ? (
             <>
@@ -1065,7 +1076,7 @@ export default function ScoringScreen({ route, navigation }: any) {
 
       <Modal visible={showRunOutPicker} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>
-          <Text style={s.mTitle}>Run Out — Who is Out?</Text>
+          <Text style={s.mTitle}>Run Out â€” Who is Out?</Text>
           <Text style={{color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 16}}>A run out can happen at either end. Select the dismissed batter.</Text>
           <TouchableOpacity style={[s.endBtn, {borderColor: COLORS.yellow, marginBottom: 12}]} onPress={() => handleRunOutWho("striker")}>
             <Text style={{color: COLORS.yellow, fontSize: 15, fontWeight: "bold", textAlign: "center"}}>* {getName(batP, inn?.strikerId)}</Text>
@@ -1083,7 +1094,7 @@ export default function ScoringScreen({ route, navigation }: any) {
 
       <Modal visible={showRunOutFielder} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>
-          <Text style={s.mTitle}>Run Out — Select Fielder</Text>
+          <Text style={s.mTitle}>Run Out â€” Select Fielder</Text>
           <Text style={{color: COLORS.textSecondary, fontSize: 12, textAlign: "center", marginBottom: 14}}>Who effected the run out?</Text>
           <ScrollView style={{maxHeight: 300}}>
             {bolP.map((p: any) => (
@@ -1100,7 +1111,7 @@ export default function ScoringScreen({ route, navigation }: any) {
 
       <Modal visible={showWDRuns} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>
-          <Text style={s.mTitle}>Wide — Select Runs</Text>
+          <Text style={s.mTitle}>Wide â€” Select Runs</Text>
           <Text style={{ color: COLORS.textSecondary, fontSize: 12, textAlign: "center", marginBottom: 14 }}>1 wide run always added. Select extra runs scored.</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center", marginBottom: 14 }}>
             {["0","1","2","3","4","5"].map(r => (
@@ -1117,7 +1128,7 @@ export default function ScoringScreen({ route, navigation }: any) {
 
       <Modal visible={showNBRuns} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>
-          <Text style={s.mTitle}>No Ball — Select Runs</Text>
+          <Text style={s.mTitle}>No Ball â€” Select Runs</Text>
           <Text style={{ color: COLORS.textSecondary, fontSize: 12, textAlign: "center", marginBottom: 14 }}>1 no ball run always added. Select bat/extra runs scored.</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center", marginBottom: 14 }}>
             {["0","1","2","3","4","5","6"].map(r => (

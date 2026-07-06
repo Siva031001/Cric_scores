@@ -276,6 +276,86 @@ export const getMatchesForPlayer = async (globalPlayerId) => {
 };
 
 // ───────────────────────────────────────────────────────────
+// PHONE-BASED PLAYER LINKING
+// ───────────────────────────────────────────────────────────
+
+export const findAccountByPhone = async (phoneNumber: string) => {
+  const key = phoneNumber.replace(/\D/g, '');
+  if (!key) return null;
+  const snap = await database().ref('pinAuth/' + key).once('value');
+  const record = snap.val();
+  if (!record) return null;
+  return { phoneNumber: key, uid: record.uid ?? null };
+};
+
+// Links every existing Guest player record matching this phone number to the
+// newly-registered account's globalPlayerId. Idempotent — safe to call
+// multiple times; already-linked players are skipped.
+export const retroactivelyLinkGuestPlayers = async (phoneNumber: string, globalPlayerId: string) => {
+  const key = phoneNumber.replace(/\D/g, '');
+  if (!key || !globalPlayerId) return;
+  const snap = await database().ref('players').orderByChild('phoneNumber').equalTo(key).once('value');
+  const updates: Record<string, any> = {};
+  snap.forEach((child: any) => {
+    const v = child.val();
+    if (v?.playerType === 'GUEST' && v?.accountId == null) {
+      updates[child.key + '/accountId'] = globalPlayerId;
+      updates[child.key + '/playerType'] = 'REGISTERED';
+      updates[child.key + '/linkedAt'] = Date.now();
+    }
+  });
+  if (Object.keys(updates).length > 0) {
+    await database().ref('players').update(updates);
+  }
+};
+
+// Creates (or reuses) a guest player identified by phone number + a
+// temporary display name, for use when the phone number has no account yet.
+// Storing phoneNumber is mandatory so future registration can retroactively
+// link this record via retroactivelyLinkGuestPlayers().
+export const createGuestPlayerByPhone = async (phoneNumber: string, displayName: string) => {
+  const key = phoneNumber.replace(/\D/g, '');
+  const user = getCurrentUser();
+  if (!user) throw new Error('Not authenticated');
+  // Reuse an existing guest record for this phone number if one already
+  // exists, instead of creating a duplicate Global Player each match.
+  const existingSnap = await database().ref('players').orderByChild('phoneNumber').equalTo(key).once('value');
+  let existingId: string | null = null;
+  existingSnap.forEach((child: any) => {
+    if (!existingId && child.val()?.playerType === 'GUEST') existingId = child.key;
+  });
+  if (existingId) {
+    await database().ref('players/' + existingId).update({ name: displayName });
+    return existingId;
+  }
+  const playerId = 'P' + Math.random().toString(36).substring(2, 10).toUpperCase();
+  await database().ref('players/' + playerId).set({
+    playerId,
+    name: displayName,
+    phoneNumber: key,
+    accountId: null,
+    playerType: 'GUEST',
+    createdBy: user.uid,
+    createdAt: Date.now(),
+  });
+  return playerId;
+};
+
+// Looks up a player-master record directly by globalPlayerId — used to pull
+// registered name/stats context after findAccountByPhone confirms an account.
+export const getPlayerMasterByAccountPhone = async (phoneNumber: string) => {
+  const key = phoneNumber.replace(/\D/g, '');
+  const snap = await database().ref('players').orderByChild('phoneNumber').equalTo(key).once('value');
+  let found: any = null;
+  snap.forEach((child: any) => {
+    const v = child.val();
+    if (v?.playerType === 'REGISTERED' && !found) found = { ...v, id: child.key };
+  });
+  return found;
+};
+
+
+// ───────────────────────────────────────────────────────────
 // TOURNAMENT MATCH COMPLETION
 // ───────────────────────────────────────────────────────────
 

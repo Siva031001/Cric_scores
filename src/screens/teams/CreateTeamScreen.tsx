@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import { saveTeam, updateTeam, getMyTeams, formatPlayerName, formatTeamName, ensureMyPlayerLinked, createPlayerMaster, getMyLinkedPlayerId } from '../../utils/firebase';
+import { saveTeam, updateTeam, getMyTeams, formatPlayerName, formatTeamName, ensureMyPlayerLinked, createPlayerMaster, getMyLinkedPlayerId, findAccountByPhone, createGuestPlayerByPhone, getPlayerMasterByAccountPhone } from '../../utils/firebase';
 import { Player } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
@@ -10,9 +10,21 @@ import AppIcon from '../../components/AppIcon';
 const ROLES = ['Batter', 'Bowler', 'Wicket Keeper', 'All Rounder'];
 const BAT_STYLES = ['Right Hand', 'Left Hand'];
 
-function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, onExpand, expandedId, onFieldChange, onTogglePlayerType }: any) {
+function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, onExpand, expandedId, onFieldChange, onPhoneLookup }: any) {
   const [localName, setLocalName] = useState(player.name || '');
+  const [localPhone, setLocalPhone] = useState(player.phoneNumber || '');
+  const [lookupStatus, setLookupStatus] = useState<'idle'|'checking'|'linked'|'guest'>(
+    player.accountStatus ?? 'idle'
+  );
   const isExpanded = expandedId === player.id;
+
+  const handlePhoneBlur = async () => {
+    const digits = localPhone.replace(/\D/g, '');
+    if (digits.length !== 10) return;
+    setLookupStatus('checking');
+    await onPhoneLookup(index, digits, setLocalName, setLookupStatus);
+  };
+
   return (
     <View style={styles.playerCard}>
       <View style={styles.playerHeader}>
@@ -20,7 +32,7 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
           <Text style={styles.playerNum}>{index + 1}</Text>
         </View>
         <TextInput
-          style={styles.playerInput}
+          style={[styles.playerInput, { flex: 1.1 }]}
           placeholder={`Player ${index + 1}${index < 11 ? ' *' : ''}`}
           placeholderTextColor={COLORS.textMuted}
           value={localName}
@@ -29,6 +41,17 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
           returnKeyType="next"
           autoCorrect={false}
           autoCapitalize="words"
+          editable={lookupStatus !== 'linked'}
+        />
+        <TextInput
+          style={[styles.playerInput, { flex: 0.9 }]}
+          placeholder="Phone number"
+          placeholderTextColor={COLORS.textMuted}
+          value={localPhone}
+          onChangeText={setLocalPhone}
+          onBlur={handlePhoneBlur}
+          keyboardType="phone-pad"
+          maxLength={10}
         />
         <TouchableOpacity style={[styles.roleBtn, captainId === player.id && styles.captainActive]} onPress={() => onCaptain(player.id)}>
           <Text style={styles.roleBtnText}>C</Text>
@@ -36,13 +59,19 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
         <TouchableOpacity style={[styles.roleBtn, wicketKeeperId === player.id && styles.wkActive]} onPress={() => onWK(player.id)}>
           <Text style={styles.roleBtnText}>WK</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.roleBtn, player.playerType === 'registered' && styles.regActive]} onPress={() => onTogglePlayerType(player.id)}>
-          <Text style={styles.roleBtnText}>{player.playerType === 'registered' ? 'Me' : 'Guest'}</Text>
-        </TouchableOpacity>
         <TouchableOpacity onPress={() => onExpand(player.id)}>
           <Text style={styles.expandBtn}>{isExpanded ? '-' : '+'}</Text>
         </TouchableOpacity>
       </View>
+      {lookupStatus === 'checking' && (
+        <Text style={{ color: COLORS.textMuted, fontSize: 11, paddingHorizontal: 10, paddingBottom: 6 }}>Checking phone number...</Text>
+      )}
+      {lookupStatus === 'linked' && (
+        <Text style={{ color: COLORS.primary, fontSize: 11, paddingHorizontal: 10, paddingBottom: 6 }}>✓ Linked to registered account</Text>
+      )}
+      {lookupStatus === 'guest' && (
+        <Text style={{ color: COLORS.orange, fontSize: 11, paddingHorizontal: 10, paddingBottom: 6 }}>No account yet — playing as guest</Text>
+      )}
       {isExpanded && (
         <View style={styles.playerDetails}>
           <Text style={styles.detailLabel}>Role</Text>
@@ -88,7 +117,7 @@ export default function CreateTeamScreen({ route, navigation }: any) {
   const initPlayers = () => {
     if (existingTeam?.players?.length > 0) {
       const existing = existingTeam.players.map((p: any) => ({ ...p }));
-      while (existing.length < 15) existing.push({ id: existing.length, name: '', role: 'Batter', battingStyle: 'Right Hand', bowlingStyle: '', playerType: 'guest', globalPlayerId: null });
+        while (existing.length < 15) existing.push({ id: existing.length, name: '', role: 'Batter', battingStyle: 'Right Hand', bowlingStyle: '', playerType: 'guest', phoneNumber: '', globalPlayerId: null });
       return existing.slice(0, 15);
     }
     return Array.from({ length: 15 }, (_, i) => ({ id: i, name: '', role: 'Batter', battingStyle: 'Right Hand', bowlingStyle: '', playerType: 'guest', globalPlayerId: null }));
@@ -108,16 +137,43 @@ export default function CreateTeamScreen({ route, navigation }: any) {
   const handleWK = useCallback((id: any) => setWicketKeeperId((prev: any) => prev === id ? null : id), []);
     const handleExpand = useCallback((id: any) => setExpandedId((prev: any) => prev === id ? null : id), []);
 
-  const handleTogglePlayerType = useCallback((id: any) => {
-    setPlayers((prev: any[]) => prev.map((p: any) => {
-      if (p.id === id) {
-        return { ...p, playerType: p.playerType === 'registered' ? 'guest' : 'registered' };
-      }
-      // Only one "registered (me)" slot allowed per team
-      if (p.playerType === 'registered') return { ...p, playerType: 'guest' };
-      return p;
-    }));
-  }, []);
+  const handlePhoneLookup = useCallback(async (index: number, phone: string, setLocalName: (n: string) => void, setLookupStatus: (s: any) => void) => {
+  // Prevent duplicate phone numbers within the same team.
+  const dupe = players.some((p: any, i: number) => i !== index && p.phoneNumber === phone);
+  if (dupe) {
+    Alert.alert('Duplicate Number', 'This phone number is already used by another player in this team.');
+    setLookupStatus('idle');
+    return;
+  }
+  try {
+    const account = await findAccountByPhone(phone);
+    if (account) {
+      const master = await getPlayerMasterByAccountPhone(phone);
+      const name = master?.name ?? '';
+      if (name) setLocalName(name);
+      setPlayers((prev: any[]) => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], phoneNumber: phone, playerType: 'registered', name: name || updated[index].name, globalPlayerId: master?.id ?? null };
+        return updated;
+      });
+      setLookupStatus('linked');
+    } else {
+      Alert.alert(
+        'No Account Found',
+        'This phone number has not been registered. Stats will not be permanently tracked until this phone number creates an account. You can still enter a temporary display name for this match.'
+      );
+      setPlayers((prev: any[]) => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], phoneNumber: phone, playerType: 'guest', globalPlayerId: null };
+        return updated;
+      });
+      setLookupStatus('guest');
+    }
+  } catch (e: any) {
+    Alert.alert('Error', 'Could not check phone number: ' + (e?.message ?? 'network error'));
+    setLookupStatus('idle');
+  }
+}, [players]);
 
   const handleFieldChange = useCallback((index: number, field: string, value: string) => {
     setPlayers((prev: any[]) => {
@@ -146,16 +202,19 @@ export default function CreateTeamScreen({ route, navigation }: any) {
       for (const p of filled) {
         const formattedName = formatPlayerName(p.name);
         let globalPlayerId = p.globalPlayerId ?? null;
-        if (p.playerType === 'registered') {
-          globalPlayerId = await ensureMyPlayerLinked(formattedName);
-        } else if (!globalPlayerId) {
+          if (p.playerType === 'registered' && globalPlayerId) {
+          // Already linked via phone lookup — nothing further to create.
+          } else if (p.phoneNumber) {
+            globalPlayerId = await createGuestPlayerByPhone(p.phoneNumber, formattedName);
+          } else if (!globalPlayerId) {
+         // No phone entered at all — fallback so match creation never blocks.
           globalPlayerId = await createPlayerMaster(formattedName, 'guest');
         }
-        finalPlayers.push({
-          id: p.id, name: formattedName, role: p.role ?? 'Batter',
-          battingStyle: p.battingStyle ?? 'Right Hand', bowlingStyle: p.bowlingStyle ?? '',
-          isCaptain: p.id === captainId, isWicketKeeper: p.id === wicketKeeperId,
-          playerType: p.playerType ?? 'guest', globalPlayerId,
+          finalPlayers.push({
+            id: p.id, name: formattedName, role: p.role ?? 'Batter',
+            battingStyle: p.battingStyle ?? 'Right Hand', bowlingStyle: p.bowlingStyle ?? '',
+            isCaptain: p.id === captainId, isWicketKeeper: p.id === wicketKeeperId,
+            playerType: p.playerType ?? 'guest', phoneNumber: p.phoneNumber ?? null, globalPlayerId,
         });
       }
       const formattedTeamName = formatTeamName(name);
@@ -246,7 +305,7 @@ export default function CreateTeamScreen({ route, navigation }: any) {
         data={players} keyExtractor={(item: any) => `p-${item.id}`}
         renderItem={({ item, index }: any) => (
           <PlayerRow player={item} index={index} captainId={captainId} wicketKeeperId={wicketKeeperId}
-            onCaptain={handleCaptain} onWK={handleWK} onExpand={handleExpand} expandedId={expandedId} onFieldChange={handleFieldChange} onTogglePlayerType={handleTogglePlayerType} />
+            onCaptain={handleCaptain} onWK={handleWK} onExpand={handleExpand} expandedId={expandedId} onFieldChange={handleFieldChange} onPhoneLookup={handlePhoneLookup} />
         )}
         removeClippedSubviews={false}
         ListFooterComponent={

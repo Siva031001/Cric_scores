@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { getMatchHistory } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import AppIcon from '../../components/AppIcon';
 
 // -- Ball-result run helper (mirrors cricketLogic's rotation logic but
 // returns TOTAL runs added to the team for a ball, used for partnerships) --
@@ -224,10 +225,10 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   };
 
   const TABS = [
-    { key: 'overview', label: 'Matches',  icon: '??' },
-    { key: 'batting',  label: 'Batting',  icon: '??' },
-    { key: 'bowling',  label: 'Bowling',  icon: '??' },
-    { key: 'fielding', label: 'Fielding', icon: '??' },
+    { key: 'overview', label: 'Matches',  icon: '📋' },
+    { key: 'batting',  label: 'Batting',  icon: '🏏' },
+    { key: 'bowling',  label: 'Bowling',  icon: '🎯' },
+    { key: 'fielding', label: 'Fielding', icon: '🧤' },
   ];
 
   const COUNTERS = [
@@ -305,7 +306,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
       <View style={s.tabs}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[s.tab, tab === t.key && s.tabActive]} onPress={() => setTab(t.key as any)} activeOpacity={0.7}>
-            <Text style={s.tabIcon}>{t.icon}</Text>
+            <AppIcon emoji={t.icon} size={15} color={tab === t.key ? COLORS.primary : COLORS.textSecondary} />
             <Text style={[s.tabTxt, tab === t.key && s.tabTxtActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
@@ -328,7 +329,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.partnershipNames}>{p.names}</Text>
-                      <Text style={s.partnershipSub}>vs {p.opponent}{p.date ? ' � ' + p.date : ''}</Text>
+                      <Text style={s.partnershipSub}>vs {p.opponent}{p.date ? ' • ' + p.date : ''}</Text>
                     </View>
                     <Text style={s.partnershipRuns}>{p.runs}{p.unbeaten ? '*' : ''} <Text style={s.partnershipBalls}>({p.balls})</Text></Text>
                   </View>
@@ -338,7 +339,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
             {filteredMatches.length === 0 ? (
               <View style={s.empty}>
-                <Text style={s.emptyIcon}>??</Text>
+                <AppIcon emoji="📭" size={40} color={COLORS.textMuted} />
                 <Text style={s.emptyTxt}>{filter === 'all' ? 'No matches yet' : 'No ' + filter + ' matches'}</Text>
                 <Text style={s.emptySub}>Start a new match to see it appear here.</Text>
                 {filter === 'all' && (
@@ -358,19 +359,24 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         {m.tournamentId ? (
                           <View style={[s.mBadge, { backgroundColor: COLORS.yellow + '33', borderColor: COLORS.yellow + '55' }]}>
-                            <Text style={[s.mBadgeTxt, { color: COLORS.yellow }]}>?? Tournament</Text>
+                            <AppIcon emoji="🏆" size={10} color={COLORS.yellow} />
                           </View>
                         ) : null}
                         <View style={[s.mBadge, m.status === 'live' ? s.mBadgeLive : m.status === 'paused' ? s.mBadgePaused : s.mBadgeDone]}>
                           <Text style={[s.mBadgeTxt, m.status === 'live' && { color: COLORS.red }, m.status === 'paused' && { color: COLORS.orange }, m.status === 'completed' && { color: COLORS.primary }]}>
-                            {m.status === 'live' ? '? Live' : m.status === 'paused' ? '? Paused' : '? Done'}
+                            {m.status === 'live' ? 'Live' : m.status === 'paused' ? 'Paused' : 'Done'}
                           </Text>
                         </View>
                       </View>
                     </View>
 
                     <Text style={s.mTeams}>{m.team1} <Text style={s.mVsInline}>vs</Text> {m.team2}</Text>
-                    {m.venue ? <Text style={s.mVenue}>?? {m.venue}</Text> : null}
+                    {m.venue ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                             <AppIcon emoji="📍" size={12} color={COLORS.textSecondary} />
+                             <Text style={s.mVenue}>{m.venue}</Text>
+                          </View>
+                            ) : null}
 
                     <View style={s.mScoresBlock}>
                       <View style={s.mScoreRow}>
@@ -386,7 +392,10 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
                     {m.winner ? (
                       <View style={s.mWinnerBanner}>
-                        <Text style={s.mWinnerTxt}>?? {m.winner}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <AppIcon emoji="🏆" size={12} color={COLORS.yellow} />
+                          <Text style={s.mWinnerTxt}>{m.winner}</Text>
+                        </View>
                       </View>
                     ) : null}
                   </TouchableOpacity>
@@ -400,7 +409,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
           <View style={s.statsArea}>
             {Object.keys(batMap).length === 0 ? (
               <View style={s.empty}>
-                <Text style={s.emptyIcon}>??</Text>
+                <AppIcon emoji="📭" size={40} color={COLORS.textMuted} />
                 <Text style={s.emptyTxt}>No batting stats yet</Text>
                 <Text style={s.emptySub}>Stats appear here after you score matches where your team bats first (team1)</Text>
               </View>
@@ -456,7 +465,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
           <View style={s.statsArea}>
             {Object.keys(bolMap).length === 0 ? (
               <View style={s.empty}>
-                <Text style={s.emptyIcon}>??</Text>
+                <AppIcon emoji="📭" size={40} color={COLORS.textMuted} />
                 <Text style={s.emptyTxt}>No bowling stats yet</Text>
                 <Text style={s.emptySub}>Stats appear after your team bowls in the 2nd innings</Text>
               </View>
@@ -513,14 +522,14 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
             <SectionHeader title="Fielding Overview" />
             <View style={s.fieldSummary}>
               {[
-                { icon: '??', label: 'Catches',   value: fieldTotals.catches,   color: COLORS.blue },
-                { icon: '??', label: 'Run Outs',  value: fieldTotals.runOuts,   color: COLORS.orange },
-                { icon: '??', label: 'Stumpings', value: fieldTotals.stumpings, color: COLORS.purple },
-                { icon: '??', label: 'Matches',   value: typeFilteredMatches.length, color: COLORS.primary },
+                { icon: '🧤', label: 'Catches',   value: fieldTotals.catches,   color: COLORS.blue },
+                { icon: '🏃', label: 'Run Outs',  value: fieldTotals.runOuts,   color: COLORS.orange },
+                { icon: '🥅', label: 'Stumpings', value: fieldTotals.stumpings, color: COLORS.purple },
+                { icon: '📋', label: 'Matches',   value: typeFilteredMatches.length, color: COLORS.primary },
               ].map((f, i) => (
                 <View key={i} style={[s.fieldingBox, { borderColor: f.color + '55' }]}>
                   <View style={[s.fieldingIcon, { backgroundColor: f.color + '22' }]}>
-                    <Text style={s.fieldingIconTxt}>{f.icon}</Text>
+                    <AppIcon emoji={f.icon} size={20} color={f.color} />
                   </View>
                   <Text style={[s.fieldingVal, { color: f.color }]}>{f.value}</Text>
                   <Text style={s.fieldingLbl}>{f.label}</Text>
@@ -530,7 +539,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
             {fieldRows.length === 0 ? (
               <View style={s.empty}>
-                <Text style={s.emptyIcon}>??</Text>
+                <AppIcon emoji="📭" size={40} color={COLORS.textMuted} />
                 <Text style={s.emptyTxt}>No fielding stats yet</Text>
                 <Text style={s.emptySub}>
                   Fielding stats are recorded when you select a fielder during Caught, Stumped, or Run Out dismissals while scoring.

@@ -6,6 +6,7 @@ import { PlayerRole, BattingStyle } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ROLES: PlayerRole[] = ['Batter', 'Bowler', 'Wicket Keeper', 'All Rounder'];
 const BATTING_STYLES: BattingStyle[] = ['Right Hand', 'Left Hand'];
@@ -25,18 +26,23 @@ export default function ProfileEditScreen({ navigation }: any) {
   const [showCountry, setShowCountry] = useState(false);
 
   useEffect(() => {
-    getUserProfile().then(p => {
-      if (p) {
-        setName(p.name ?? '');
-        setMobile(p.mobile ?? '');
-        setEmail(p.email ?? '');
-        setRole(p.role ?? 'Batter');
-        setBattingStyle(p.battingStyle ?? 'Right Hand');
-        setBowlingStyle(p.bowlingStyle ?? '');
-        setCountry(p.country ?? 'India');
-        setPhoto(p.photo ?? null);
-      }
-    }).finally(() => setLoading(false));
+  (async () => {
+    const loginPhone = await AsyncStorage.getItem('cricketscorer_phone');
+    const p = await getUserProfile();
+    if (p) {
+      setName(p.name ?? '');
+      setEmail(p.email ?? '');
+      setRole(p.role ?? 'Batter');
+      setBattingStyle(p.battingStyle ?? 'Right Hand');
+      setBowlingStyle(p.bowlingStyle ?? '');
+      setCountry(p.country ?? 'India');
+      setPhoto(p.photo ?? null);
+    }
+    // Mobile number always reflects the number used to log in — not
+    // editable here, since it's the account identity used by pinAuth.
+    setMobile(loginPhone ?? p?.mobile ?? '');
+    setLoading(false);
+  })();
   }, []);
 
   const pickPhoto = () => {
@@ -81,7 +87,10 @@ export default function ProfileEditScreen({ navigation }: any) {
           <Text style={styles.label}>Full Name *</Text>
           <TextInput style={styles.input} placeholder="Enter your name" placeholderTextColor={COLORS.textMuted} value={name} onChangeText={setName} />
           <Text style={styles.label}>Mobile Number</Text>
-          <TextInput style={styles.input} placeholder="Enter mobile number" placeholderTextColor={COLORS.textMuted} value={mobile} onChangeText={setMobile} keyboardType="phone-pad" />
+            <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card2 }]}>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 15, flex: 1 }}>{mobile ? '+91 ' + mobile : 'Not set'}</Text>
+          <AppIcon emoji="🔒" size={14} color={COLORS.textMuted} />
+          </View>
           <Text style={styles.label}>Email ID</Text>
           <TextInput style={styles.input} placeholder="Enter email address" placeholderTextColor={COLORS.textMuted} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
           <Text style={styles.label}>Playing Role</Text>
