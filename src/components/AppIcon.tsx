@@ -48,6 +48,7 @@ const EMOJI_TO_ICON: Record<string, string> = {
   "🔒": "lock",
   "📭": "inbox",
   "🥅": "soccer-goal",
+  "←": "arrow-left"
 };
 
 export default function AppIcon({

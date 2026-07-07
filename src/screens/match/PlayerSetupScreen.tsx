@@ -5,7 +5,7 @@ import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
 
 export default function PlayerSetupScreen({ route, navigation }: any) {
-  const { team1, team2, overs, venue, team1Players, team2Players, team1Logo, team2Logo, tournamentId, tournamentMatchId } = route.params;
+  const { team1, team2, overs, venue, ballType, team1Players, team2Players, team1Logo, team2Logo, tournamentId, tournamentMatchId } = route.params;
   const [selected1, setSelected1] = useState<number[]>([]);
   const [selected2, setSelected2] = useState<number[]>([]);
   const [activeTeam, setActiveTeam] = useState<1|2>(1);
@@ -35,7 +35,7 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
     if (!tossChoice) { Alert.alert("Error", "Select Bat or Bowl"); return; }
     const playing1 = (team1Players as Player[]).filter(p => selected1.includes(p.id));
     const playing2 = (team2Players as Player[]).filter(p => selected2.includes(p.id));
-    navigation.navigate("BattingSetup", { team1, team2, overs, venue, team1Players: playing1, team2Players: playing2, team1Logo, team2Logo, tossWinner, tossChoice, tournamentId, tournamentMatchId });
+    navigation.navigate("BattingSetup", { team1, team2, overs, venue, ballType, team1Players: playing1, team2Players: playing2, team1Logo, team2Logo, tossWinner, tossChoice, tournamentId, tournamentMatchId });
   };
 
   if (step === "toss") {

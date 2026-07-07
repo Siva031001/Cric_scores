@@ -1,8 +1,9 @@
-import 'react-native-gesture-handler';
+﻿import 'react-native-gesture-handler';
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import AppIcon from "./src/components/AppIcon";
 import LoginScreen from "./src/screens/auth/LoginScreen";
 import ForgotPasswordScreen from "./src/screens/auth/ForgotPasswordScreen";
 import HomeScreen from "./src/screens/home/HomeScreen";
@@ -52,7 +53,7 @@ function SplashScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#0a1628', justifyContent: 'center', alignItems: 'center' }}>
       <Animated.View style={{ alignItems: 'center', opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
-        <Text style={{ fontSize: 80, marginBottom: 16 }}>??</Text>
+        <AppIcon emoji="🏏" size={80} color="#fff" style={{ marginBottom: 16 }} />
         <Text style={{ color: '#ffffff', fontSize: 36, fontWeight: 'bold' }}>CricketScorer</Text>
         <Text style={{ color: '#4ade80', fontSize: 16, marginTop: 8 }}>Your cricket companion</Text>
       </Animated.View>

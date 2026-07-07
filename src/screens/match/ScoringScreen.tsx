@@ -17,6 +17,7 @@ import {
 } from "../../utils/cricketLogic";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
+import AppIcon from '../../components/AppIcon';
 
 export default function ScoringScreen({ route, navigation }: any) {
   const { matchId } = route.params ?? {};
@@ -726,7 +727,7 @@ export default function ScoringScreen({ route, navigation }: any) {
 
       {byeMode && (
         <View style={s.modeBanner}>
-          <Text style={s.modeTxt}>{byeMode} � tap a run button</Text>
+          <Text style={s.modeTxt}>{byeMode} — tap a run button</Text>
           <TouchableOpacity onPress={() => setByeMode(null)}><Text style={s.modeCancel}>Cancel</Text></TouchableOpacity>
         </View>
       )}
@@ -864,7 +865,7 @@ export default function ScoringScreen({ route, navigation }: any) {
         <View style={s.mOverlay}><View style={s.modal}>
           <View style={{flexDirection:"row", alignItems:"center", marginBottom: 14}}>
             <TouchableOpacity onPress={() => { setShowEndMatch(false); setShowEndConfirm(true); }} style={{marginRight: 10}}>
-              <Text style={{color: COLORS.primary, fontSize: 22, fontWeight:"bold"}}>?</Text>
+              <AppIcon emoji="←" size={22} color={COLORS.primary} />
             </TouchableOpacity>
             <Text style={[s.mTitle, {marginBottom: 0, flex: 1}]}>Select Reason</Text>
           </View>
@@ -890,7 +891,7 @@ export default function ScoringScreen({ route, navigation }: any) {
             You can Undo last ball before proceeding
           </Text>
           <TouchableOpacity style={s.cancelBtn} onPress={() => setShowInningsEnd(false)}>
-            <Text style={[s.cancelTxt, {color: COLORS.orange}]}>Undo Last Ball � Stay Here</Text>
+            <Text style={[s.cancelTxt, {color: COLORS.orange}]}>Undo Last Ball — Stay Here</Text>
           </TouchableOpacity>
           {match.currentInnings === 1 ? (
             <>

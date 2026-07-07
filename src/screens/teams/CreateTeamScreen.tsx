@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, FlatList, KeyboardAvoidingView, Platform, Modal  } from 'react-native';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { saveTeam, updateTeam, getMyTeams, formatPlayerName, formatTeamName, ensureMyPlayerLinked, createPlayerMaster, getMyLinkedPlayerId, findAccountByPhone, createGuestPlayerByPhone, getPlayerMasterByAccountPhone } from '../../utils/firebase';
 import { Player } from '../../types/cricket';
@@ -7,14 +7,14 @@ import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 
+
 const ROLES = ['Batter', 'Bowler', 'Wicket Keeper', 'All Rounder'];
 const BAT_STYLES = ['Right Hand', 'Left Hand'];
 
 function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, onExpand, expandedId, onFieldChange, onPhoneLookup }: any) {
-  const [localName, setLocalName] = useState(player.name || '');
   const [localPhone, setLocalPhone] = useState(player.phoneNumber || '');
   const [lookupStatus, setLookupStatus] = useState<'idle'|'checking'|'linked'|'guest'>(
-    player.accountStatus ?? 'idle'
+    player.phoneNumber ? (player.playerType === 'registered' ? 'linked' : 'guest') : 'idle'
   );
   const isExpanded = expandedId === player.id;
 
@@ -22,7 +22,7 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
     const digits = localPhone.replace(/\D/g, '');
     if (digits.length !== 10) return;
     setLookupStatus('checking');
-    await onPhoneLookup(index, digits, setLocalName, setLookupStatus);
+    await onPhoneLookup(index, digits, () => {}, setLookupStatus);
   };
 
   return (
@@ -32,20 +32,8 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
           <Text style={styles.playerNum}>{index + 1}</Text>
         </View>
         <TextInput
-          style={[styles.playerInput, { flex: 1.1 }]}
-          placeholder={`Player ${index + 1}${index < 11 ? ' *' : ''}`}
-          placeholderTextColor={COLORS.textMuted}
-          value={localName}
-          onChangeText={text => { setLocalName(text); onFieldChange(index, '_name', text); }}
-          blurOnSubmit={false}
-          returnKeyType="next"
-          autoCorrect={false}
-          autoCapitalize="words"
-          editable={lookupStatus !== 'linked'}
-        />
-        <TextInput
-          style={[styles.playerInput, { flex: 0.9 }]}
-          placeholder="Phone number"
+          style={[styles.playerInput, { flex: 1.2 }]}
+          placeholder={`Phone number ${index < 11 ? '*' : ''}`}
           placeholderTextColor={COLORS.textMuted}
           value={localPhone}
           onChangeText={setLocalPhone}
@@ -53,6 +41,11 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
           keyboardType="phone-pad"
           maxLength={10}
         />
+        {lookupStatus !== 'idle' && lookupStatus !== 'checking' && (
+          <Text style={{ color: COLORS.text, fontSize: 13, flex: 1, paddingHorizontal: 4 }} numberOfLines={1}>
+            {player.name || '(no name)'}
+          </Text>
+        )}
         <TouchableOpacity style={[styles.roleBtn, captainId === player.id && styles.captainActive]} onPress={() => onCaptain(player.id)}>
           <Text style={styles.roleBtnText}>C</Text>
         </TouchableOpacity>
@@ -111,6 +104,8 @@ export default function CreateTeamScreen({ route, navigation }: any) {
   const [captainId, setCaptainId] = useState(existingTeam?.players?.find((p: any) => p.isCaptain)?.id ?? null);
   const [wicketKeeperId, setWicketKeeperId] = useState(existingTeam?.players?.find((p: any) => p.isWicketKeeper)?.id ?? null);
   const [expandedId, setExpandedId] = useState(null);
+  const [namePromptFor, setNamePromptFor] = useState<number | null>(null);
+  const [namePromptValue, setNamePromptValue] = useState('');
   const initTeamType = route.params?.defaultTeamType ?? existingTeam?.teamType ?? 'my';
   const [teamType, setTeamType] = useState<'my'|'other'>(initTeamType);
 
@@ -138,7 +133,6 @@ export default function CreateTeamScreen({ route, navigation }: any) {
     const handleExpand = useCallback((id: any) => setExpandedId((prev: any) => prev === id ? null : id), []);
 
   const handlePhoneLookup = useCallback(async (index: number, phone: string, setLocalName: (n: string) => void, setLookupStatus: (s: any) => void) => {
-  // Prevent duplicate phone numbers within the same team.
   const dupe = players.some((p: any, i: number) => i !== index && p.phoneNumber === phone);
   if (dupe) {
     Alert.alert('Duplicate Number', 'This phone number is already used by another player in this team.');
@@ -158,22 +152,36 @@ export default function CreateTeamScreen({ route, navigation }: any) {
       });
       setLookupStatus('linked');
     } else {
-      Alert.alert(
-        'No Account Found',
-        'This phone number has not been registered. Stats will not be permanently tracked until this phone number creates an account. You can still enter a temporary display name for this match.'
-      );
       setPlayers((prev: any[]) => {
         const updated = [...prev];
         updated[index] = { ...updated[index], phoneNumber: phone, playerType: 'guest', globalPlayerId: null };
         return updated;
       });
       setLookupStatus('guest');
+      Alert.alert(
+        'No Account Found',
+        'This phone number has not been registered. Stats will not be permanently tracked until this phone number creates an account.',
+        [{ text: 'OK', onPress: () => { setNamePromptValue(''); setNamePromptFor(index); } }]
+      );
     }
   } catch (e: any) {
     Alert.alert('Error', 'Could not check phone number: ' + (e?.message ?? 'network error'));
     setLookupStatus('idle');
   }
 }, [players]);
+
+const confirmNamePrompt = useCallback(() => {
+  if (namePromptFor === null) return;
+  const name = namePromptValue.trim();
+  if (!name) { Alert.alert('Error', 'Please enter a display name'); return; }
+  setPlayers((prev: any[]) => {
+    const updated = [...prev];
+    updated[namePromptFor] = { ...updated[namePromptFor], name };
+    return updated;
+  });
+  setNamePromptFor(null);
+  setNamePromptValue('');
+}, [namePromptFor, namePromptValue]);
 
   const handleFieldChange = useCallback((index: number, field: string, value: string) => {
     setPlayers((prev: any[]) => {
@@ -183,13 +191,15 @@ export default function CreateTeamScreen({ route, navigation }: any) {
     });
   }, []);
 
-  const handleSave = async () => {
+    const fromTournament = route.params?.fromTournament ?? false;
+    const tournamentIdParam = route.params?.tournamentId ?? null;
+    const handleSave = async () => {
     const name = teamNameRef.current.trim();
     if (!name) { Alert.alert('Error', 'Please enter team name'); return; }
     if (captainId === null) { Alert.alert('Error', 'Please select a Captain (tap C button)'); return; }
     if (wicketKeeperId === null) { Alert.alert('Error', 'Please select a Wicket Keeper (tap WK button)'); return; }
-    const filled = players.filter((p: any) => p.name?.trim());
-    if (filled.length < 11) { Alert.alert('Error', `Enter at least 11 player names (${filled.length} entered)`); return; }
+    const filled = players.filter((p: any) => p.phoneNumber?.trim() && p.name?.trim());
+      if (filled.length < 11) { Alert.alert('Error', `Enter phone number + name for at least 11 players (${filled.length} entered)`); return; }
     if (!filled.map((p: any) => p.id).includes(captainId)) { Alert.alert('Error', 'Captain must have a name'); return; }
     if (!filled.map((p: any) => p.id).includes(wicketKeeperId)) { Alert.alert('Error', 'Wicket Keeper must have a name'); return; }
     setSaving(true);
@@ -222,36 +232,42 @@ export default function CreateTeamScreen({ route, navigation }: any) {
         await updateTeam(existingTeam.id, { name, logo: logo ?? undefined, players: finalPlayers });
         Alert.alert('Updated!', `"${name}" updated.`, [{ text: 'OK', onPress: () => navigation.goBack() }]);
       } else {
-        await saveTeam({
+        const teamId = await saveTeam({
           name: formattedTeamName,
           logo: logo ?? undefined,
           players: finalPlayers,
           teamType
-        });
+          });
 
-        Alert.alert(
-          'Saved!',
-          '"' + formattedTeamName + '" saved as ' +
-          (teamType === 'my' ? 'My Team' : 'Other Team') +
-          '.',
-          [{
-            text: 'OK',
-            onPress: () => {
-              if (fromNewMatch) {
-                navigation.navigate('NewMatch', {
-                  savedTeam: {
-                    name: formattedTeamName,
-                    players: finalPlayers,
-                    logo
-                  },
-                  teamSlot
-                });
-              } else {
-                navigation.goBack();
-              }
-            }
-          }]
-        );
+Alert.alert(
+  'Saved!',
+  '"' + formattedTeamName + '" saved as ' +
+  (teamType === 'my' ? 'My Team' : 'Other Team') +
+  '.',
+  [{
+    text: 'OK',
+    onPress: async () => {
+      if (fromTournament && tournamentIdParam) {
+        try {
+          const database = require('@react-native-firebase/database').default;
+          const { updateTournament } = require('../../utils/firebase');
+          const snap = await database().ref('tournaments/' + tournamentIdParam).once('value');
+          const tournament = snap.val();
+          const newTeam = { teamId: teamId, teamName: formattedTeamName, logo, players: finalPlayers, played: 0, won: 0, lost: 0, tied: 0, nrr: 0, points: 0 };
+          await updateTournament(tournamentIdParam, { teams: [...(tournament?.teams ?? []), newTeam] });
+        } catch (e) { console.warn('Could not auto-add team to tournament', e); }
+        navigation.navigate('TournamentDetail', { tournamentId: tournamentIdParam });
+      } else if (fromNewMatch) {
+        navigation.navigate('NewMatch', {
+          savedTeam: { name: formattedTeamName, players: finalPlayers, logo },
+          teamSlot
+        });
+      } else {
+        navigation.goBack();
+      }
+    }
+  }]
+);
       }
     } catch (e: any) { Alert.alert('Error', e?.message); }
     finally { setSaving(false); }
@@ -297,7 +313,6 @@ export default function CreateTeamScreen({ route, navigation }: any) {
       <View style={styles.playersHeader}>
         <Text style={styles.playersTitle}>Players ({filledCount}/15) — Min 11 required</Text>
         <Text style={styles.playersHint}>C = Captain   WK = Keeper   +/- = Details</Text>
-        <Text style={[styles.playersHint, {marginTop: 4}]}>Tap 'Guest' on YOUR OWN row to mark it as 'Me' — only one player per team can be marked Me</Text>
       </View>
       <FlatList
         initialNumToRender={15} maxToRenderPerBatch={15} windowSize={10}
@@ -317,6 +332,29 @@ export default function CreateTeamScreen({ route, navigation }: any) {
           </View>
         }
       />
+
+      <Modal visible={namePromptFor !== null} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: SPACING.lg }}>
+          <View style={{ backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.border }}>
+            <Text style={{ color: COLORS.text, fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>Enter Display Name</Text>
+            <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 12 }}>
+              This is a temporary name for this match only — it will be replaced automatically once this number registers.
+            </Text>
+            <TextInput
+              style={{ backgroundColor: COLORS.background, color: COLORS.text, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16 }}
+              placeholder="e.g. King"
+              placeholderTextColor={COLORS.textMuted}
+              value={namePromptValue}
+              onChangeText={setNamePromptValue}
+              autoFocus
+              autoCapitalize="words"
+            />
+            <TouchableOpacity style={{ backgroundColor: COLORS.primary, padding: 14, borderRadius: RADIUS.md, alignItems: 'center' }} onPress={confirmNamePrompt}>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save Name</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

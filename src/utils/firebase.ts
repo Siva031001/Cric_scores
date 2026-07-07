@@ -219,6 +219,26 @@ export const getMyLinkedPlayerId = async () => {
   return foundId;
 };
 
+export const retroactivelyLinkGuestPlayers = async (phoneNumber: string, globalPlayerId: string) => {
+  const key = phoneNumber.replace(/\D/g, '');
+  if (!key || !globalPlayerId) return;
+  const user = getCurrentUser();
+  if (!user) return;
+  const snap = await database().ref('players').orderByChild('phoneNumber').equalTo(key).once('value');
+  const updates: Record<string, any> = {};
+  snap.forEach((child: any) => {
+    const v = child.val();
+    if (v?.playerType === 'GUEST' && v?.accountId == null) {
+      updates[child.key + '/accountId'] = user.uid;   // ← was globalPlayerId, must be Firebase uid
+      updates[child.key + '/playerType'] = 'REGISTERED';
+      updates[child.key + '/linkedAt'] = Date.now();
+    }
+  });
+  if (Object.keys(updates).length > 0) {
+    await database().ref('players').update(updates);
+  }
+};
+
 export const ensureMyPlayerLinked = async (displayName) => {
   const existing = await getMyLinkedPlayerId();
   if (existing) return existing;
@@ -288,26 +308,6 @@ export const findAccountByPhone = async (phoneNumber: string) => {
   return { phoneNumber: key, uid: record.uid ?? null };
 };
 
-// Links every existing Guest player record matching this phone number to the
-// newly-registered account's globalPlayerId. Idempotent — safe to call
-// multiple times; already-linked players are skipped.
-export const retroactivelyLinkGuestPlayers = async (phoneNumber: string, globalPlayerId: string) => {
-  const key = phoneNumber.replace(/\D/g, '');
-  if (!key || !globalPlayerId) return;
-  const snap = await database().ref('players').orderByChild('phoneNumber').equalTo(key).once('value');
-  const updates: Record<string, any> = {};
-  snap.forEach((child: any) => {
-    const v = child.val();
-    if (v?.playerType === 'GUEST' && v?.accountId == null) {
-      updates[child.key + '/accountId'] = globalPlayerId;
-      updates[child.key + '/playerType'] = 'REGISTERED';
-      updates[child.key + '/linkedAt'] = Date.now();
-    }
-  });
-  if (Object.keys(updates).length > 0) {
-    await database().ref('players').update(updates);
-  }
-};
 
 // Creates (or reuses) a guest player identified by phone number + a
 // temporary display name, for use when the phone number has no account yet.

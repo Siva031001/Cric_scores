@@ -46,6 +46,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
       .finally(() => setStatsLoading(false));
   }, [tournament?.matches]);
 
+  useEffect(() => {
+  const unsub = navigation.addListener('focus', () => {
+    // Refresh tournament data when returning from MyTeams team-selection
+    // (in case a team was just added there).
+  });
+  return unsub;
+  }, [navigation]);
+
   const closeMatchModal = () => { setShowAddMatch(false); setMatchStep(1); setMatchTeam1(""); setMatchTeam2(""); setMatchDate(getTodayString()); setMatchTime(""); setMatchVenue(""); };
 
   const handleAddExistingTeam = async (team: Team) => {
@@ -281,16 +289,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         {tab === "teams" && (
           <View style={styles.tabContent}>
             <View style={styles.addTeamRow}>
-              <TouchableOpacity style={[styles.addTeamBtn, {flex: 1}]} onPress={() => setShowAddTeam(true)}>
-                <Text style={styles.addTeamBtnText}>+ Add Team from My Teams</Text>
+              <TouchableOpacity
+                style={[styles.addTeamBtn, {flex: 1}]}
+                onPress={() => navigation.navigate('MyTeams', { selectMode: true, tournamentId })}
+                >
+              <Text style={styles.addTeamBtnText}>+ Add Team from My Teams</Text>
               </TouchableOpacity>
-            </View>
-            <View style={{backgroundColor: COLORS.card2, padding: 10, borderRadius: RADIUS.sm, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border}}>
-              <Text style={{color: COLORS.textSecondary, fontSize: 12, textAlign: "center"}}>Create teams in Teams screen first, then add them here</Text>
-              <TouchableOpacity onPress={() => navigation.navigate("MyTeams")} style={{alignItems: "center", marginTop: 6}}>
-                <Text style={{color: COLORS.primary, fontSize: 12, fontWeight: "bold"}}>Go to Teams Screen →</Text>
-              </TouchableOpacity>
-            </View>
+          </View>
+            
             {(tournament.teams ?? []).length === 0 ? (
               <View style={styles.empty}><Text style={styles.emptyIcon}></Text><Text style={styles.emptyText}>No teams added yet</Text><Text style={styles.emptyHint}>Add teams to start the tournament</Text></View>
             ) : (
@@ -407,30 +413,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      <Modal visible={showAddTeam} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Add from My Teams</Text>
-            <ScrollView style={{ maxHeight: 380 }}>
-              {myTeams.length === 0 ? (
-                <View style={styles.empty}><Text style={styles.emptyText}>No teams in My Teams</Text><Text style={styles.emptyHint}>Create teams in My Teams first</Text></View>
-              ) : (
-                myTeams.map((team: any) => {
-                  const added = tournament.teams?.some((t: any) => t.teamName === team.name);
-                  return (
-                    <TouchableOpacity key={team.id} style={[styles.teamSelectRow, added && styles.teamSelectRowAdded]} onPress={() => !added && handleAddExistingTeam(team)} disabled={added}>
-                      <View style={styles.teamSelectLogo}><Text style={styles.teamSelectLogoText}>{team.name.charAt(0).toUpperCase()}</Text></View>
-                      <View style={{ flex: 1 }}><Text style={styles.teamSelectName}>{team.name}</Text><Text style={styles.teamSelectSub}>{team.players?.length ?? 0} players</Text></View>
-                      <Text style={[styles.teamSelectAction, added && { color: COLORS.textMuted }]}>{added ? "Added" : "+ Add"}</Text>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </ScrollView>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowAddTeam(false)}><Text style={styles.modalCloseBtnText}>Close</Text></TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      
 
       <Modal visible={showNewTeam} transparent animationType="slide">
         <View style={styles.modalOverlay}>

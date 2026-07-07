@@ -14,6 +14,7 @@ export default function NewMatchScreen({ route, navigation }: any) {
   const [team1Data, setTeam1Data] = useState<Team | null>(null);
   const [team2Data, setTeam2Data] = useState<Team | null>(null);
   const [overs, setOvers] = useState('20');
+  const [ballType, setBallType] = useState<'Leather Ball'|'Tennis Ball'>('Tennis Ball');
   const [venue, setVenue] = useState('');
   const [myTeams, setMyTeams] = useState<Team[]>([]);
   const [searching1, setSearching1] = useState(false);
@@ -94,6 +95,7 @@ export default function NewMatchScreen({ route, navigation }: any) {
       team2: team2Data.name,
       overs,
       venue,
+      ballType,
       team1Players: team1Data.players,
       team2Players: team2Data.players,
       team1Logo: team1Data.logo,
@@ -234,6 +236,20 @@ export default function NewMatchScreen({ route, navigation }: any) {
           />
         </View>
       </View>
+      
+      <View style={styles.fieldBox}>
+        <Text style={styles.fieldLabel}>🏏 Ball Type</Text>
+          <View style={styles.oversRow}>
+        {(['Leather Ball','Tennis Ball'] as const).map(b => (
+      <TouchableOpacity
+        key={b}
+        style={[styles.oversBtn, ballType === b && styles.oversBtnActive]}
+        onPress={() => setBallType(b)}>
+        <Text style={[styles.oversBtnText, ballType === b && styles.oversBtnTextActive]}>{b}</Text>
+      </TouchableOpacity>
+        ))}
+         </View>
+        </View>
 
       {/* Start Button */}
       <TouchableOpacity style={styles.startBtn} onPress={handleStart}>

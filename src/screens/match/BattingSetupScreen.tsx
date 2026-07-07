@@ -13,7 +13,7 @@ type SelectionTab = 'striker' | 'nonstriker' | 'bowler';
 
 export default function BattingSetupScreen({ route, navigation }: any) {
   const {
-    team1, team2, overs, venue,
+    team1, team2, overs, venue, ballType,
     team1Players, team2Players,
     tossWinner, tossChoice,
     tournamentId, tournamentMatchId,
@@ -79,6 +79,7 @@ export default function BattingSetupScreen({ route, navigation }: any) {
         team2Players: finalTeam2Players,
         totalOvers: parseInt(overs, 10),
         venue: venue ?? '',
+        ballType: ballType ?? 'Tennis Ball',
         tossWinner,
         tossChoice,
         matchDate: now.toLocaleDateString('en-IN'),

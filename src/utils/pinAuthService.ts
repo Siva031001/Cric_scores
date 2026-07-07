@@ -173,11 +173,77 @@ export const startForgotPasswordOtp = async (phone: string) => {
   if (!exists) {
     return { success: false, error: 'No account found for this number.' };
   }
+
+  const rateCheck = await checkOtpRateLimit(key);
+  if (!rateCheck.allowed) {
+    if (rateCheck.secondsUntilResend) {
+      return { success: false, error: 'Please wait ' + rateCheck.secondsUntilResend + ' seconds before requesting another OTP.', cooldown: rateCheck.secondsUntilResend };
+    }
+    return { success: false, error: rateCheck.error };
+  }
+
   try {
-    const confirmation = await auth().signInWithPhoneNumber('+91' + key); // TODO: swap to a country picker if you support non-India numbers
+    const confirmation = await auth().signInWithPhoneNumber('+91' + key);
+    await recordOtpSent(key);
     return { success: true, confirmation };
   } catch (e: any) {
-    return { success: false, error: e?.message ?? 'Could not send OTP. Check the number and try again.' };
+    console.warn('Phone OTP send failed:', e?.code, e?.message);
+    const code = e?.code ?? '';
+    let msg = 'Could not send OTP. Check the number and try again.';
+    if (code.includes('billing-not-enabled')) msg = 'SMS service is not enabled for this app yet. Please contact support.';
+    else if (code.includes('too-many-requests')) msg = 'Too many attempts. Please try again later.';
+    else if (code.includes('invalid-phone-number')) msg = 'Invalid phone number format.';
+    else if (code.includes('quota-exceeded')) msg = 'SMS quota exceeded for today. Please try again tomorrow.';
+    return { success: false, error: msg };
+  }
+};
+
+// ── Forgot Password OTP rate limiting ──────────────────────
+// Stored at otpLimits/{phone}: { count, windowStart, lastSentAt }
+const OTP_MAX_PER_WINDOW = 3;
+const OTP_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+const OTP_RESEND_COOLDOWN_MS = 30 * 1000; // 30 seconds
+
+export const checkOtpRateLimit = async (phone: string): Promise<{ allowed: boolean; error?: string; secondsUntilResend?: number }> => {
+  const key = normalizePhone(phone);
+  const ref = database().ref('otpLimits/' + key);
+  const snap = await ref.once('value');
+  const record = snap.val();
+  const now = Date.now();
+
+  if (!record) {
+    return { allowed: true };
+  }
+
+  // Reset window if 24h has passed since it started.
+  if (now - (record.windowStart ?? 0) >= OTP_WINDOW_MS) {
+    return { allowed: true };
+  }
+
+  if ((record.count ?? 0) >= OTP_MAX_PER_WINDOW) {
+    return { allowed: false, error: 'You have reached the maximum OTP request limit for today. Please try again after 24 hours.' };
+  }
+
+  const sinceLastSent = now - (record.lastSentAt ?? 0);
+  if (sinceLastSent < OTP_RESEND_COOLDOWN_MS) {
+    return { allowed: false, secondsUntilResend: Math.ceil((OTP_RESEND_COOLDOWN_MS - sinceLastSent) / 1000) };
+  }
+
+  return { allowed: true };
+};
+
+export const recordOtpSent = async (phone: string) => {
+  const key = normalizePhone(phone);
+  const ref = database().ref('otpLimits/' + key);
+  const snap = await ref.once('value');
+  const record = snap.val();
+  const now = Date.now();
+
+  if (!record || now - (record.windowStart ?? 0) >= OTP_WINDOW_MS) {
+    // Start a fresh 24h window.
+    await ref.set({ count: 1, windowStart: now, lastSentAt: now });
+  } else {
+    await ref.update({ count: (record.count ?? 0) + 1, lastSentAt: now });
   }
 };
 

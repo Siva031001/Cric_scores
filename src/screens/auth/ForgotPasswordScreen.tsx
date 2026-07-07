@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, {useEffect, useState } from "react";
+
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import { startForgotPasswordOtp, verifyForgotPasswordOtp, resetPinWithPhoneAuth } from "../../utils/pinAuthService";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
@@ -14,24 +15,33 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   const [confirmPin, setConfirmPin] = useState("");
   const [confirmation, setConfirmation] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+  if (resendCooldown <= 0) return;
+  const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+  return () => clearTimeout(t);
+}, [resendCooldown]);
 
   const handleSendOtp = async () => {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length !== 10) {
-      Alert.alert("Error", "Please enter your 10-digit mobile number (the same one you used to log in, without +91 or spaces)");
-      return;
-    }
-    setLoading(true);
-    const res = await startForgotPasswordOtp(digits);
-    setLoading(false);
-    if (!res.success) {
-      Alert.alert("Error", res.error ?? "Could not send OTP");
-      return;
-    }
-    setPhone(digits);
-    setConfirmation(res.confirmation);
-    setStep("otp");
-  };
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length !== 10) {
+    Alert.alert("Error", "Please enter your 10-digit mobile number (the same one you used to log in, without +91 or spaces)");
+    return;
+  }
+  setLoading(true);
+  const res = await startForgotPasswordOtp(digits);
+  setLoading(false);
+  if (!res.success) {
+    Alert.alert("Error", res.error ?? "Could not send OTP");
+    if ((res as any).cooldown) setResendCooldown((res as any).cooldown);
+    return;
+  }
+  setPhone(digits);
+  setConfirmation(res.confirmation);
+  setStep("otp");
+  setResendCooldown(30);
+};
 
   const handleVerifyOtp = async () => {
     if (!otp.trim() || otp.trim().length < 4) {
@@ -91,24 +101,33 @@ export default function ForgotPasswordScreen({ navigation }: any) {
         )}
 
         {step === "otp" && (
-          <>
-            <Text style={s.label}>Enter the OTP sent to {phone}</Text>
-            <TextInput
-              style={s.input}
-              placeholder="6-digit code"
-              placeholderTextColor={COLORS.textMuted}
-              value={otp}
-              onChangeText={setOtp}
-              keyboardType="number-pad"
-            />
-            <TouchableOpacity style={s.btn} onPress={handleVerifyOtp} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Verify OTP</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setStep("phone")}>
-              <Text style={s.link}>Change phone number</Text>
-            </TouchableOpacity>
-          </>
-        )}
+  <>
+    <Text style={s.label}>Enter the OTP sent to {phone}</Text>
+    <TextInput
+      style={s.input}
+      placeholder="6-digit code"
+      placeholderTextColor={COLORS.textMuted}
+      value={otp}
+      onChangeText={setOtp}
+      keyboardType="number-pad"
+    />
+    <TouchableOpacity style={s.btn} onPress={handleVerifyOtp} disabled={loading}>
+      {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Verify OTP</Text>}
+    </TouchableOpacity>
+    <TouchableOpacity
+      onPress={handleSendOtp}
+      disabled={resendCooldown > 0 || loading}
+      style={{ opacity: resendCooldown > 0 ? 0.5 : 1 }}
+    >
+      <Text style={s.link}>
+        {resendCooldown > 0 ? 'Resend OTP in ' + resendCooldown + 's' : 'Resend OTP'}
+      </Text>
+    </TouchableOpacity>
+    <TouchableOpacity onPress={() => setStep("phone")}>
+      <Text style={s.link}>Change phone number</Text>
+    </TouchableOpacity>
+  </>
+)}
 
         {step === "newPin" && (
           <>

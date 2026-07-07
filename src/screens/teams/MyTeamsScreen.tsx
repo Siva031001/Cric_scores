@@ -4,10 +4,40 @@ import { getMyTeams, deleteTeam } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 
-export default function MyTeamsScreen({ navigation }: any) {
+export default function MyTeamsScreen({ navigation, route }: any) {
+  const selectMode = route?.params?.selectMode ?? false;
+  const tournamentId = route?.params?.tournamentId ?? null;
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [teamTab, setTeamTab] = useState<'my'|'other'>('my');
+
+  const handleSelectForTournament = async (team: any) => {
+  try {
+    const { updateTournament, subscribeToTournament } = require('../../utils/firebase');
+    // Read current tournament once to append without clobbering concurrent edits.
+    const database = require('@react-native-firebase/database').default;
+    const snap = await database().ref('tournaments/' + tournamentId).once('value');
+    const tournament = snap.val();
+    if (!tournament) { Alert.alert('Error', 'Tournament not found'); return; }
+    if (tournament.teams?.some((t: any) => t.teamName === team.name)) {
+      Alert.alert('Already Added', team.name + ' is already in this tournament');
+      return;
+    }
+    const newTeam = {
+      teamId: team.id,
+      teamName: team.name,
+      logo: team.logo ?? undefined,
+      players: team.players ?? [],
+      played: 0, won: 0, lost: 0, tied: 0, nrr: 0, points: 0,
+    };
+    await updateTournament(tournamentId, { teams: [...(tournament.teams ?? []), newTeam] });
+    Alert.alert('Added!', team.name + ' added with ' + (team.players?.length ?? 0) + ' players', [
+      { text: 'OK', onPress: () => navigation.goBack() },
+    ]);
+  } catch (e: any) {
+    Alert.alert('Error', e?.message ?? 'Could not add team');
+  }
+};
 
   const load = async () => {
     setLoading(true);
@@ -35,7 +65,10 @@ export default function MyTeamsScreen({ navigation }: any) {
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
 
   const TeamCard = ({ item }: any) => (
-    <TouchableOpacity style={s.card} onPress={() => navigation.navigate('TeamDetail', { teamId: item.id })}>
+    <TouchableOpacity
+      style={s.card}
+      onPress={() => selectMode ? handleSelectForTournament(item) : navigation.navigate('TeamDetail', { teamId: item.id })}
+    >
       <View style={s.logoBox}>
         {item.logo ? <Image source={{ uri: item.logo }} style={s.logoImg} /> : <Text style={s.logoText}>{item.name.charAt(0).toUpperCase()}</Text>}
       </View>
@@ -51,18 +84,27 @@ export default function MyTeamsScreen({ navigation }: any) {
           {item.players?.find((p: any) => p.isCaptain) ? ` • C: ${item.players.find((p: any) => p.isCaptain)?.name}` : ''}
         </Text>
       </View>
-      <TouchableOpacity style={s.editBtn} onPress={() => navigation.navigate('CreateTeam', { existingTeam: item })}>
-        <Text style={s.editIcon}>Edit</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(item)}>
-        <Text style={s.deleteIcon}>Del</Text>
-      </TouchableOpacity>
+      {!selectMode && (
+  <>
+    <TouchableOpacity style={s.editBtn} onPress={() => navigation.navigate('CreateTeam', { existingTeam: item })}>
+      <Text style={s.editIcon}>Edit</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(item)}>
+      <Text style={s.deleteIcon}>Del</Text>
+    </TouchableOpacity>
+  </>
+  )}
     </TouchableOpacity>
   );
 
   return (
     <View style={s.container}>
-      <Header title="Teams" onBack={() => navigation.goBack()} rightText="+ New" onRight={() => navigation.navigate('CreateTeam')} />
+      <Header
+        title={selectMode ? "Select Team for Tournament" : "Teams"}
+        onBack={() => navigation.goBack()}
+        rightText="+ New"
+        onRight={() => navigation.navigate('CreateTeam', selectMode ? { fromTournament: true, tournamentId } : undefined)}
+    />
 
       {/* Sub Tabs */}
       <View style={s.subTabs}>

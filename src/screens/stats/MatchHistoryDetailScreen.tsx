@@ -71,6 +71,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   const [tab, setTab] = useState<'overview'|'batting'|'bowling'|'fielding'>('overview');
   const [filter, setFilter] = useState<string>('all');
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all'|'tournament'|'normal'>('all');
+  const [ballTypeFilter, setBallTypeFilter] = useState<'all'|'Leather Ball'|'Tennis Ball'>('all');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [batSort, setBatSort] = useState<SortKey>('runs');
   const [bolSort, setBolSort] = useState<SortKey>('wickets');
@@ -105,6 +106,10 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
       ? dateFilteredMatches.filter((m: any) => !!m.tournamentId)
       : dateFilteredMatches.filter((m: any) => !m.tournamentId);
 
+  const ballFilteredMatches = ballTypeFilter === 'all'
+    ? typeFilteredMatches
+    : typeFilteredMatches.filter((m: any) => m.ballType === ballTypeFilter);
+
   const formResults = typeFilteredMatches
     .filter((m: any) => m.status === 'completed')
     .slice(0, 5)
@@ -118,50 +123,64 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
     .filter(Boolean);
 
   const batMap: any = {};
-  typeFilteredMatches.forEach((m: any) => {
-    const inn = m.innings1;
+  ballFilteredMatches.forEach((m: any) => {
+  // Check BOTH innings — whichever roster this scorer's own team appears in.
+  // team1Players is always the batting-side roster of innings1, team2Players
+  // is the batting-side roster of innings2 (post toss-adjustment upstream).
+  [
+    { inn: m.innings1, roster: m.team1Players ?? [] },
+    { inn: m.innings2, roster: m.team2Players ?? [] },
+  ].forEach(({ inn, roster }) => {
     if (!inn?.batsmanStats) return;
-    const myIds = new Set((m.team1Players ?? []).map((p: any) => String(p.id)));
     Object.values(inn.batsmanStats).forEach((bs: any) => {
       if (!bs) return;
       const k = String(bs.playerId ?? 0);
-      if (!myIds.has(k)) return;
-      const pName = (m.team1Players ?? []).find((p: any) => String(p.id) === k)?.name ?? ('Player ' + (parseInt(k) + 1));
-      if (!batMap[k]) batMap[k] = { runs: 0, balls: 0, fours: 0, sixes: 0, outs: 0, innings: 0, scores: [], name: pName };
-      batMap[k].runs += bs.runs ?? 0;
-      batMap[k].balls += bs.balls ?? 0;
-      batMap[k].fours += bs.fours ?? 0;
-      batMap[k].sixes += bs.sixes ?? 0;
-      if ((bs.balls ?? 0) > 0) { batMap[k].innings += 1; batMap[k].scores.push(bs.runs ?? 0); }
-      if (bs.isOut) batMap[k].outs += 1;
-      batMap[k].name = pName;
+      const player = roster.find((p: any) => String(p.id) === k);
+      if (!player) return;
+      // Key by globalPlayerId when available so the SAME person across
+      // different teams/matches aggregates into one row, not duplicate rows.
+      const key = bs.globalPlayerId ?? (k + ':' + player.name);
+      if (!batMap[key]) batMap[key] = { runs: 0, balls: 0, fours: 0, sixes: 0, outs: 0, innings: 0, scores: [], name: player.name };
+      batMap[key].runs += bs.runs ?? 0;
+      batMap[key].balls += bs.balls ?? 0;
+      batMap[key].fours += bs.fours ?? 0;
+      batMap[key].sixes += bs.sixes ?? 0;
+      if ((bs.balls ?? 0) > 0) { batMap[key].innings += 1; batMap[key].scores.push(bs.runs ?? 0); }
+      if (bs.isOut) batMap[key].outs += 1;
+      batMap[key].name = player.name;
     });
   });
+});
 
   const bolMap: any = {};
-  typeFilteredMatches.forEach((m: any) => {
-    const inn = m.innings2;
+    ballFilteredMatches.forEach((m: any) => {
+  // Bowling roster for innings1 is team2Players; for innings2 it's team1Players.
+  [
+    { inn: m.innings1, roster: m.team2Players ?? [] },
+    { inn: m.innings2, roster: m.team1Players ?? [] },
+  ].forEach(({ inn, roster }) => {
     if (!inn?.bowlerStats) return;
-    const myIds = new Set((m.team1Players ?? []).map((p: any) => String(p.id)));
     Object.values(inn.bowlerStats).forEach((bw: any) => {
       if (!bw) return;
       const k = String(bw.playerId ?? 0);
-      if (!myIds.has(k)) return;
-      const pName = (m.team1Players ?? []).find((p: any) => String(p.id) === k)?.name ?? ('Player ' + (parseInt(k) + 1));
-      if (!bolMap[k]) bolMap[k] = { overs: 0, balls: 0, runs: 0, wickets: 0, wides: 0, noBalls: 0, innings: 0, figures: [], name: pName };
-      bolMap[k].overs += bw.overs ?? 0;
-      bolMap[k].balls += bw.balls ?? 0;
-      bolMap[k].runs += bw.runs ?? 0;
-      bolMap[k].wickets += bw.wickets ?? 0;
-      bolMap[k].wides += bw.wides ?? 0;
-      bolMap[k].noBalls += bw.noBalls ?? 0;
+      const player = roster.find((p: any) => String(p.id) === k);
+      if (!player) return;
+      const key = bw.globalPlayerId ?? (k + ':' + player.name);
+      if (!bolMap[key]) bolMap[key] = { overs: 0, balls: 0, runs: 0, wickets: 0, wides: 0, noBalls: 0, innings: 0, figures: [], name: player.name };
+      bolMap[key].overs += bw.overs ?? 0;
+      bolMap[key].balls += bw.balls ?? 0;
+      bolMap[key].runs += bw.runs ?? 0;
+      bolMap[key].wickets += bw.wickets ?? 0;
+      bolMap[key].wides += bw.wides ?? 0;
+      bolMap[key].noBalls += bw.noBalls ?? 0;
       if ((bw.overs ?? 0) > 0 || (bw.balls ?? 0) > 0) {
-        bolMap[k].innings += 1;
-        bolMap[k].figures.push({ w: bw.wickets ?? 0, r: bw.runs ?? 0 });
+        bolMap[key].innings += 1;
+        bolMap[key].figures.push({ w: bw.wickets ?? 0, r: bw.runs ?? 0 });
       }
-      bolMap[k].name = pName;
+      bolMap[key].name = player.name;
     });
   });
+});
 
   const fieldMap: any = {};
   typeFilteredMatches.forEach((m: any) => {
@@ -300,6 +319,14 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
         <Text style={[s.filterChipTxt, dateFilter === k && s.filterChipTxtActive]}>{l}</Text>
       </TouchableOpacity>
     ))}
+    <View style={s.filterDivider} />
+    {(['all','Leather Ball','Tennis Ball'] as const).map(bt => (
+      <TouchableOpacity key={bt} style={[s.filterChip, ballTypeFilter === bt && s.filterChipActive]} onPress={() => setBallTypeFilter(bt)} activeOpacity={0.7}>
+        <Text style={[s.filterChipTxt, ballTypeFilter === bt && s.filterChipTxtActive]}>
+          {bt === 'all' ? 'All Balls' : bt}
+        </Text>
+      </TouchableOpacity>
+    ))}
   </ScrollView>
 </View>
 
@@ -421,41 +448,38 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                   <SortChip label="Average" active={batSort === 'avg'} onPress={() => setBatSort('avg')} />
                   <SortChip label="Strike Rate" active={batSort === 'sr'} onPress={() => setBatSort('sr')} />
                 </View>
-                {battingEntries.map(([id, bs, avgN, srN]: any) => {
-                  const avg = bs.outs > 0 ? avgN.toFixed(1) : bs.runs > 0 ? bs.runs + '*' : '0';
-                  const sr = srN.toFixed(1);
-                  const hs = bs.scores.length > 0 ? Math.max(...bs.scores) : 0;
-                  const fifties  = bs.scores.filter((x: number) => x >= 50 && x < 100).length;
-                  const hundreds = bs.scores.filter((x: number) => x >= 100).length;
-                  return (
-                    <View key={id} style={s.pCard}>
-                      <View style={s.pCardHead}>
-                        <View style={s.pAvatar}>
-                          <Text style={s.pAvatarTxt}>{(bs.name ?? 'P').charAt(0).toUpperCase()}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.pName}>{bs.name}</Text>
-                          <Text style={s.pSub}>{bs.innings} innings played</Text>
-                        </View>
-                        <View style={s.pHighlight}>
-                          <Text style={s.pHNum}>{bs.runs}</Text>
-                          <Text style={s.pHLbl}>RUNS</Text>
-                        </View>
-                      </View>
-                      <ScoreStrip scores={bs.scores} />
-                      <View style={s.statGrid}>
-                        <StatRow label="Balls Faced"   value={bs.balls} />
-                        <StatRow label="4s"            value={bs.fours} />
-                        <StatRow label="6s"            value={bs.sixes} />
-                        <StatRow label="Strike Rate"   value={sr}  highlight={batSort === 'sr'} />
-                        <StatRow label="Average"       value={avg} highlight={batSort === 'avg'} />
-                        <StatRow label="Highest Score" value={hs}  highlight />
-                        <StatRow label="50s"           value={fifties} />
-                        <StatRow label="100s"          value={hundreds} />
-                      </View>
-                    </View>
-                  );
-                })}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SPACING.lg, gap: 12 }}>
+  {battingEntries.map(([id, bs, avgN, srN]: any) => {
+    const avg = bs.outs > 0 ? avgN.toFixed(1) : bs.runs > 0 ? bs.runs + '*' : '0';
+    const sr = srN.toFixed(1);
+    const hs = bs.scores.length > 0 ? Math.max(...bs.scores) : 0;
+    const fifties  = bs.scores.filter((x: number) => x >= 50 && x < 100).length;
+    const hundreds = bs.scores.filter((x: number) => x >= 100).length;
+    return (
+      <View key={id} style={[s.pCard, { width: 220, marginHorizontal: 0 }]}>
+        <View style={s.pCardHead}>
+          <View style={s.pAvatar}>
+            <Text style={s.pAvatarTxt}>{(bs.name ?? 'P').charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.pName} numberOfLines={1}>{bs.name}</Text>
+            <Text style={s.pSub}>{bs.innings} inn</Text>
+          </View>
+        </View>
+        <View style={s.pHighlight}>
+          <Text style={s.pHNum}>{bs.runs}</Text>
+          <Text style={s.pHLbl}>RUNS</Text>
+        </View>
+        <View style={s.statGrid}>
+          <StatRow label="SR" value={sr} highlight />
+          <StatRow label="Avg" value={avg} highlight />
+          <StatRow label="HS" value={hs} />
+          <StatRow label="4s/6s" value={bs.fours + '/' + bs.sixes} />
+        </View>
+      </View>
+    );
+  })}
+</ScrollView>
               </>
             )}
           </View>
