@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal } from 'react-native';
 import { getMatchHistory } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
@@ -73,6 +73,9 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all'|'tournament'|'normal'>('all');
   const [ballTypeFilter, setBallTypeFilter] = useState<'all'|'Leather Ball'|'Tennis Ball'>('all');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [showMatchTypeDropdown, setShowMatchTypeDropdown] = useState(false);
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [showBallTypeDropdown, setShowBallTypeDropdown] = useState(false);
   const [batSort, setBatSort] = useState<SortKey>('runs');
   const [bolSort, setBolSort] = useState<SortKey>('wickets');
 
@@ -305,29 +308,67 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
       </TouchableOpacity>
     ))}
   </View>
-  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.filterScrollRow, { marginTop: 8 }]}>
-    {(['all','tournament','normal'] as const).map(tf => (
-      <TouchableOpacity key={tf} style={[s.filterChip, matchTypeFilter === tf && s.filterChipActive]} onPress={() => setMatchTypeFilter(tf)} activeOpacity={0.7}>
-        <Text style={[s.filterChipTxt, matchTypeFilter === tf && s.filterChipTxtActive]}>
-          {tf === 'all' ? 'All Types' : tf === 'tournament' ? 'Tournament' : 'Normal'}
-        </Text>
-      </TouchableOpacity>
-    ))}
-    <View style={s.filterDivider} />
-    {([['all','All Time'],['30','30 Days'],['90','90 Days']] as const).map(([k, l]) => (
-      <TouchableOpacity key={k} style={[s.filterChip, dateFilter === k && s.filterChipActive]} onPress={() => setDateFilter(k as DateFilter)} activeOpacity={0.7}>
-        <Text style={[s.filterChipTxt, dateFilter === k && s.filterChipTxtActive]}>{l}</Text>
-      </TouchableOpacity>
-    ))}
-    <View style={s.filterDivider} />
-    {(['all','Leather Ball','Tennis Ball'] as const).map(bt => (
-      <TouchableOpacity key={bt} style={[s.filterChip, ballTypeFilter === bt && s.filterChipActive]} onPress={() => setBallTypeFilter(bt)} activeOpacity={0.7}>
-        <Text style={[s.filterChipTxt, ballTypeFilter === bt && s.filterChipTxtActive]}>
-          {bt === 'all' ? 'All Balls' : bt}
-        </Text>
-      </TouchableOpacity>
-    ))}
-  </ScrollView>
+
+  <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: SPACING.lg, marginTop: 8 }}>
+    <TouchableOpacity style={s.dropdownBtn} onPress={() => setShowMatchTypeDropdown(true)}>
+      <Text style={s.dropdownBtnTxt}>
+        {matchTypeFilter === 'all' ? 'All Types' : matchTypeFilter === 'tournament' ? 'Tournament' : 'Normal'}
+      </Text>
+      <Text style={s.dropdownArrow}>▼</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={s.dropdownBtn} onPress={() => setShowDateDropdown(true)}>
+      <Text style={s.dropdownBtnTxt}>
+        {dateFilter === 'all' ? 'All Time' : dateFilter === '30' ? '30 Days' : '90 Days'}
+      </Text>
+      <Text style={s.dropdownArrow}>▼</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={s.dropdownBtn} onPress={() => setShowBallTypeDropdown(true)}>
+      <Text style={s.dropdownBtnTxt}>
+        {ballTypeFilter === 'all' ? 'Match Type' : ballTypeFilter}
+      </Text>
+      <Text style={s.dropdownArrow}>▼</Text>
+    </TouchableOpacity>
+  </View>
+
+  <Modal visible={showMatchTypeDropdown} transparent animationType="fade">
+    <TouchableOpacity style={s.dropdownOverlay} activeOpacity={1} onPress={() => setShowMatchTypeDropdown(false)}>
+      <View style={s.dropdownMenu}>
+        {(['all','tournament','normal'] as const).map(tf => (
+          <TouchableOpacity key={tf} style={s.dropdownItem} onPress={() => { setMatchTypeFilter(tf); setShowMatchTypeDropdown(false); }}>
+            <Text style={[s.dropdownItemTxt, matchTypeFilter === tf && { color: COLORS.primary, fontWeight: 'bold' }]}>
+              {tf === 'all' ? 'All Types' : tf === 'tournament' ? 'Tournament' : 'Normal'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </TouchableOpacity>
+  </Modal>
+
+  <Modal visible={showDateDropdown} transparent animationType="fade">
+    <TouchableOpacity style={s.dropdownOverlay} activeOpacity={1} onPress={() => setShowDateDropdown(false)}>
+      <View style={s.dropdownMenu}>
+        {([['all','All Time'],['30','30 Days'],['90','90 Days']] as const).map(([k, l]) => (
+          <TouchableOpacity key={k} style={s.dropdownItem} onPress={() => { setDateFilter(k as DateFilter); setShowDateDropdown(false); }}>
+            <Text style={[s.dropdownItemTxt, dateFilter === k && { color: COLORS.primary, fontWeight: 'bold' }]}>{l}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </TouchableOpacity>
+  </Modal>
+
+  <Modal visible={showBallTypeDropdown} transparent animationType="fade">
+    <TouchableOpacity style={s.dropdownOverlay} activeOpacity={1} onPress={() => setShowBallTypeDropdown(false)}>
+      <View style={s.dropdownMenu}>
+        {(['all','Leather Ball','Tennis Ball'] as const).map(bt => (
+          <TouchableOpacity key={bt} style={s.dropdownItem} onPress={() => { setBallTypeFilter(bt); setShowBallTypeDropdown(false); }}>
+            <Text style={[s.dropdownItemTxt, ballTypeFilter === bt && { color: COLORS.primary, fontWeight: 'bold' }]}>
+              {bt === 'all' ? 'Match Type' : bt}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </TouchableOpacity>
+  </Modal>
 </View>
 
       <View style={s.tabs}>
@@ -613,6 +654,13 @@ const s = StyleSheet.create({
   loadingTxt: { color: COLORS.textSecondary, fontSize: 13 },
 
   filterBlock: { paddingTop: 10, paddingBottom: 8 },
+  dropdownBtn: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10 },
+  dropdownBtnTxt: { color: COLORS.text, fontSize: 12, fontWeight: '600' },
+  dropdownArrow: { color: COLORS.primary, fontSize: 10 },
+  dropdownOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  dropdownMenu: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, paddingVertical: 8, minWidth: 200, borderWidth: 1, borderColor: COLORS.border },
+  dropdownItem: { paddingVertical: 12, paddingHorizontal: 20 },
+  dropdownItemTxt: { color: COLORS.textSecondary, fontSize: 14 },
   filterScrollRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SPACING.lg, alignItems: 'center' },
   filterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADIUS.round, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
   filterChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },

@@ -47,7 +47,7 @@ const EMOJI_TO_ICON: Record<string, string> = {
   "›": "chevron-right",
   "🔒": "lock",
   "📭": "inbox",
-  "🥅": "soccer-goal",
+  "🥅": "gate",
   "←": "arrow-left"
 };
 
