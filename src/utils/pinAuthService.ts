@@ -34,11 +34,16 @@ export const checkPhoneExists = async (phone: string): Promise<boolean> => {
 export const createPinAccount = async (phone: string, pin: string): Promise<string> => {
   const key = normalizePhone(phone);
 
-  let user = auth().currentUser;
-  if (!user) {
-    const cred = await auth().signInAnonymously();
-    user = cred.user;
+  // Always start a brand-new anonymous session for a new registration —
+  // reusing an existing session (e.g. left over from a previous test
+  // account on this device) would attach the new phone number to the OLD
+  // UID and inherit its teams/matches/profile, which is the exact bug
+  // this guards against.
+  if (auth().currentUser) {
+    await auth().signOut();
   }
+  const cred = await auth().signInAnonymously();
+  const user = cred.user;
 
   const salt = generateSalt();
   const pinHash = hashPin(pin, salt);

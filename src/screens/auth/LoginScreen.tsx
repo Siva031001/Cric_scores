@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, StatusBar } from "react-native";
 import { checkPhoneExists, createPinAccount, loginWithPin } from "../../utils/pinAuthService";
+import { startForgotPasswordOtp, verifyForgotPasswordOtp } from "../../utils/pinAuthService";
 import AppIcon from "../../components/AppIcon";
 import { isValidPinFormat } from "../../utils/pinAuth";
 
-type Mode = "phone" | "setup-pin" | "confirm-pin" | "login-pin";
+type Mode = "phone" | "verify-otp" | "setup-pin" | "confirm-pin" | "login-pin";
 
 export default function LoginScreen({ navigation }: any) {
   const [phone, setPhone] = useState("");
@@ -13,6 +14,15 @@ export default function LoginScreen({ navigation }: any) {
   const [confirmPinValue, setConfirmPinValue] = useState("");
   const [firstPin, setFirstPin] = useState("");
   const [loading, setLoading] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [confirmation, setConfirmation] = useState<any>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
 
   const checkNumber = async () => {
     const digits = phone.replace(/\D/g, "");
@@ -23,10 +33,56 @@ export default function LoginScreen({ navigation }: any) {
     try {
       setLoading(true);
       const exists = await checkPhoneExists(digits);
-      setMode(exists ? "login-pin" : "setup-pin");
-      setPin("");
+      if (exists) {
+        setMode("login-pin");
+        setPin("");
+      } else {
+        // New number — verify ownership via OTP before allowing PIN setup.
+        const res = await startForgotPasswordOtp(digits);
+        // startForgotPasswordOtp checks checkPhoneExists internally and
+        // returns an error for unregistered numbers — bypass that check
+        // for registration by calling signInWithPhoneNumber directly instead.
+        const authMod = require('@react-native-firebase/auth').default;
+        const conf = await authMod().signInWithPhoneNumber('+91' + digits);
+        setConfirmation(conf);
+        setMode("verify-otp");
+        setResendCooldown(30);
+      }
     } catch (error: any) {
       Alert.alert("Error", error?.message ?? "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyRegistrationOtp = async () => {
+    if (!otp.trim() || otp.trim().length < 4) {
+      Alert.alert("Error", "Enter the code you received");
+      return;
+    }
+    try {
+      setLoading(true);
+      await confirmation.confirm(otp.trim());
+      setMode("setup-pin");
+      setPin("");
+    } catch (error: any) {
+      Alert.alert("Error", "Incorrect or expired code. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendRegistrationOtp = async () => {
+    if (resendCooldown > 0) return;
+    try {
+      setLoading(true);
+      const digits = phone.replace(/\D/g, "");
+      const authMod = require('@react-native-firebase/auth').default;
+      const conf = await authMod().signInWithPhoneNumber('+91' + digits);
+      setConfirmation(conf);
+      setResendCooldown(30);
+    } catch (error: any) {
+      Alert.alert("Error", error?.message ?? "Could not resend OTP");
     } finally {
       setLoading(false);
     }
@@ -90,6 +146,7 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   const titleFor = () => {
+    if (mode === "verify-otp") return "Verify your number";
     if (mode === "setup-pin") return "Create a PIN";
     if (mode === "confirm-pin") return "Confirm your PIN";
     if (mode === "login-pin") return "Enter your PIN";
@@ -97,6 +154,7 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   const subFor = () => {
+    if (mode === "verify-otp") return "Enter the OTP sent to +91 " + phone;
     if (mode === "setup-pin") return "Set a 4-6 digit PIN for +91 " + phone;
     if (mode === "confirm-pin") return "Re-enter your PIN to confirm";
     if (mode === "login-pin") return "Enter your PIN for +91 " + phone;
@@ -129,6 +187,23 @@ export default function LoginScreen({ navigation }: any) {
             </TouchableOpacity>
           </>
         )}
+
+        {mode === "verify-otp" && (
+  <>
+    <TextInput style={styles.otpInput} placeholder="Enter OTP" placeholderTextColor="#9ca3af" keyboardType="number-pad" maxLength={6} value={otp} onChangeText={setOtp} selectionColor="#4ade80" />
+    <TouchableOpacity style={[styles.btn, loading && styles.btnDisabled]} onPress={handleVerifyRegistrationOtp} disabled={loading}>
+      {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Verify OTP</Text>}
+    </TouchableOpacity>
+    <TouchableOpacity style={styles.changeBtn} onPress={handleResendRegistrationOtp} disabled={resendCooldown > 0}>
+      <Text style={[styles.changeBtnText, resendCooldown > 0 && { opacity: 0.5 }]}>
+        {resendCooldown > 0 ? 'Resend OTP in ' + resendCooldown + 's' : 'Resend OTP'}
+      </Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={styles.changeBtn} onPress={goBackToPhone}>
+      <Text style={styles.changeBtnText}>Change Number</Text>
+    </TouchableOpacity>
+  </>
+)}
 
         {mode === "setup-pin" && (
           <>

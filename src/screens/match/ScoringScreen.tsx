@@ -18,6 +18,7 @@ import {
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from '../../components/AppIcon';
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function ScoringScreen({ route, navigation }: any) {
   const { matchId } = route.params ?? {};
@@ -68,6 +69,30 @@ export default function ScoringScreen({ route, navigation }: any) {
     });
     return unsub;
   }, [matchId]);
+
+  useFocusEffect(
+  React.useCallback(() => {
+    // Re-run the innings-transition/opener-check logic whenever this screen
+    // regains focus (e.g. returning from Scorecard). If a setTimeout-driven
+    // UI transition was silently dropped while this screen was frozen in
+    // the background, this forces state to resync with the real match data.
+    if (!match) return;
+    if (match.currentInnings === 2 && match.innings2?.strikerId === -1 && !showOpenerSelect && !openerSelectionDoneRef.current) {
+      setOpenerStep("striker");
+      setOpener1Id(null); setOpener2Id(null); setOpener3Id(null);
+      setShowOpenerSelect(true);
+    }
+    const inn1Complete = (match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers;
+    if (match.currentInnings === 1 && match.status === "live" && inn1Complete && !showInningsEnd && !openerSelectionDoneRef.current) {
+      setInningsData(match.innings1);
+      setShowInningsEnd(true);
+    }
+    // Clear any stuck pending-picker overlays that may have been left mid-transition.
+    if (pendingBowlerAfterWicketRef.current && !showNewBowler) {
+      setShowNewBowler(true);
+    }
+  }, [match])
+);
 
   useEffect(() => {
   if (!match) return;

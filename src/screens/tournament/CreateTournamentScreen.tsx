@@ -126,9 +126,25 @@ export default function CreateTournamentScreen({ navigation }: any) {
             {format === 'Others' && (
               <TextInput style={styles.input} placeholder="Enter overs e.g. 15" placeholderTextColor={COLORS.textMuted} value={customFormat} onChangeText={setCustomFormat} keyboardType="numeric" />
             )}
-            <TouchableOpacity style={styles.nextBtn} onPress={() => { if (!name.trim() || !orgName.trim()) { Alert.alert('Error', 'Fill required fields'); return; } setStep(2); }}>
-              <Text style={styles.nextBtnText}>Next: Add Teams</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.nextBtn} onPress={async () => {
+  if (!name.trim() || !orgName.trim()) { Alert.alert('Error', 'Fill required fields'); return; }
+  const finalFormat = format === 'Others' ? customFormat || 'Custom' : format;
+  setSaving(true);
+  try {
+    const id = await createTournament({
+      name: name.trim(), organisationName: orgName.trim(), venue: venue.trim(),
+      startDate: startDate.trim(), endDate: endDate.trim(), ballType, format: finalFormat,
+      teams: [], matches: [], status: 'upcoming',
+    });
+    navigation.replace('TournamentDetail', { tournamentId: id });
+  } catch (e: any) {
+    Alert.alert('Error', e?.message);
+  } finally {
+    setSaving(false);
+  }
+}} disabled={saving}>
+  <Text style={styles.nextBtnText}>{saving ? 'Creating...' : 'Create Tournament'}</Text>
+</TouchableOpacity>
           </View>
         )}
 

@@ -11,7 +11,7 @@ import AppIcon from '../../components/AppIcon';
 const ROLES = ['Batter', 'Bowler', 'Wicket Keeper', 'All Rounder'];
 const BAT_STYLES = ['Right Hand', 'Left Hand'];
 
-function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, onExpand, expandedId, onFieldChange, onPhoneLookup }: any) {
+function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, onExpand, expandedId, onFieldChange, onPhoneLookup, onEditName  }: any) {
   const [localPhone, setLocalPhone] = useState(player.phoneNumber || '');
   const [lookupStatus, setLookupStatus] = useState<'idle'|'checking'|'linked'|'guest'>(
     player.phoneNumber ? (player.playerType === 'registered' ? 'linked' : 'guest') : 'idle'
@@ -42,10 +42,16 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
           maxLength={10}
         />
         {lookupStatus !== 'idle' && lookupStatus !== 'checking' && (
-          <Text style={{ color: COLORS.text, fontSize: 13, flex: 1, paddingHorizontal: 4 }} numberOfLines={1}>
-            {player.name || '(no name)'}
-          </Text>
-        )}
+            player.name ? (
+        <Text style={{ color: COLORS.text, fontSize: 13, flex: 1, paddingHorizontal: 4 }} numberOfLines={1}>
+          {player.name}
+        </Text>
+          ) : (
+        <TouchableOpacity style={{ flex: 1, paddingHorizontal: 4 }} onPress={() => onEditName(index)}>
+        <Text style={{ color: COLORS.orange, fontSize: 13, fontWeight: 'bold' }}>Edit Name</Text>
+        </TouchableOpacity>
+          )
+          )}
         <TouchableOpacity style={[styles.roleBtn, captainId === player.id && styles.captainActive]} onPress={() => onCaptain(player.id)}>
           <Text style={styles.roleBtnText}>C</Text>
         </TouchableOpacity>
@@ -144,13 +150,19 @@ export default function CreateTeamScreen({ route, navigation }: any) {
     if (account) {
       const master = await getPlayerMasterByAccountPhone(phone);
       const name = master?.name ?? '';
-      if (name) setLocalName(name);
-      setPlayers((prev: any[]) => {
-        const updated = [...prev];
-        updated[index] = { ...updated[index], phoneNumber: phone, playerType: 'registered', name: name || updated[index].name, globalPlayerId: master?.id ?? null };
-        return updated;
+    if (name) setLocalName(name);
+    setPlayers((prev: any[]) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], phoneNumber: phone, playerType: 'registered', name: name || updated[index].name, globalPlayerId: master?.id ?? null };
+    return updated;
       });
-      setLookupStatus('linked');
+    setLookupStatus('linked');
+    // Linked account exists but has no profile name set yet — prompt so the
+    // scorer isn't blocked at Save with an uneditable empty name field.
+    if (!name) {
+    setNamePromptValue('');
+    setNamePromptFor(index);
+    }
     } else {
       setPlayers((prev: any[]) => {
         const updated = [...prev];
@@ -174,6 +186,10 @@ const confirmNamePrompt = useCallback(() => {
   if (namePromptFor === null) return;
   const name = namePromptValue.trim();
   if (!name) { Alert.alert('Error', 'Please enter a display name'); return; }
+  if (!/^[a-zA-Z0-9\s]+$/.test(name)) {
+    Alert.alert('Invalid Name', 'Only letters and numbers are allowed. Special characters are not permitted.');
+    return;
+  }
   setPlayers((prev: any[]) => {
     const updated = [...prev];
     updated[namePromptFor] = { ...updated[namePromptFor], name };
@@ -320,8 +336,9 @@ Alert.alert(
         data={players} keyExtractor={(item: any) => `p-${item.id}`}
         renderItem={({ item, index }: any) => (
           <PlayerRow player={item} index={index} captainId={captainId} wicketKeeperId={wicketKeeperId}
-            onCaptain={handleCaptain} onWK={handleWK} onExpand={handleExpand} expandedId={expandedId} onFieldChange={handleFieldChange} onPhoneLookup={handlePhoneLookup} />
-        )}
+            onCaptain={handleCaptain} onWK={handleWK} onExpand={handleExpand} expandedId={expandedId} onFieldChange={handleFieldChange} onPhoneLookup={handlePhoneLookup} 
+              onEditName={(idx: number) => { setNamePromptValue(''); setNamePromptFor(idx); }} />
+          )}
         removeClippedSubviews={false}
         ListFooterComponent={
           <View style={styles.footer}>
