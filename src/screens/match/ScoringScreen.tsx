@@ -15,10 +15,11 @@ import {
   createEmptyBatsmanStats,
   createEmptyBowlerStats,
 } from "../../utils/cricketLogic";
+import { useFocusEffect } from "@react-navigation/native";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from '../../components/AppIcon';
-import { useFocusEffect } from "@react-navigation/native";
+
 
 export default function ScoringScreen({ route, navigation }: any) {
   const { matchId } = route.params ?? {};
