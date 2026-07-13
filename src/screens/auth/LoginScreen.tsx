@@ -4,6 +4,7 @@ import { checkPhoneExists, createPinAccount, loginWithPin } from "../../utils/pi
 import { startForgotPasswordOtp, verifyForgotPasswordOtp } from "../../utils/pinAuthService";
 import AppIcon from "../../components/AppIcon";
 import { isValidPinFormat } from "../../utils/pinAuth";
+import { COLORS } from "../../constants/theme";
 
 type Mode = "phone" | "verify-otp" | "setup-pin" | "confirm-pin" | "login-pin";
 
@@ -165,7 +166,7 @@ export default function LoginScreen({ navigation }: any) {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <StatusBar barStyle="light-content" backgroundColor="#0a1628" />
       <View style={styles.header}>
-        <Text style={styles.logo}>🏏</Text>
+        <AppIcon emoji="🏏" size={64} color={COLORS.primary} />
         <Text style={styles.appName}>CricketScorer</Text>
         <Text style={styles.tagline}>Score every ball, track every match</Text>
       </View>

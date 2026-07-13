@@ -15,10 +15,10 @@ import {
   createEmptyBatsmanStats,
   createEmptyBowlerStats,
 } from "../../utils/cricketLogic";
-import { useFocusEffect } from "@react-navigation/native";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from '../../components/AppIcon';
+import { useFocusEffect } from "@react-navigation/native";
 
 
 export default function ScoringScreen({ route, navigation }: any) {
@@ -60,42 +60,42 @@ export default function ScoringScreen({ route, navigation }: any) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVideoOverlay, setShowVideoOverlay] = useState(false);
 
-  useEffect(() => {
-    if (!matchId) { setLoading(false); return; }
-    const unsub = subscribeToMatch(matchId, (data: any) => {
-      setMatch(data);
-      setLoading(false);
-      if (data?.isLive !== undefined) setIsLive(data.isLive);
-      if (data?.streamUrl) { setStreamUrl(data.streamUrl); setIsStreaming(data.isStreaming ?? false); }
-    });
-    return unsub;
-  }, [matchId]);
+ useEffect(() => {
+  if (!matchId) { setLoading(false); return; }
+  const unsub = subscribeToMatch(matchId, (data: any) => {
+    setMatch(data);
+    setLoading(false);
+    if (data?.isLive !== undefined) setIsLive(data.isLive);
+    if (data?.streamUrl) { setStreamUrl(data.streamUrl); setIsStreaming(data.isStreaming ?? false); }
+  });
+  return unsub;
+}, [matchId]);
 
-  useFocusEffect(
+// Forces a fresh one-time read whenever this screen regains focus (e.g.
+// returning from Scorecard). The Firebase realtime listener above can go
+// stale while this screen is frozen in the background by react-native-
+// screens, and setMatch's callback silently stops firing — this forced
+// read is what actually keeps scoring usable without needing to restart
+// the app. This hook ONLY calls setMatch — it does not run any
+// transition-check logic itself, so it cannot cause duplicate popups;
+// the single useEffect below (triggered by the resulting match-state
+// change) is the only place transition checks run.
+useFocusEffect(
   React.useCallback(() => {
-    // Re-run the innings-transition/opener-check logic whenever this screen
-    // regains focus (e.g. returning from Scorecard). If a setTimeout-driven
-    // UI transition was silently dropped while this screen was frozen in
-    // the background, this forces state to resync with the real match data.
-    if (!match) return;
-    if (match.currentInnings === 2 && match.innings2?.strikerId === -1 && !showOpenerSelect && !openerSelectionDoneRef.current) {
-      setOpenerStep("striker");
-      setOpener1Id(null); setOpener2Id(null); setOpener3Id(null);
-      setShowOpenerSelect(true);
-    }
-    const inn1Complete = (match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers;
-    if (match.currentInnings === 1 && match.status === "live" && inn1Complete && !showInningsEnd && !openerSelectionDoneRef.current) {
-      setInningsData(match.innings1);
-      setShowInningsEnd(true);
-    }
-    // Clear any stuck pending-picker overlays that may have been left mid-transition.
-    if (pendingBowlerAfterWicketRef.current && !showNewBowler) {
-      setShowNewBowler(true);
-    }
-  }, [match])
+    if (!matchId) return;
+    const database = require('@react-native-firebase/database').default;
+    database().ref('matches/' + matchId).once('value').then((snap: any) => {
+      const data = snap.val();
+      if (data) {
+        setMatch(data);
+        if (data?.isLive !== undefined) setIsLive(data.isLive);
+        if (data?.streamUrl) { setStreamUrl(data.streamUrl); setIsStreaming(data.isStreaming ?? false); }
+      }
+    });
+  }, [matchId])
 );
 
-  useEffect(() => {
+useEffect(() => {
   if (!match) return;
   if (match.currentInnings === 2 && showInningsEnd) {
     setShowInningsEnd(false);
@@ -110,10 +110,6 @@ export default function ScoringScreen({ route, navigation }: any) {
     setOpener1Id(null); setOpener2Id(null); setOpener3Id(null);
     setShowOpenerSelect(true);
   }
-  // Re-open the innings-end modal if we return to this screen (e.g. from
-  // Scorecard's "Back to Scoring") and innings 1 is still complete but the
-  // transition to innings 2 never happened. Without this, scoring stays
-  // frozen with no way to proceed.
   const inn1Complete = (match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers;
   if (
     match.currentInnings === 1 &&

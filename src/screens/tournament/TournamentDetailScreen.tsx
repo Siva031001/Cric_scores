@@ -26,6 +26,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   const [statsTab, setStatsTab] = useState<"batting"|"bowling"|"fielding">("batting");
   const [statsLoading, setStatsLoading] = useState(false);
   const [completedMatchesData, setCompletedMatchesData] = useState<any[]>([]);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeToTournament(tournamentId, setTournament);
@@ -215,7 +216,12 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <Header title={tournament.name} onBack={() => navigation.goBack()} />
+      <Header
+        title={tournament.name}
+        onBack={() => navigation.goBack()}
+        rightText="Info"
+        onRight={() => setShowInfoModal(true)}
+      />
       <View style={styles.infoBar}>
   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
     <AppIcon emoji="🏢" size={12} color={COLORS.textSecondary} />
@@ -413,7 +419,35 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      
+      <Modal visible={showInfoModal} transparent animationType="fade">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modal}>
+      <Text style={styles.modalTitle}>Tournament Details</Text>
+      <ScrollView style={{ maxHeight: 400 }}>
+        {[
+          { label: 'Tournament Name', value: tournament.name },
+          { label: 'Organisation', value: tournament.organisationName },
+          { label: 'Venue', value: tournament.venue || '-' },
+          { label: 'Format (Overs)', value: tournament.format || '-' },
+          { label: 'Ball Type', value: tournament.ballType || '-' },
+          { label: 'Start Date', value: tournament.startDate || '-' },
+          { label: 'End Date', value: tournament.endDate || '-' },
+          { label: 'Status', value: tournament.status ?? '-' },
+          { label: 'Teams', value: String(tournament.teams?.length ?? 0) },
+          { label: 'Matches Scheduled', value: String(tournament.matches?.length ?? 0) },
+        ].map((row, i) => (
+          <View key={i} style={styles.infoRow}>
+            <Text style={styles.infoLabel}>{row.label}</Text>
+            <Text style={styles.infoValue}>{row.value}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowInfoModal(false)}>
+        <Text style={styles.modalCloseBtnText}>Close</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
 
       <Modal visible={showNewTeam} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -554,6 +588,9 @@ const styles = StyleSheet.create({
   modal: { backgroundColor: COLORS.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SPACING.lg },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 15 },
   modalTitle: { color: COLORS.text, fontSize: 18, fontWeight: "bold", marginBottom: 15, textAlign: "center" },
+    infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    infoLabel: { color: COLORS.textSecondary, fontSize: 13 },
+    infoValue: { color: COLORS.text, fontSize: 13, fontWeight: "bold", flex: 1, textAlign: "right", marginLeft: 10 },
   modalTitle2: { color: COLORS.text, fontSize: 16, fontWeight: "bold", textAlign: "center", flex: 1 },
   backBtn: { backgroundColor: COLORS.card2, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.round, borderWidth: 1, borderColor: COLORS.border },
   backBtnText: { color: COLORS.primary, fontSize: 13, fontWeight: "bold" },

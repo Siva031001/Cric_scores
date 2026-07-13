@@ -173,14 +173,11 @@ export const getMyTournaments = async () => {
   const user = getCurrentUser();
   if (!user) return [];
   const indexSnap = await database().ref(`users/${user.uid}/tournaments`).once('value');
-  const ids = [];
+  const ids: string[] = [];
   indexSnap.forEach(child => ids.push(child.key));
-  const tournaments = [];
-  for (const id of ids) {
-    const snap = await database().ref(`tournaments/${id}`).once('value');
-    if (snap.val()) tournaments.push(snap.val());
-  }
-  return tournaments;
+  if (ids.length === 0) return [];
+  const snaps = await Promise.all(ids.map(id => database().ref(`tournaments/${id}`).once('value')));
+  return snaps.map(s => s.val()).filter(Boolean);
 };
 
 export const subscribeToTournament = (id, callback) => {
@@ -276,23 +273,20 @@ export const getMatchesForPlayer = async (globalPlayerId) => {
   const user = getCurrentUser();
   if (!user) return [];
   const indexSnap = await database().ref('users/' + user.uid + '/matches').once('value');
-  const matchIds = [];
+  const matchIds: string[] = [];
   indexSnap.forEach(child => matchIds.push(child.key));
-  const matches = [];
-  for (const id of matchIds) {
-    const snap = await database().ref('matches/' + id).once('value');
-    const m = snap.val();
-    if (!m) continue;
-    const appearsIn = [m.innings1, m.innings2].some(inn => {
+  if (matchIds.length === 0) return [];
+  const snaps = await Promise.all(matchIds.map(id => database().ref('matches/' + id).once('value')));
+  const matches = snaps.map(s => s.val()).filter(Boolean).filter((m: any) => {
+    return [m.innings1, m.innings2].some((inn: any) => {
       if (!inn) return false;
-      const bat = Object.values(inn.batsmanStats ?? {}).some((s) => s?.globalPlayerId === globalPlayerId);
-      const bowl = Object.values(inn.bowlerStats ?? {}).some((s) => s?.globalPlayerId === globalPlayerId);
-      const field = Object.values(inn.fieldingStats ?? {}).some((s) => s?.globalPlayerId === globalPlayerId);
+      const bat = Object.values(inn.batsmanStats ?? {}).some((s: any) => s?.globalPlayerId === globalPlayerId);
+      const bowl = Object.values(inn.bowlerStats ?? {}).some((s: any) => s?.globalPlayerId === globalPlayerId);
+      const field = Object.values(inn.fieldingStats ?? {}).some((s: any) => s?.globalPlayerId === globalPlayerId);
       return bat || bowl || field;
     });
-    if (appearsIn) matches.push(m);
-  }
-  return matches.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  });
+  return matches.sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 };
 
 // ───────────────────────────────────────────────────────────

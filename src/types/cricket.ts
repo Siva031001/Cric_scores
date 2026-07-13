@@ -140,6 +140,29 @@ export interface TournamentMatch {
   result?: string;
 }
 
+export type TournamentFormatType = 'League' | 'Knockout' | 'Pool + Knockout';
+export type KnockoutStage = 'Round of 16' | 'Quarter Final' | 'Semi Final' | 'Final' | 'Third Place Match';
+
+export interface Pool {
+  poolId: string;
+  poolName: string;
+  teamIds: string[]; // TournamentTeam.teamId values
+  qualifyCount: 1 | 2 | 4;
+}
+
+export interface KnockoutFixture {
+  id: string;
+  stage: KnockoutStage;
+  slot: number; // e.g. 1,2,3,4 for QF1-4, used for bracket ordering
+  homeTeamName?: string; // resolved team name, or "Winner of QF1" placeholder
+  awayTeamName?: string;
+  homeSourceFixtureId?: string; // if this slot is fed by a previous knockout match's winner
+  awaySourceFixtureId?: string;
+  status: 'scheduled' | 'live' | 'completed';
+  matchId?: string;
+  winner?: string;
+}
+
 export interface Tournament {
   id: string;
   name: string;
@@ -149,6 +172,11 @@ export interface Tournament {
   endDate: string;
   ballType: BallType;
   format?: string;
+  tournamentFormat?: TournamentFormatType;
+  pools?: Pool[];
+  knockoutStartStage?: KnockoutStage;
+  includeThirdPlaceMatch?: boolean;
+  knockoutFixtures?: KnockoutFixture[];
   teams: TournamentTeam[];
   matches: TournamentMatch[];
   createdBy: string;

@@ -31,6 +31,7 @@ export default function CreateTournamentScreen({ navigation }: any) {
   const [matchDate, setMatchDate] = useState(getTodayString());
   const [matchTime, setMatchTime] = useState('');
   const [matchVenue, setMatchVenue] = useState('');
+  const [tournamentFormat, setTournamentFormat] = useState<'League'|'Knockout'|'Pool + Knockout'>('League');
 
   const addTeam = () => {
     if (!newTeamName.trim()) return;
@@ -115,6 +116,14 @@ export default function CreateTournamentScreen({ navigation }: any) {
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={styles.label}>Tournament Format *</Text>
+<View style={styles.chipRow}>
+  {(['League', 'Knockout', 'Pool + Knockout'] as const).map(f => (
+    <TouchableOpacity key={f} style={[styles.chip, tournamentFormat === f && styles.chipActive]} onPress={() => setTournamentFormat(f)}>
+      <Text style={[styles.chipText, tournamentFormat === f && styles.chipTextActive]}>{f}</Text>
+    </TouchableOpacity>
+  ))}
+</View>
             <Text style={styles.label}>Match Format (Overs)</Text>
             <View style={styles.chipRow}>
               {FORMAT_OPTIONS.map(f => (
@@ -134,6 +143,7 @@ export default function CreateTournamentScreen({ navigation }: any) {
     const id = await createTournament({
       name: name.trim(), organisationName: orgName.trim(), venue: venue.trim(),
       startDate: startDate.trim(), endDate: endDate.trim(), ballType, format: finalFormat,
+      tournamentFormat,
       teams: [], matches: [], status: 'upcoming',
     });
     navigation.replace('TournamentDetail', { tournamentId: id });
