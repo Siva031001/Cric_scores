@@ -236,10 +236,21 @@ export const retroactivelyLinkGuestPlayers = async (phoneNumber: string, globalP
   }
 };
 
-export const ensureMyPlayerLinked = async (displayName) => {
+export const ensureMyPlayerLinked = async (displayName, phoneNumber = null) => {
   const existing = await getMyLinkedPlayerId();
-  if (existing) return existing;
-  return await createPlayerMaster(displayName, 'registered');
+  if (existing) {
+    // Backfill phoneNumber if it wasn't stored when this record was first
+    // created — without it, phone-lookup during team creation can never
+    // find this player's own stats record again.
+    if (phoneNumber) {
+      const snap = await database().ref('players/' + existing).once('value');
+      if (!snap.val()?.phoneNumber) {
+        await database().ref('players/' + existing).update({ phoneNumber: phoneNumber.replace(/\D/g, '') });
+      }
+    }
+    return existing;
+  }
+  return await createPlayerMaster(displayName, 'registered', phoneNumber);
 };
 
 export const searchGuestPlayers = async (query) => {

@@ -68,7 +68,7 @@ export const createPinAccount = async (phone: string, pin: string): Promise<stri
   // block account creation — log and continue.
   try {
     const { ensureMyPlayerLinked, retroactivelyLinkGuestPlayers } = require('./firebase');
-    const globalPlayerId = await ensureMyPlayerLinked('');
+    const globalPlayerId = await ensureMyPlayerLinked('',key);
     await retroactivelyLinkGuestPlayers(key, globalPlayerId);
   } catch (e) {
     console.warn('Retroactive guest-player linking failed:', e);

@@ -19,6 +19,7 @@ import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from '../../components/AppIcon';
 import { useFocusEffect } from "@react-navigation/native";
+import ScorecardScreen from "./ScorecardScreen";
 
 
 export default function ScoringScreen({ route, navigation }: any) {
@@ -59,10 +60,12 @@ export default function ScoringScreen({ route, navigation }: any) {
   const [streamUrl, setStreamUrl] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [showVideoOverlay, setShowVideoOverlay] = useState(false);
+  const [showScorecardModal, setShowScorecardModal] = useState(false);
 
  useEffect(() => {
   if (!matchId) { setLoading(false); return; }
   const unsub = subscribeToMatch(matchId, (data: any) => {
+    console.log('[LISTENER FIRED]', new Date().toISOString(), data?.innings1?.runs, data?.currentInnings);
     setMatch(data);
     setLoading(false);
     if (data?.isLive !== undefined) setIsLive(data.isLive);
@@ -240,7 +243,8 @@ useEffect(() => {
   };
 
   const applyBall = async (result: string) => {
-    if (!match || saving) return;
+  console.log('[APPLY BALL CALLED]', result, 'saving=', saving);
+  if (!match || saving) return;
     if (typeof result !== "string") return;
     if (match.status === "completed") { setSaving(false); return; }
     const guardInn = match.currentInnings === 1 ? match.innings1 : match.innings2;
@@ -781,7 +785,7 @@ useEffect(() => {
       <View style={s.bottomBar}>
         <Pressable style={s.bbBtn} onPress={handleUndo} disabled={!!(saving || matchCompleted)}><Text style={s.bbTxt}>Undo</Text></Pressable>
         <Pressable style={[s.bbBtn, {backgroundColor: COLORS.blue}]} onPress={handleShare}><Text style={[s.bbTxt, {color:"#fff"}]}>Share</Text></Pressable>
-        <Pressable style={[s.bbBtn, {backgroundColor: COLORS.primary}]} onPress={() => navigation.navigate("Scorecard", { matchId })}><Text style={[s.bbTxt, {color:"#fff"}]}>Scorecard</Text></Pressable>
+        <Pressable style={[s.bbBtn, {backgroundColor: COLORS.primary}]} onPress={() => setShowScorecardModal(true)}><Text style={[s.bbTxt, {color:"#fff"}]}>Scorecard</Text></Pressable>
       </View>
 
       {showNewBowler && (
@@ -874,7 +878,7 @@ useEffect(() => {
           <TouchableOpacity style={[s.confirmBtn, {backgroundColor: COLORS.red}]} onPress={() => { setShowEndConfirm(false); setShowEndMatch(true); }}>
             <Text style={s.confirmTxt}>End / Abandon Match</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[s.confirmBtn, {backgroundColor: COLORS.blue, marginTop: 8}]} onPress={() => { setShowEndConfirm(false); navigation.navigate("Scorecard", { matchId }); }}>
+          <TouchableOpacity style={[s.confirmBtn, {backgroundColor: COLORS.blue, marginTop: 8}]} onPress={() => { setShowEndConfirm(false); setShowScorecardModal(true); }}>
             <Text style={s.confirmTxt}>View Scorecard</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.cancelBtn} onPress={() => setShowEndConfirm(false)}>
@@ -923,7 +927,7 @@ useEffect(() => {
                   disabled={saving}>
                   <Text style={s.confirmTxt}>Start 2nd Innings</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.cancelBtn, {marginTop: 6}]} onPress={() => { setShowInningsEnd(false); navigation.navigate("Scorecard", { matchId }); }}>
+              <TouchableOpacity style={[s.cancelBtn, {marginTop: 6}]} onPress={() => { setShowInningsEnd(false); setShowScorecardModal(true); }}>
                 <Text style={s.cancelTxt}>View 1st Innings Scorecard</Text>
               </TouchableOpacity>
             </>
@@ -1164,6 +1168,24 @@ useEffect(() => {
           </View>
           <TouchableOpacity style={s.cancelBtn} onPress={() => setShowNBRuns(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
         </View></View>
+      </Modal>
+      <Modal visible={showScorecardModal} animationType="slide" onRequestClose={() => setShowScorecardModal(false)}>
+        <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', padding: SPACING.md, paddingTop: 50 }}>
+            <TouchableOpacity onPress={() => setShowScorecardModal(false)} style={{ padding: 8 }}>
+              <Text style={{ color: COLORS.primary, fontSize: 16, fontWeight: 'bold' }}>← Back to Scoring</Text>
+            </TouchableOpacity>
+          </View>
+          <ScorecardScreen
+            route={{ params: { matchId } }}
+            navigation={{
+              goBack: () => setShowScorecardModal(false),
+              navigate: () => {},
+              replace: () => {},
+              reset: () => {},
+            }}
+          />
+        </View>
       </Modal>
     </View>
   );
