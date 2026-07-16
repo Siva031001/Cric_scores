@@ -124,6 +124,11 @@ export default function CreateTournamentScreen({ navigation }: any) {
     </TouchableOpacity>
   ))}
 </View>
+{tournamentFormat === 'Pool + Knockout' && (
+  <Text style={styles.dateHint}>
+    You'll set up pools, assign teams, and configure qualification after creating the tournament — from the new "Pools" tab.
+  </Text>
+)}
             <Text style={styles.label}>Match Format (Overs)</Text>
             <View style={styles.chipRow}>
               {FORMAT_OPTIONS.map(f => (

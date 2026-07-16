@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, TextInput, Alert } from "react-native";
-import { subscribeToTournament, updateTournament, getMyTeams, getMatchById } from "../../utils/firebase";
+import { subscribeToTournament, updateTournament, getMyTeams, getMatchById, createPool, deletePool, renamePool, assignTeamToPool, removeTeamFromPool, addPoolMatch, arePoolsComplete, autoGenerateKnockoutBracket, editKnockoutFixtureTeams, startKnockoutMatch, createCaptainInvite, approveCaptainSubmission, deleteTournament } from "../../utils/firebase";
 import { Tournament, TournamentTeam, Team } from "../../types/cricket";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from "../../components/AppIcon";
+import { AdBanner, AdRewardedGate } from "../../components/AdPlaceholder";
+
 
 const getTodayString = () => { const d = new Date(); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear(); };
-
+const STAGE_ORDER_DISPLAY = ['Round of 16', 'Quarter Final', 'Semi Final', 'Third Place Match', 'Final'];
 export default function TournamentDetailScreen({ route, navigation }: any) {
   const { tournamentId } = route.params;
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -27,6 +29,32 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   const [statsLoading, setStatsLoading] = useState(false);
   const [completedMatchesData, setCompletedMatchesData] = useState<any[]>([]);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showPoolModal, setShowPoolModal] = useState(false);
+  const [newPoolName, setNewPoolName] = useState("");
+  const [newPoolQualify, setNewPoolQualify] = useState<1|2|4>(2);
+  const [assignPoolId, setAssignPoolId] = useState<string|null>(null);
+  const [poolMatchModal, setPoolMatchModal] = useState<{poolId: string} | null>(null);
+  const [poolMatchTeam1, setPoolMatchTeam1] = useState("");
+  const [poolMatchTeam2, setPoolMatchTeam2] = useState("");
+  const [poolMatchDate, setPoolMatchDate] = useState(getTodayString());
+  const [showBracketSetup, setShowBracketSetup] = useState(false);
+  const [bracketStartStage, setBracketStartStage] = useState<'Quarter Final'|'Semi Final'|'Final'>('Quarter Final');
+  const [includeThirdPlace, setIncludeThirdPlace] = useState(false);
+  const [editingFixture, setEditingFixture] = useState<any>(null);
+  const [editHomeTeam, setEditHomeTeam] = useState("");
+  const [editAwayTeam, setEditAwayTeam] = useState("");
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteTeamName, setInviteTeamName] = useState("");
+  const [generatedInviteCode, setGeneratedInviteCode] = useState<string|null>(null);
+  const [renamingPool, setRenamingPool] = useState<{poolId: string, currentName: string} | null>(null);
+  const [renamePoolValue, setRenamePoolValue] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteRewarded, setShowDeleteRewarded] = useState(false);
+  const [deletingTournament, setDeletingTournament] = useState(false);
+  const [showManualBracket, setShowManualBracket] = useState(false);
+  const [manualStage, setManualStage] = useState<'Quarter Final'|'Semi Final'|'Final'|'Third Place Match'>('Quarter Final');
+  const [manualHomeTeam, setManualHomeTeam] = useState("");
+  const [manualAwayTeam, setManualAwayTeam] = useState("");
 
   useEffect(() => {
     const unsub = subscribeToTournament(tournamentId, setTournament);
@@ -36,16 +64,32 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
   // Whenever the tournament's completed matches change, fetch their full
   // match data (innings/batsmanStats/bowlerStats/fieldingStats) for stats aggregation.
+  // Whenever the tournament's completed matches change, fetch their full
+  // match data (innings/batsmanStats/bowlerStats/fieldingStats) for stats aggregation.
+  // NEW: pulls completed matchIds from all three sources — the overall
+  // tournament.matches list, every pool's matches, AND knockout fixtures —
+  // so tournament-wide stats cover Pool + Knockout, not just League matches.
   useEffect(() => {
-    const completedIds = (tournament?.matches ?? [])
+    const overallIds = (tournament?.matches ?? [])
       .filter((m: any) => m.status === "completed" && m.matchId)
       .map((m: any) => m.matchId);
+    const poolIds = (tournament?.pools ?? [])
+      .flatMap((p: any) => p.matches ?? [])
+      .filter((m: any) => m.status === "completed" && m.matchId)
+      .map((m: any) => m.matchId);
+    const knockoutIds = (tournament?.knockoutFixtures ?? [])
+      .filter((f: any) => f.status === "completed" && f.matchId)
+      .map((f: any) => f.matchId);
+
+    // De-dupe in case the same matchId somehow appears twice.
+    const completedIds = Array.from(new Set([...overallIds, ...poolIds, ...knockoutIds]));
+
     if (completedIds.length === 0) { setCompletedMatchesData([]); return; }
     setStatsLoading(true);
     Promise.all(completedIds.map((id: string) => getMatchById(id)))
       .then((results: any[]) => setCompletedMatchesData(results.filter(Boolean)))
       .finally(() => setStatsLoading(false));
-  }, [tournament?.matches]);
+  }, [tournament?.matches, tournament?.pools, tournament?.knockoutFixtures]);
 
   useEffect(() => {
   const unsub = navigation.addListener('focus', () => {
@@ -135,7 +179,9 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   const TABS = [
     { key: "matches", label: "Matches", icon: "M" },
     { key: "teams", label: "Teams", icon: "T" },
-    { key: "points", label: "Points", icon: "P" },
+    ...(tournament.tournamentFormat === "Pool + Knockout" ? [{ key: "pools", label: "Pools", icon: "G" }] : []),
+    ...(tournament.tournamentFormat !== "League" ? [{ key: "bracket", label: "Bracket", icon: "K" }] : []),
+    { key: "points", label: tournament.tournamentFormat === "Pool + Knockout" ? "Overall" : "Points", icon: "P" },
     { key: "stats", label: "Stats", icon: "S" },
   ];
 
@@ -217,11 +263,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   return (
     <View style={styles.container}>
       <Header
-        title={tournament.name}
-        onBack={() => navigation.goBack()}
-        rightText="Info"
-        onRight={() => setShowInfoModal(true)}
-      />
+  title={tournament.name}
+  onBack={() => navigation.goBack()}
+  rightText="Info"
+  onRight={() => setShowInfoModal(true)}
+/>
+<TouchableOpacity onPress={() => setShowDeleteConfirm(true)} style={{ position: 'absolute', top: 50, right: 70, padding: 8, zIndex: 10 }}>
+  <Text style={{ color: COLORS.red, fontSize: 12, fontWeight: 'bold' }}>Delete</Text>
+</TouchableOpacity>
       <View style={styles.infoBar}>
   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
     <AppIcon emoji="🏢" size={12} color={COLORS.textSecondary} />
@@ -293,29 +342,257 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
           </View>
         )}
         {tab === "teams" && (
-          <View style={styles.tabContent}>
-            <View style={styles.addTeamRow}>
-              <TouchableOpacity
-                style={[styles.addTeamBtn, {flex: 1}]}
-                onPress={() => navigation.navigate('MyTeams', { selectMode: true, tournamentId })}
-                >
-              <Text style={styles.addTeamBtnText}>+ Add Team from My Teams</Text>
-              </TouchableOpacity>
-          </View>
+  <View style={styles.tabContent}>
+    <View style={styles.addTeamRow}>
+      <TouchableOpacity
+        style={[styles.addTeamBtn, {flex: 1}]}
+        onPress={() => navigation.navigate('MyTeams', { selectMode: true, tournamentId })}
+        >
+      <Text style={styles.addTeamBtnText}>+ Add Team from My Teams</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.addTeamBtn, {flex: 1, backgroundColor: COLORS.blue}]}
+        onPress={() => { setInviteTeamName(""); setGeneratedInviteCode(null); setShowInviteModal(true); }}
+        >
+      <Text style={styles.addTeamBtnText}>+ Invite Team Captain</Text>
+      </TouchableOpacity>
+  </View>
             
             {(tournament.teams ?? []).length === 0 ? (
               <View style={styles.empty}><Text style={styles.emptyIcon}></Text><Text style={styles.emptyText}>No teams added yet</Text><Text style={styles.emptyHint}>Add teams to start the tournament</Text></View>
             ) : (
-              (tournament.teams ?? []).map((team: any, i: number) => (
-                <View key={i} style={styles.teamCard}>
-                  <View style={styles.teamLogoBox}><Text style={styles.teamLogoText}>{team.teamName.charAt(0).toUpperCase()}</Text></View>
-                  <View style={styles.teamInfo}><Text style={styles.teamName}>{team.teamName}</Text><Text style={styles.teamStats}>P:{team.played} W:{team.won} L:{team.lost} Pts:{team.points}</Text></View>
-                  <TouchableOpacity onPress={() => handleRemoveTeam(team.teamId)}><Text style={styles.removeText}>X</Text></TouchableOpacity>
-                </View>
-              ))
+              (tournament.teams ?? []).map((team: any, i: number) => {
+  const invite = (tournament.captainInvites ?? []).find((inv: any) => inv.teamId === team.teamId);
+  return (
+    <View key={i} style={styles.teamCard}>
+      <View style={styles.teamLogoBox}><Text style={styles.teamLogoText}>{team.teamName.charAt(0).toUpperCase()}</Text></View>
+      <View style={styles.teamInfo}>
+        <Text style={styles.teamName}>{team.teamName}</Text>
+        <Text style={styles.teamStats}>P:{team.played} W:{team.won} L:{team.lost} Pts:{team.points}</Text>
+        {invite && (
+          <Text style={{ color: invite.status === 'pending' ? COLORS.orange : invite.status === 'submitted' ? COLORS.blue : COLORS.primary, fontSize: 11, fontWeight: 'bold', marginTop: 2 }}>
+            {invite.status === 'pending' ? `Invite pending — Code: ${invite.inviteCode}` : invite.status === 'submitted' ? `Squad submitted (${team.players?.length ?? 0} players) — tap to approve` : 'Approved'}
+          </Text>
+        )}
+      </View>
+      {invite && invite.status === 'submitted' && (
+        <TouchableOpacity onPress={() => approveCaptainSubmission(tournamentId, team.teamId)} style={{ marginRight: 8 }}>
+          <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: 'bold' }}>Approve</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity onPress={() => handleRemoveTeam(team.teamId)}><Text style={styles.removeText}>X</Text></TouchableOpacity>
+    </View>
+  );
+})
             )}
           </View>
         )}
+
+        {tab === "pools" && (
+  <View style={styles.tabContent}>
+    <TouchableOpacity style={styles.addMatchBtn} onPress={() => { setNewPoolName(""); setNewPoolQualify(2); setShowPoolModal(true); }}>
+      <Text style={styles.addMatchBtnText}>+ Create Pool</Text>
+    </TouchableOpacity>
+
+    {(tournament.pools ?? []).length === 0 ? (
+      <View style={styles.empty}>
+        <AppIcon emoji="🏊" size={48} color={COLORS.textMuted} />
+        <Text style={styles.emptyText}>No pools created yet</Text>
+        <Text style={styles.emptyHint}>Create pools (e.g. "Pool A", "Virat Pool") then assign teams to each</Text>
+      </View>
+    ) : (
+      (tournament.pools ?? []).map((pool: any) => {
+        const unassignedTeams = (tournament.teams ?? []).filter((t: any) =>
+          !(tournament.pools ?? []).some((p: any) => (p.teamIds ?? []).includes(t.teamId))
+        );
+        return (
+          <View key={pool.poolId} style={styles.matchCard}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <Text style={styles.matchTeams}>{pool.poolName}</Text>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TouchableOpacity onPress={() => { setRenamingPool({ poolId: pool.poolId, currentName: pool.poolName }); setRenamePoolValue(pool.poolName); }}>
+  <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: "bold" }}>Rename</Text>
+</TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  Alert.alert("Delete Pool", `Delete "${pool.poolName}"? Teams will become unassigned.`, [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Delete", style: "destructive", onPress: () => deletePool(tournamentId, pool.poolId) },
+                  ]);
+                }}>
+                  <Text style={{ color: COLORS.red, fontSize: 12, fontWeight: "bold" }}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <Text style={styles.matchMetaText}>Qualifies: Top {pool.qualifyCount} • {(pool.teamIds ?? []).length} teams</Text>
+
+            <View style={{ marginTop: 10, marginBottom: 10 }}>
+              {(pool.teamIds ?? []).length === 0 ? (
+                <Text style={{ color: COLORS.textMuted, fontSize: 12 }}>No teams assigned yet</Text>
+              ) : (
+                (pool.teamIds ?? []).map((teamId: string) => {
+                  const team = (tournament.teams ?? []).find((t: any) => t.teamId === teamId);
+                  return (
+                    <View key={teamId} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: COLORS.border + "55" }}>
+                      <Text style={{ color: COLORS.text, fontSize: 13 }}>{team?.teamName ?? teamId}</Text>
+                      <TouchableOpacity onPress={() => removeTeamFromPool(tournamentId, pool.poolId, teamId)}>
+                        <Text style={{ color: COLORS.red, fontSize: 12, fontWeight: "bold" }}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+
+            {unassignedTeams.length > 0 && (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: "bold", marginBottom: 6 }}>Add team to this pool:</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                  {unassignedTeams.map((t: any) => (
+                    <TouchableOpacity key={t.teamId} style={styles.teamChip} onPress={() => assignTeamToPool(tournamentId, pool.poolId, t.teamId)}>
+                      <Text style={styles.teamChipText}>+ {t.teamName}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity style={[styles.startBtn, { alignSelf: "flex-start" }]} onPress={() => {
+              setPoolMatchTeam1(""); setPoolMatchTeam2(""); setPoolMatchDate(getTodayString());
+              setPoolMatchModal({ poolId: pool.poolId });
+            }}>
+              <Text style={styles.startBtnText}>+ Schedule Pool Match</Text>
+            </TouchableOpacity>
+
+            {(pool.matches ?? []).length > 0 && (
+              <View style={{ marginTop: 10 }}>
+                {pool.matches.map((m: any) => (
+                  <View key={m.id} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6 }}>
+                    <Text style={{ color: COLORS.text, fontSize: 13 }}>{m.team1} vs {m.team2}</Text>
+                    {m.status === "scheduled" && (
+                      <TouchableOpacity style={styles.startBtn} onPress={() => handleStartMatch(m)}>
+                        <Text style={styles.startBtnText}>Start</Text>
+                      </TouchableOpacity>
+                    )}
+                    {m.status === "live" && (
+                      <TouchableOpacity style={[styles.startBtn, styles.continueBtn]} onPress={() => handleStartMatch(m)}>
+                        <Text style={styles.startBtnText}>Continue</Text>
+                      </TouchableOpacity>
+                    )}
+                    {m.status === "completed" && (
+                      <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: "bold" }}>{m.winner}</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Pool-wise points table */}
+            <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 10 }}>
+              <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: "bold", marginBottom: 8 }}>Pool Standings</Text>
+              <View style={styles.pointsHeader}>
+                <Text style={[styles.pointsCell, styles.pointsName]}>Team</Text>
+                <Text style={styles.pointsCell}>P</Text><Text style={styles.pointsCell}>W</Text><Text style={styles.pointsCell}>L</Text>
+                <Text style={styles.pointsCell}>NRR</Text><Text style={[styles.pointsCell, { color: COLORS.primary }]}>Pts</Text>
+              </View>
+              {[...(pool.standings ?? [])].sort((a: any, b: any) => b.points - a.points || b.nrr - a.nrr).map((t: any, i: number) => (
+                <View key={t.teamId} style={[styles.pointsRow, i < pool.qualifyCount && { borderColor: COLORS.yellow, borderWidth: 2 }]}>
+                  <Text style={[styles.pointsCell, styles.pointsName]}>{i < pool.qualifyCount ? "✓ " : ""}{t.teamName}</Text>
+                  <Text style={styles.pointsCell}>{t.played}</Text>
+                  <Text style={styles.pointsCell}>{t.won}</Text>
+                  <Text style={styles.pointsCell}>{t.lost}</Text>
+                  <Text style={styles.pointsCell}>{(t.nrr ?? 0) > 0 ? "+" : ""}{(t.nrr ?? 0).toFixed(2)}</Text>
+                  <Text style={[styles.pointsCell, styles.pointsPts]}>{t.points}</Text>
+                </View>
+              ))}
+              {(pool.standings ?? []).length > 0 && (
+                <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 4 }}>✓ = qualifies for knockout</Text>
+              )}
+            </View>
+          </View>
+        );
+      })
+    )}
+  </View>
+)}
+
+{tab === "bracket" && (
+  <View style={styles.tabContent}>
+    {tournament.tournamentFormat === "Pool + Knockout" && !arePoolsComplete(tournament) ? (
+      <View style={styles.empty}>
+        <AppIcon emoji="🔒" size={48} color={COLORS.textMuted} />
+        <Text style={styles.emptyText}>Bracket Locked</Text>
+        <Text style={styles.emptyHint}>Complete all pool matches to unlock the knockout bracket</Text>
+      </View>
+    ) : (tournament.knockoutFixtures ?? []).length === 0 ? (
+  <>
+    <View style={styles.empty}>
+      <AppIcon emoji="🏆" size={48} color={COLORS.textMuted} />
+      <Text style={styles.emptyText}>No Bracket Yet</Text>
+      <Text style={styles.emptyHint}>Auto-generate from pool qualifiers, or build manually</Text>
+    </View>
+    <TouchableOpacity style={styles.addMatchBtn} onPress={() => setShowBracketSetup(true)}>
+      <Text style={styles.addMatchBtnText}>+ Auto-Generate Bracket</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={[styles.addMatchBtn, { backgroundColor: COLORS.blue }]} onPress={() => {
+      setManualStage('Quarter Final'); setManualHomeTeam(''); setManualAwayTeam('');
+      setShowManualBracket(true);
+    }}>
+      <Text style={styles.addMatchBtnText}>+ Add Match Manually</Text>
+    </TouchableOpacity>
+  </>
+) : (
+      STAGE_ORDER_DISPLAY.filter((stage) => (tournament.knockoutFixtures ?? []).some((f: any) => f.stage === stage)).map((stage) => (
+        <View key={stage} style={{ marginBottom: 16 }}>
+          <Text style={{ color: COLORS.primary, fontSize: 14, fontWeight: "bold", marginBottom: 8 }}>{stage}</Text>
+          {(tournament.knockoutFixtures ?? []).filter((f: any) => f.stage === stage).sort((a: any, b: any) => a.slot - b.slot).map((f: any) => (
+            <View key={f.id} style={styles.matchCard}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={styles.matchTeams}>
+                  {f.homeTeamName ?? (f.homeSourcePool ? `${f.homeSourcePool} #${f.homeSourcePoolRank}` : "Winner of previous match")}
+                  {"  vs  "}
+                  {f.awayTeamName ?? (f.awaySourcePool ? `${f.awaySourcePool} #${f.awaySourcePoolRank}` : "Winner of previous match")}
+                </Text>
+              </View>
+              {f.homeSourcePool && (
+                <Text style={styles.matchMetaText}>{f.homeSourcePool} #{f.homeSourcePoolRank} vs {f.awaySourcePool} #{f.awaySourcePoolRank}</Text>
+              )}
+              <View style={styles.matchFooter}>
+                <View style={[styles.statusBadge, f.status === "live" && styles.statusLive, f.status === "completed" && styles.statusDone]}>
+                  <Text style={styles.statusText}>{f.status === "completed" ? "Done" : f.status === "live" ? "Live" : "Scheduled"}</Text>
+                </View>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {f.status === "scheduled" && f.homeTeamName && f.awayTeamName && (
+                    <TouchableOpacity style={styles.startBtn} onPress={() => handleStartMatch({ id: f.id, team1: f.homeTeamName, team2: f.awayTeamName, date: "TBD", time: "TBD", venue: tournament.venue ?? "TBD", status: "scheduled" })}>
+                      <Text style={styles.startBtnText}>Start</Text>
+                    </TouchableOpacity>
+                  )}
+                  {f.status === "live" && (
+                    <TouchableOpacity style={[styles.startBtn, styles.continueBtn]} onPress={() => navigation.navigate("Scoring", { matchId: f.matchId })}>
+                      <Text style={styles.startBtnText}>Continue</Text>
+                    </TouchableOpacity>
+                  )}
+                  {f.status === "completed" && f.matchId && (
+                    <TouchableOpacity style={[styles.startBtn, styles.viewBtn]} onPress={() => navigation.navigate("Scorecard", { matchId: f.matchId })}>
+                      <Text style={styles.startBtnText}>Scorecard</Text>
+                    </TouchableOpacity>
+                  )}
+                  {f.status === "scheduled" && (
+                    <TouchableOpacity style={[styles.startBtn, { backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border }]} onPress={() => {
+                      setEditingFixture(f); setEditHomeTeam(f.homeTeamName ?? ""); setEditAwayTeam(f.awayTeamName ?? "");
+                    }}>
+                      <Text style={[styles.startBtnText, { color: COLORS.text }]}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      ))
+    )}
+  </View>
+)}
         {tab === "points" && (
           <View style={styles.tabContent}>
             {(tournament.teams ?? []).length === 0 ? (
@@ -519,9 +796,234 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
           </View>
         </ScrollView>
       </Modal>
+
+      <Modal visible={showPoolModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Create Pool</Text>
+            <Text style={styles.modalLabel}>Pool Name *</Text>
+            <TextInput style={styles.modalInput} placeholder='e.g. "Pool A" or "Virat Pool"' placeholderTextColor={COLORS.textMuted} value={newPoolName} onChangeText={setNewPoolName} autoFocus />
+            <Text style={styles.modalLabel}>Qualify to Knockout</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+              {[1, 2, 4].map((n) => (
+                <TouchableOpacity key={n} style={[styles.teamChip, newPoolQualify === n && styles.teamChipActive]} onPress={() => setNewPoolQualify(n as 1|2|4)}>
+                  <Text style={[styles.teamChipText, newPoolQualify === n && styles.teamChipTextActive]}>Top {n}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowPoolModal(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+                if (!newPoolName.trim()) { Alert.alert("Error", "Enter a pool name"); return; }
+                await createPool(tournamentId, newPoolName, newPoolQualify);
+                setShowPoolModal(false);
+              }}>
+                <Text style={styles.modalAddText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!poolMatchModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Schedule Pool Match</Text>
+            {poolMatchModal && (() => {
+              const pool = (tournament.pools ?? []).find((p: any) => p.poolId === poolMatchModal.poolId);
+              const poolTeamNames = (pool?.teamIds ?? []).map((tid: string) => (tournament.teams ?? []).find((t: any) => t.teamId === tid)?.teamName).filter(Boolean);
+              return (
+                <>
+                  <Text style={styles.modalLabel}>Team 1 *</Text>
+<View style={styles.teamChipRow}>
+  {poolTeamNames.map((name: any) => (
+    <TouchableOpacity key={name} style={[styles.teamChip, poolMatchTeam1 === name && styles.teamChipActive]} onPress={() => setPoolMatchTeam1(name)}>
+      <Text style={[styles.teamChipText, poolMatchTeam1 === name && styles.teamChipTextActive]}>{name}</Text>
+    </TouchableOpacity>
+  ))}
+</View>
+                  <Text style={styles.modalLabel}>Team 2 *</Text>
+<View style={styles.teamChipRow}>
+  {poolTeamNames.map((name: any) => (
+    <TouchableOpacity key={name} style={[styles.teamChip, poolMatchTeam2 === name && styles.teamChipActive]} onPress={() => setPoolMatchTeam2(name)}>
+      <Text style={[styles.teamChipText, poolMatchTeam2 === name && styles.teamChipTextActive]}>{name}</Text>
+    </TouchableOpacity>
+  ))}
+</View>
+                  <Text style={styles.modalLabel}>Date (DD/MM/YYYY)</Text>
+                  <TextInput style={styles.modalInput} value={poolMatchDate} onChangeText={setPoolMatchDate} />
+                  <View style={styles.modalBtns}>
+                    <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setPoolMatchModal(null)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+                      if (!poolMatchTeam1 || !poolMatchTeam2) { Alert.alert("Error", "Select both teams"); return; }
+                      if (poolMatchTeam1 === poolMatchTeam2) { Alert.alert("Error", "Teams must be different"); return; }
+                      await addPoolMatch(tournamentId, poolMatchModal.poolId, { team1: poolMatchTeam1, team2: poolMatchTeam2, date: poolMatchDate });
+                      setPoolMatchModal(null);
+                    }}>
+                      <Text style={styles.modalAddText}>Schedule</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={showInviteModal} transparent animationType="slide">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modal}>
+      <Text style={styles.modalTitle}>Invite Team Captain</Text>
+      {!generatedInviteCode ? (
+        <>
+          <Text style={styles.modalLabel}>Team Name *</Text>
+          <TextInput style={styles.modalInput} placeholder="Enter team name" placeholderTextColor={COLORS.textMuted} value={inviteTeamName} onChangeText={setInviteTeamName} autoFocus />
+          <View style={styles.modalBtns}>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowInviteModal(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+              if (!inviteTeamName.trim()) { Alert.alert("Error", "Enter a team name"); return; }
+              try {
+                const code = await createCaptainInvite(tournamentId, inviteTeamName);
+                setGeneratedInviteCode(code);
+              } catch (e: any) { Alert.alert("Error", e?.message); }
+            }}>
+              <Text style={styles.modalAddText}>Generate Invite</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={{ backgroundColor: COLORS.background, borderRadius: RADIUS.md, padding: 20, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: COLORS.primary }}>
+            <Text style={{ color: COLORS.textSecondary, fontSize: 12, marginBottom: 6 }}>Invite Code</Text>
+            <Text style={{ color: COLORS.primary, fontSize: 28, fontWeight: 'bold', letterSpacing: 4 }}>{generatedInviteCode}</Text>
+          </View>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 16 }}>
+            Share this code with the team captain. They'll enter it in the app to add players for "{inviteTeamName}".
+          </Text>
+          <TouchableOpacity style={styles.modalAddBtn} onPress={() => setShowInviteModal(false)}>
+            <Text style={styles.modalAddText}>Done</Text>
+          </TouchableOpacity>
+        </>
+      )}
+
+      <Modal visible={!!renamingPool} transparent animationType="fade">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modal}>
+      <Text style={styles.modalTitle}>Rename Pool</Text>
+      <TextInput style={styles.modalInput} value={renamePoolValue} onChangeText={setRenamePoolValue} autoFocus />
+      <View style={styles.modalBtns}>
+        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setRenamingPool(null)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+          if (!renamePoolValue.trim()) { Alert.alert("Error", "Enter a pool name"); return; }
+          await renamePool(tournamentId, renamingPool!.poolId, renamePoolValue);
+          setRenamingPool(null);
+        }}>
+          <Text style={styles.modalAddText}>Save</Text>
+        </TouchableOpacity>
+      </View>
     </View>
+  </View>
+</Modal>
+<Modal visible={showDeleteConfirm} transparent animationType="fade">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modal}>
+      <Text style={styles.modalTitle}>Delete Tournament?</Text>
+      <Text style={{ color: COLORS.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: 16 }}>
+        This action cannot be undone. Deleting this tournament will permanently remove all associated data, including teams, fixtures, points tables, match history, and tournament statistics.
+      </Text>
+      <AdBanner />
+      <View style={[styles.modalBtns, { marginTop: 16 }]}>
+        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowDeleteConfirm(false)}>
+          <Text style={styles.modalCancelText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.modalAddBtn, { backgroundColor: COLORS.red }]} onPress={() => { setShowDeleteConfirm(false); setShowDeleteRewarded(true); }}>
+          <Text style={styles.modalAddText}>Watch Ad & Delete</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+<AdRewardedGate
+  visible={showDeleteRewarded}
+  onComplete={async () => {
+    setShowDeleteRewarded(false);
+    setDeletingTournament(true);
+    try {
+      await deleteTournament(tournamentId);
+      Alert.alert('Deleted', 'Tournament deleted successfully.');
+      navigation.reset({ index: 0, routes: [{ name: 'MyTournament' }] });
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not delete tournament');
+    } finally {
+      setDeletingTournament(false);
+    }
+  }}
+  onSkip={() => {
+    setShowDeleteRewarded(false);
+    Alert.alert('Ad Skipped', 'Please watch the complete advertisement to delete the tournament.');
+  }}
+/>
+
+<Modal visible={showManualBracket} transparent animationType="slide">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modal}>
+      <Text style={styles.modalTitle}>Add Match Manually</Text>
+      <Text style={styles.modalLabel}>Stage *</Text>
+      <View style={styles.teamChipRow}>
+        {(['Quarter Final', 'Semi Final', 'Final', 'Third Place Match'] as const).map((stage) => (
+          <TouchableOpacity key={stage} style={[styles.teamChip, manualStage === stage && styles.teamChipActive]} onPress={() => setManualStage(stage)}>
+            <Text style={[styles.teamChipText, manualStage === stage && styles.teamChipTextActive]}>{stage}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={styles.modalLabel}>Team 1</Text>
+      <View style={styles.teamChipRow}>
+        {(tournament.teams ?? []).map((t: any) => (
+          <TouchableOpacity key={t.teamId} style={[styles.teamChip, manualHomeTeam === t.teamName && styles.teamChipActive]} onPress={() => setManualHomeTeam(t.teamName)}>
+            <Text style={[styles.teamChipText, manualHomeTeam === t.teamName && styles.teamChipTextActive]}>{t.teamName}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={styles.modalLabel}>Team 2 (leave unselected for a "Winner of..." placeholder)</Text>
+      <View style={styles.teamChipRow}>
+        {(tournament.teams ?? []).map((t: any) => (
+          <TouchableOpacity key={t.teamId} style={[styles.teamChip, manualAwayTeam === t.teamName && styles.teamChipActive]} onPress={() => setManualAwayTeam(t.teamName)}>
+            <Text style={[styles.teamChipText, manualAwayTeam === t.teamName && styles.teamChipTextActive]}>{t.teamName}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={styles.modalBtns}>
+        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowManualBracket(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+          const existingSlots = (tournament.knockoutFixtures ?? []).filter((f: any) => f.stage === manualStage).length;
+          const fixture = {
+            id: 'ko_manual_' + Date.now(),
+            stage: manualStage,
+            slot: existingSlots + 1,
+            homeTeamName: manualHomeTeam || undefined,
+            awayTeamName: manualAwayTeam || undefined,
+            status: 'scheduled',
+          };
+          try {
+            await setManualKnockoutFixture(tournamentId, fixture);
+            setShowManualBracket(false);
+          } catch (e: any) { Alert.alert("Error", e?.message); }
+        }}>
+          <Text style={styles.modalAddText}>Add</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+    </View>
+  </View>
+</Modal>
+    </View>
+
+    
   );
 }
+            
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },

@@ -7,8 +7,12 @@ import Header from "../../components/Header";
 
 export default function ScorecardScreen({ route, navigation }: any) {
   const { matchId } = route.params ?? {};
-  const [match, setMatch] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // NEW: accept live match data as a prop (used when embedded as a modal
+  // inside ScoringScreen). If not provided, fall back to subscribing
+  // ourselves (used when this is the actual routed "Scorecard" screen).
+  const injectedMatch = route.params?.liveMatch ?? null;
+  const [match, setMatch] = useState<any>(injectedMatch);
+  const [loading, setLoading] = useState(!injectedMatch);
   const [activeTab, setActiveTab] = useState<"inn1"|"inn2">("inn1");
   const [showMOM, setShowMOM] = useState(false);
   const [momCandidates, setMomCandidates] = useState<any[]>([]);
@@ -16,11 +20,17 @@ export default function ScorecardScreen({ route, navigation }: any) {
   const momShownRef = React.useRef(false);
 
   useEffect(() => {
+    // If match data is being injected via props, sync it directly —
+    // no independent Firebase subscription, no unmount/resubscribe races.
+    if (injectedMatch) {
+      setMatch(injectedMatch);
+      setLoading(false);
+      return;
+    }
     if (!matchId) { setLoading(false); return; }
     const unsub = subscribeToMatch(matchId, (data: any) => {
       setMatch(data);
       setLoading(false);
-      // #4 — show top 2 candidates so scorer can pick
       if (data?.status === "completed" && !data?.manOfMatch && !momShownRef.current) {
         momShownRef.current = true;
         const candidates = calculateManOfMatchCandidates(data);
@@ -32,7 +42,19 @@ export default function ScorecardScreen({ route, navigation }: any) {
       }
     });
     return unsub;
-  }, [matchId]);
+  }, [matchId, injectedMatch]);
+
+  // Safely go back whether this screen is a real routed screen (where
+// canGoBack() tells us if there's a previous screen) or an embedded modal
+// inside ScoringScreen (where canGoBack is undefined but goBack/reset are
+// always safe to call). Never falls through to a no-op navigate().
+const goBackSafe = () => {
+  if (typeof navigation.canGoBack !== 'function' || navigation.canGoBack()) {
+    navigation.goBack();
+  } else {
+    navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+  }
+};
 
   const buildFullScorecardText = () => {
     const lines: string[] = [];
@@ -276,15 +298,15 @@ export default function ScorecardScreen({ route, navigation }: any) {
       <ScrollView style={s.container}>
         {/* #3 — back goes to Home when match is completed, not screen-by-screen */}
         <Header
-          title="Scorecard"
-          onBack={() => {
-            if (match?.status === "completed") {
-              navigation.reset({ index: 0, routes: [{ name: "Home" }] });
-            } else {
-              navigation.goBack();
-            }
-          }}
-        />
+  title="Scorecard"
+  onBack={() => {
+    if (match?.status === "completed") {
+      navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+    } else {
+      goBackSafe();
+    }
+  }}
+/>
 
         <View style={s.matchHeader}>
           <Text style={s.teamsTitle}>{match.team1}</Text>
@@ -420,22 +442,22 @@ export default function ScorecardScreen({ route, navigation }: any) {
         {/* Action Buttons */}
         {match.status === "live" && match.currentInnings === 1 && ((match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers) && (
   <TouchableOpacity style={[s.shareBtn, {backgroundColor: COLORS.primary, marginTop: 0}]}
-      onPress={() => navigation.goBack()}>
+      onPress={goBackSafe}>
      <Text style={s.shareBtnTxt}>Back to Scoring — Start 2nd Innings There</Text>
   </TouchableOpacity>
 )}
 {match.status === "live" && match.currentInnings === 1 && !((match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers) && (
   <TouchableOpacity style={[s.shareBtn, { backgroundColor: COLORS.red, marginTop: 0 }]}
-    onPress={() => navigation.goBack()}>
+    onPress={goBackSafe}>
     <Text style={s.shareBtnTxt}>Back to Scoring</Text>
   </TouchableOpacity>
 )}
         {match.status === "live" && match.currentInnings === 2 && (
-          <TouchableOpacity style={[s.shareBtn, { backgroundColor: COLORS.red, marginTop: 0 }]}
-            onPress={() => navigation.goBack()}>
-            <Text style={s.shareBtnTxt}>Continue Scoring</Text>
-          </TouchableOpacity>
-        )}
+  <TouchableOpacity style={[s.shareBtn, { backgroundColor: COLORS.red, marginTop: 0 }]}
+    onPress={goBackSafe}>
+    <Text style={s.shareBtnTxt}>Continue Scoring</Text>
+  </TouchableOpacity>
+)}
 
         {/* MOM Banner */}
         {match.manOfMatch && (

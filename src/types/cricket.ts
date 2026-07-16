@@ -148,6 +148,8 @@ export interface Pool {
   poolName: string;
   teamIds: string[]; // TournamentTeam.teamId values
   qualifyCount: 1 | 2 | 4;
+  matches: TournamentMatch[];   // NEW: fixtures scoped to this pool only
+  standings: TournamentTeam[];  // NEW: pool-only points table, separate from tournament.teams
 }
 
 export interface KnockoutFixture {
@@ -161,6 +163,15 @@ export interface KnockoutFixture {
   status: 'scheduled' | 'live' | 'completed';
   matchId?: string;
   winner?: string;
+}
+
+export interface CaptainInvite {
+  teamId: string;
+  teamName: string;
+  inviteCode: string;
+  status: 'pending' | 'submitted' | 'approved';
+  submittedPlayers?: any[];
+  submittedAt?: number;
 }
 
 export interface Tournament {
@@ -182,6 +193,7 @@ export interface Tournament {
   createdBy: string;
   createdAt: number;
   status: 'upcoming' | 'live' | 'completed';
+  captainInvites?: CaptainInvite[]; // NEW
 }
 
 export interface UserProfile {

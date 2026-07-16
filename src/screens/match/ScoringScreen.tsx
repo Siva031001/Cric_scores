@@ -504,7 +504,27 @@ useEffect(() => {
       openerSelectionDoneRef.current = false;
     try {
   const key = match.currentInnings === 1 ? "innings1" : "innings2";
-    await updateMatch(matchId, { [key]: undoLastBall(match[key]) });
+    const undoneInn = undoLastBall(match[key]);
+    await updateMatch(matchId, { [key]: undoneInn });
+
+    // NEW: if undo landed exactly back on an over boundary (balls === 0,
+    // at least one over bowled, overs remaining, not all out), the bowler
+    // who was selected for the over that just got undone is stale — the
+    // very first ball of that over no longer exists. Re-open the New
+    // Bowler picker, exactly as if the over had just completed normally,
+    // so the user is forced to (re)select before the next delivery.
+    const atOverBoundary =
+      (undoneInn.balls ?? 0) === 0 &&
+      (undoneInn.overs ?? 0) > 0 &&
+      (undoneInn.overs ?? 0) < match.totalOvers &&
+      (undoneInn.wickets ?? 0) < 10;
+
+    if (atOverBoundary) {
+      setPendingWicket(false);
+      setPendingBowlerAfterWicket(false);
+      pendingBowlerAfterWicketRef.current = false;
+      setShowNewBowler(true);
+    }
       } catch (e: any) { Alert.alert("Error", e?.message); }
     setSaving(false);
   };
@@ -927,9 +947,9 @@ useEffect(() => {
                   disabled={saving}>
                   <Text style={s.confirmTxt}>Start 2nd Innings</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.cancelBtn, {marginTop: 6}]} onPress={() => { setShowInningsEnd(false); setShowScorecardModal(true); }}>
-                <Text style={s.cancelTxt}>View 1st Innings Scorecard</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={[s.cancelBtn, {marginTop: 6}]} onPress={() => { setShowScorecardModal(true); }}>
+  <Text style={s.cancelTxt}>View 1st Innings Scorecard</Text>
+</TouchableOpacity>
             </>
           ) : (
             <>
@@ -1170,23 +1190,27 @@ useEffect(() => {
         </View></View>
       </Modal>
       <Modal visible={showScorecardModal} animationType="slide" onRequestClose={() => setShowScorecardModal(false)}>
-        <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', padding: SPACING.md, paddingTop: 50 }}>
-            <TouchableOpacity onPress={() => setShowScorecardModal(false)} style={{ padding: 8 }}>
-              <Text style={{ color: COLORS.primary, fontSize: 16, fontWeight: 'bold' }}>← Back to Scoring</Text>
-            </TouchableOpacity>
-          </View>
-          <ScorecardScreen
-            route={{ params: { matchId } }}
-            navigation={{
-              goBack: () => setShowScorecardModal(false),
-              navigate: () => {},
-              replace: () => {},
-              reset: () => {},
-            }}
-          />
-        </View>
-      </Modal>
+  <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', padding: SPACING.md, paddingTop: 50 }}>
+      <TouchableOpacity onPress={() => setShowScorecardModal(false)} style={{ padding: 8 }}>
+        <Text style={{ color: COLORS.primary, fontSize: 16, fontWeight: 'bold' }}>← Back to Scoring</Text>
+      </TouchableOpacity>
+    </View>
+    <ScorecardScreen
+      // NEW: pass the already-subscribed `match` state directly instead of
+      // letting ScorecardScreen open a second Firebase subscription on the
+      // same path. This removes the whole class of bug where closing this
+      // modal could leave ScoringScreen's listener dead or stale.
+      route={{ params: { matchId, liveMatch: match } }}
+      navigation={{
+        goBack: () => setShowScorecardModal(false),
+        navigate: () => {},
+        replace: () => {},
+        reset: () => setShowScorecardModal(false),
+      }}
+    />
+  </View>
+</Modal>
     </View>
   );
 }

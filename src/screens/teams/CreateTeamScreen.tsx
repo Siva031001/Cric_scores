@@ -102,9 +102,16 @@ export default function CreateTeamScreen({ route, navigation }: any) {
   const fromNewMatch = route.params?.fromNewMatch ?? false;
   const teamSlot = route.params?.teamSlot ?? null;
   const prefillName = route.params?.prefillName ?? '';
+    // NEW: captain-invite submission mode — locks the team name, and on save
+    // submits players to the specific invited team slot instead of creating
+    // a brand-new "my teams" entry.
+  const captainInviteMode = route.params?.captainInviteMode ?? false;
+  const inviteTournamentId = route.params?.inviteTournamentId ?? null;
+  const inviteTeamId = route.params?.inviteTeamId ?? null;
+  const inviteTeamName = route.params?.inviteTeamName ?? '';
 
-  const teamNameRef = useRef(existingTeam?.name ?? prefillName);
-  const [teamNameDisplay, setTeamNameDisplay] = useState(existingTeam?.name ?? prefillName);
+  const teamNameRef = useRef(existingTeam?.name ?? (captainInviteMode ? inviteTeamName : prefillName));
+  const [teamNameDisplay, setTeamNameDisplay] = useState(existingTeam?.name ?? (captainInviteMode ? inviteTeamName : prefillName));
   const [logo, setLogo] = useState(existingTeam?.logo ?? null);
   const [saving, setSaving] = useState(false);
   const [captainId, setCaptainId] = useState(existingTeam?.players?.find((p: any) => p.isCaptain)?.id ?? null);
@@ -244,6 +251,15 @@ const confirmNamePrompt = useCallback(() => {
         });
       }
       const formattedTeamName = formatTeamName(name);
+      if (captainInviteMode) {
+        const { submitCaptainTeam } = require('../../utils/firebase');
+        await submitCaptainTeam(inviteTournamentId, inviteTeamId, finalPlayers);
+        Alert.alert('Submitted!', `Your squad for "${inviteTeamName}" has been submitted to the organizer.`, [
+          { text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }) },
+        ]);
+        setSaving(false);
+        return;
+      }
       if (existingTeam?.id) {
         await updateTeam(existingTeam.id, { name, logo: logo ?? undefined, players: finalPlayers });
         Alert.alert('Updated!', `"${name}" updated.`, [{ text: 'OK', onPress: () => navigation.goBack() }]);
@@ -304,7 +320,7 @@ Alert.alert(
              )}
         </TouchableOpacity>
         <View style={styles.topRight}>
-          <TextInput style={styles.teamNameInput} placeholder="Team Name *" placeholderTextColor={COLORS.textMuted} defaultValue={teamNameDisplay} onChangeText={text => { teamNameRef.current = text; }} onEndEditing={e => setTeamNameDisplay(e.nativeEvent.text)} autoCorrect={false} autoCapitalize="words" />
+          <TextInput style={styles.teamNameInput} placeholder="Team Name *" placeholderTextColor={COLORS.textMuted} defaultValue={teamNameDisplay} onChangeText={text => { teamNameRef.current = text; }} onEndEditing={e => setTeamNameDisplay(e.nativeEvent.text)} autoCorrect={false} autoCapitalize="words" editable={!captainInviteMode} />
           {/* Team Type Selector */}
           {!existingTeam && (
             <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>

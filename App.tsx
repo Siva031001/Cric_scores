@@ -34,6 +34,7 @@ import MatchHistoryDetailScreen from "./src/screens/stats/MatchHistoryDetailScre
 import { createNavigationContainerRef } from "@react-navigation/native";
 import { Alert } from "react-native";
 import { subscribeToSessionValidity, logoutLocalSession } from "./src/utils/pinAuthService";
+import JoinAsCaptainScreen from "./src/screens/tournament/JoinAsCaptainScreen";
 
 // NOTE: The old src/screens/LeaderboardScreen.tsx has been intentionally removed.
 // It imported from a non-existent '../utils/leaderboard' utility and was dead code
@@ -55,7 +56,7 @@ function SplashScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#0a1628', justifyContent: 'center', alignItems: 'center' }}>
       <Animated.View style={{ alignItems: 'center', opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
-        <AppIcon emoji="🏏" size={80} color="#fff" style={{ marginBottom: 16 }} />
+        <AppIcon emoji="0" size={80} color="#fff" style={{ marginBottom: 16 }} />
         <Text style={{ color: '#ffffff', fontSize: 36, fontWeight: 'bold' }}>CricketScorer</Text>
         <Text style={{ color: '#4ade80', fontSize: 16, marginTop: 8 }}>Your cricket companion</Text>
       </Animated.View>
@@ -145,6 +146,7 @@ export default function App() {
         <Stack.Screen name="TournamentDetail" component={TournamentDetailScreen} />
         <Stack.Screen name="CreateTournament" component={CreateTournamentScreen} />
         <Stack.Screen name="TournamentLeaderboard" component={TournamentLeaderboardScreen} />
+        <Stack.Screen name="JoinAsCaptain" component={JoinAsCaptainScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

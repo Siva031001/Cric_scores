@@ -59,6 +59,8 @@ export default function HomeScreen({ navigation }: any) {
     setSearchResults(results);
   };
 
+  
+
   // Live Match (id:'live') REMOVED as requested
   const MENU = [
     { id: 'matches', icon: '📊', label: 'My Matches', sub: 'Stats & Overview', screen: 'MyMatches', color: COLORS.blue },
