@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, Text, TouchableOpacity, Pressable, StyleSheet, Alert, ScrollView, Share, ActivityIndicator, Modal, TextInput } from "react-native";
 import { WebView } from "react-native-webview";
-import { subscribeToMatch, updateMatch, completeTournamentMatch, generateMatchSummary } from "../../utils/firebase";
-import {
+import { subscribeToMatch, updateMatch, completeTournamentMatch } from "../../utils/firebase";import {
   processBall,
   undoLastBall,
   getOversString,
@@ -176,13 +175,13 @@ useEffect(() => {
   };
 };
 
-  // Helper: fire AI summary generation after a match completes.
-  // Non-blocking � errors are caught and logged so a Gemini failure
-  // never prevents the scorecard from loading or crashes the app.
-  const triggerAISummary = (updatedMatch: any) => {
-    generateMatchSummary(matchId, updatedMatch).catch((e: any) =>
-      console.warn("AI summary skipped:", e?.message)
-    );
+  // AI summary is no longer generated automatically on match completion —
+  // it's now a manual, ad-gated action the user triggers from the
+  // Scorecard screen ("Generate AI Summary" button). This function is kept
+  // as a no-op stub so the existing triggerAISummary(...) call sites below
+  // don't need to be touched individually.
+  const triggerAISummary = (_updatedMatch: any) => {
+    // Intentionally does nothing — see ScorecardScreen's "Generate AI Summary" button.
   };
 
   const finishWicketBall = async (

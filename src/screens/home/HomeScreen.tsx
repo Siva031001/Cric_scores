@@ -162,6 +162,9 @@ export default function HomeScreen({ navigation }: any) {
           <View style={{ height: 30 }} />
         </ScrollView>
       )}
+      <View style={{ paddingHorizontal: SPACING.lg, paddingBottom: SPACING.md }}>
+        <AdBanner />
+      </View>
     </View>
   );
 }

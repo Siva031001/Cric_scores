@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, TextInput, Alert } from "react-native";
-import { subscribeToTournament, updateTournament, getMyTeams, getMatchById, createPool, deletePool, renamePool, assignTeamToPool, removeTeamFromPool, addPoolMatch, arePoolsComplete, autoGenerateKnockoutBracket, editKnockoutFixtureTeams, startKnockoutMatch, createCaptainInvite, approveCaptainSubmission, deleteTournament } from "../../utils/firebase";
-import { Tournament, TournamentTeam, Team } from "../../types/cricket";
+import { subscribeToTournament, updateTournament, getMyTeams, getMatchById, createPool, deletePool, renamePool, assignTeamToPool, removeTeamFromPool, addPoolMatch, arePoolsComplete, autoGenerateKnockoutBracket, editKnockoutFixtureTeams, startKnockoutMatch, createCaptainInvite, approveCaptainSubmission, deleteTournament, setManualKnockoutFixture } from "../../utils/firebase";import { Tournament, TournamentTeam, Team } from "../../types/cricket";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from "../../components/AppIcon";
 import { AdBanner, AdRewardedGate } from "../../components/AdPlaceholder";
-
+import AdInterstitial from "../../components/AdInterstitial";
 
 const getTodayString = () => { const d = new Date(); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear(); };
 const STAGE_ORDER_DISPLAY = ['Round of 16', 'Quarter Final', 'Semi Final', 'Third Place Match', 'Final'];
@@ -55,6 +54,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   const [manualStage, setManualStage] = useState<'Quarter Final'|'Semi Final'|'Final'|'Third Place Match'>('Quarter Final');
   const [manualHomeTeam, setManualHomeTeam] = useState("");
   const [manualAwayTeam, setManualAwayTeam] = useState("");
+  const [showStatsInterstitial, setShowStatsInterstitial] = useState(false);
+  const statsInterstitialShownRef = React.useRef(false);
 
   useEffect(() => {
     const unsub = subscribeToTournament(tournamentId, setTournament);
@@ -263,8 +264,9 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   return (
     <View style={styles.container}>
       <Header
+  <Header
   title={tournament.name}
-  onBack={() => navigation.goBack()}
+  onBack={() => { setShowStatsInterstitial(false); navigation.goBack(); }}
   rightText="Info"
   onRight={() => setShowInfoModal(true)}
 />
@@ -617,8 +619,13 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
           </View>
         )}
         {tab === "stats" && (
-          <View style={styles.tabContent}>
-            {statsLoading ? (
+  <View style={styles.tabContent} onLayout={() => {
+    if (!statsInterstitialShownRef.current && !statsLoading && completedMatchesData.length > 0) {
+      statsInterstitialShownRef.current = true;
+      setShowStatsInterstitial(true);
+    }
+  }}>
+    {statsLoading ? (
               <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 30 }} />
             ) : completedMatchesData.length === 0 ? (
               <View style={styles.empty}><Text style={styles.emptyIcon}></Text><Text style={styles.emptyText}>Stats available after matches</Text><Text style={styles.emptyHint}>Complete matches to see statistics</Text></View>

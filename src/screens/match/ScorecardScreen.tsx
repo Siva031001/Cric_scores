@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Share, Alert, Modal } from "react-native";
-import { subscribeToMatch, updateMatch, calculateManOfMatch, calculateManOfMatchCandidates, saveManOfMatch } from "../../utils/firebase";
+import { subscribeToMatch, updateMatch, calculateManOfMatch, calculateManOfMatchCandidates, saveManOfMatch, generateMatchSummary } from "../../utils/firebase";
+import { AdBanner, AdRewardedGate } from "../../components/AdPlaceholder";
 import { getOversString, getRunRate, statKey } from "../../utils/cricketLogic";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
+import AdInterstitial from "../../components/AdInterstitial";
 
 export default function ScorecardScreen({ route, navigation }: any) {
   const { matchId } = route.params ?? {};
@@ -17,8 +19,13 @@ export default function ScorecardScreen({ route, navigation }: any) {
   const [showMOM, setShowMOM] = useState(false);
   const [momCandidates, setMomCandidates] = useState<any[]>([]);
   const [selectedMOM, setSelectedMOM] = useState<any>(null);
+  const [showAIConfirm, setShowAIConfirm] = useState(false);
+  const [showAIRewarded, setShowAIRewarded] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
   const momShownRef = React.useRef(false);
-
+  const [showMatchCompleteInterstitial, setShowMatchCompleteInterstitial] = useState(false);
+  const [showShareInterstitial, setShowShareInterstitial] = useState(false);
+  const interstitialShownRef = React.useRef(false);
   useEffect(() => {
     // If match data is being injected via props, sync it directly —
     // no independent Firebase subscription, no unmount/resubscribe races.
@@ -39,6 +46,13 @@ export default function ScorecardScreen({ route, navigation }: any) {
           setSelectedMOM(candidates[0]);
           setShowMOM(true);
         }
+      }
+      // Interstitial fires once per screen visit, only for completed matches,
+      // and only after the MOM flow has had a chance to show first (avoid
+      // stacking two full-screen overlays).
+      if (data?.status === "completed" && !interstitialShownRef.current) {
+        interstitialShownRef.current = true;
+        setTimeout(() => setShowMatchCompleteInterstitial(true), 800);
       }
     });
     return unsub;
@@ -295,7 +309,7 @@ const goBackSafe = () => {
 
   return (
     <>
-      <ScrollView style={s.container}>
+      <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 60 }}>
         {/* #3 — back goes to Home when match is completed, not screen-by-screen */}
         <Header
   title="Scorecard"
@@ -352,11 +366,15 @@ const goBackSafe = () => {
             </View>
             {match.summaryText ? (
               <Text style={s.aiSummaryText}>{match.summaryText}</Text>
-            ) : (
+            ) : generatingAI ? (
               <View style={s.aiSummaryLoading}>
                 <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 8 }} />
                 <Text style={s.aiSummaryLoadingTxt}>Generating summary...</Text>
               </View>
+            ) : (
+              <TouchableOpacity style={s.aiGenerateBtn} onPress={() => setShowAIConfirm(true)}>
+                <Text style={s.aiGenerateBtnTxt}>✨ Generate AI Summary</Text>
+              </TouchableOpacity>
             )}
           </View>
         )}
@@ -435,7 +453,10 @@ const goBackSafe = () => {
         )}
 
         {/* Share Button */}
-        <TouchableOpacity style={s.shareBtn} onPress={handleShare}>
+        <TouchableOpacity style={s.shareBtn} onPress={async () => {
+          await handleShare();
+          setShowShareInterstitial(true);
+        }}>
           <Text style={s.shareBtnTxt}>Share Scorecard</Text>
         </TouchableOpacity>
 
@@ -518,6 +539,64 @@ const goBackSafe = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={showAIConfirm} transparent animationType="fade">
+        <View style={s.momOverlay}>
+          <View style={s.momModal}>
+            <Text style={s.momModalTitle}>🤖 Generate AI Summary</Text>
+            <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 16 }}>
+              AI Generation uses premium resources. Please watch a short advertisement to continue.
+            </Text>
+            <AdBanner />
+            <TouchableOpacity style={[s.momConfirmBtn, { marginTop: 16 }]} onPress={() => { setShowAIConfirm(false); setShowAIRewarded(true); }}>
+              <Text style={s.momConfirmTxt}>Watch Ad & Continue</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.momSkipBtn} onPress={() => setShowAIConfirm(false)}>
+              <Text style={s.momSkipTxt}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <AdRewardedGate
+        visible={showAIRewarded}
+        onComplete={async () => {
+          setShowAIRewarded(false);
+          setGeneratingAI(true);
+          try {
+            await generateMatchSummary(matchId, match);
+          } catch (e: any) {
+            Alert.alert("Error", "Could not generate summary: " + (e?.message ?? "unknown error"));
+          } finally {
+            setGeneratingAI(false);
+          }
+        }}
+        onSkip={() => {
+          setShowAIRewarded(false);
+          Alert.alert("Ad Skipped", "Please watch the complete advertisement to use AI Generation.");
+        }}
+      />
+
+      <AdRewardedGate
+        visible={showAIRewarded}
+        onComplete={async () => {
+          setShowAIRewarded(false);
+          setGeneratingAI(true);
+          try {
+            await generateMatchSummary(matchId, match);
+          } catch (e: any) {
+            Alert.alert("Error", "Could not generate summary: " + (e?.message ?? "unknown error"));
+          } finally {
+            setGeneratingAI(false);
+          }
+        }}
+        onSkip={() => {
+          setShowAIRewarded(false);
+          Alert.alert("Ad Skipped", "Please watch the complete advertisement to use AI Generation.");
+        }}
+      />
+    <AdInterstitial visible={showMatchCompleteInterstitial} onDismiss={() => setShowMatchCompleteInterstitial(false)} />
+      <AdInterstitial visible={showShareInterstitial} onDismiss={() => setShowShareInterstitial(false)} />
     </>
   );
 }
@@ -600,4 +679,6 @@ const s = StyleSheet.create({
   momSkipTxt: { color: COLORS.textSecondary, fontWeight: "bold" },
   shareBtn: { backgroundColor: COLORS.primary, margin: SPACING.lg, marginBottom: 8, padding: 14, borderRadius: RADIUS.md, alignItems: "center" },
   shareBtnTxt: { color: "#fff", fontSize: 15, fontWeight: "bold" },
+  aiGenerateBtn: { backgroundColor: COLORS.primary + "22", borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.md, paddingVertical: 12, alignItems: "center" },
+  aiGenerateBtnTxt: { color: COLORS.primary, fontSize: 14, fontWeight: "bold" },
 });

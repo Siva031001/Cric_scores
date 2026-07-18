@@ -1045,3 +1045,37 @@ export const deleteTournament = async (tournamentId) => {
   await database().ref(`tournaments/${tournamentId}`).remove();
   await database().ref(`users/${user.uid}/tournaments/${tournamentId}`).remove();
 };
+
+// ───────────────────────────────────────────────────────────
+// TIERED MATCH HISTORY — free tiers vs rewarded-ad-gated tiers
+// ───────────────────────────────────────────────────────────
+
+// tier: 'today' | 'week' | 'month60' | 'custom' | 'lifetime'
+// Free tiers: 'today', 'week'. Gated tiers: 'month60', 'custom', 'lifetime'
+// — the CALLER is responsible for showing the rewarded ad gate BEFORE
+// calling this with a gated tier; this function only applies the date
+// filter, it doesn't know about ad state.
+export const getMatchHistoryTiered = async (tier, customStart, customEnd) => {
+  const linkedPlayerId = await getMyLinkedPlayerId();
+  const allMatches = linkedPlayerId
+    ? await getMatchesForPlayer(linkedPlayerId)
+    : await getMatchHistory();
+
+  if (tier === 'lifetime') return allMatches;
+
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  let cutoff;
+  switch (tier) {
+    case 'today': cutoff = now - DAY; break;
+    case 'week': cutoff = now - 7 * DAY; break;
+    case 'month60': cutoff = now - 60 * DAY; break;
+    case 'custom': {
+      const start = customStart ? new Date(customStart).getTime() : 0;
+      const end = customEnd ? new Date(customEnd).getTime() + DAY : now;
+      return allMatches.filter((m) => (m.createdAt ?? 0) >= start && (m.createdAt ?? 0) <= end);
+    }
+    default: cutoff = now - DAY;
+  }
+  return allMatches.filter((m) => (m.createdAt ?? 0) >= cutoff);
+};

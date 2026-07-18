@@ -40,24 +40,32 @@ export const createPinAccount = async (phone: string, pin: string): Promise<stri
   // UID and inherit its teams/matches/profile, which is the exact bug
   // this guards against.
   if (auth().currentUser) {
-    await auth().signOut();
-  }
-  const cred = await auth().signInAnonymously();
-  const user = cred.user;
+  await auth().signOut();
+}
 
-  const salt = generateSalt();
-  const pinHash = hashPin(pin, salt);
-  const sessionId = generateSessionId();
+// Sign in with a custom token bound to a stable, phone-derived uid (via
+// Cloud Function) instead of a random anonymous uid. This is what makes
+// the SAME uid come back on every device for this phone number, so stats
+// stay linked to the verified phone number regardless of which device
+// scores the match.
+const functionsMod = require('@react-native-firebase/functions').default;
+const { data: tokenData } = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
+const cred = await auth().signInWithCustomToken(tokenData.token);
+const user = cred.user;
 
-  await database().ref(`pinAuth/${key}`).set({
-    phoneNumber: key,
-    salt,
-    pinHash,
-    activeSessionId: sessionId,
-    uid: user.uid,
-    createdAt: Date.now(),
-    lastLoginAt: Date.now(),
-  });
+const salt = generateSalt();
+const pinHash = hashPin(pin, salt);
+const sessionId = generateSessionId();
+
+await database().ref(`pinAuth/${key}`).set({
+  phoneNumber: key,
+  salt,
+  pinHash,
+  activeSessionId: sessionId,
+  uid: user.uid, // stable: "phone_" + key, identical on every device
+  createdAt: Date.now(),
+  lastLoginAt: Date.now(),
+});
 
   await AsyncStorage.setItem(LOCAL_SESSION_KEY, sessionId);
   await AsyncStorage.setItem(LOCAL_PHONE_KEY, key);
@@ -91,22 +99,16 @@ export const loginWithPin = async (phone: string, pin: string): Promise<{ succes
   }
 
   const isValid = verifyPin(pin, record.salt, record.pinHash);
-  if (!isValid) {
-    return { success: false, error: 'Incorrect PIN. Please try again.' };
-  }
+if (!isValid) {
+  return { success: false, error: 'Incorrect PIN. Please try again.' };
+}
 
-  // Sign in anonymously as the SAME uid this phone was originally linked to
-  // isn't directly possible (anonymous auth can't "resume" a specific uid
-  // across devices) — so we sign in fresh anonymously on this device, and
-  // rely on the pinAuth/{phone} record (not the auth uid) as the source of
-  // truth for "who this phone number belongs to." Your data functions that
-  // key off getCurrentUser().uid for personal data (teams, matches) will
-  // need to key off the phone number instead if cross-device data access
-  // is required — flag this to Claude if that's the case, it's a bigger
-  // change than session locking alone.
-  if (!auth().currentUser) {
-    await auth().signInAnonymously();
-  }
+if (auth().currentUser) {
+  await auth().signOut();
+}
+const functionsMod = require('@react-native-firebase/functions').default;
+const { data: tokenData } = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
+await auth().signInWithCustomToken(tokenData.token);
 
   const newSessionId = generateSessionId();
   await database().ref(`pinAuth/${key}`).update({
@@ -286,4 +288,41 @@ export const resetPinWithPhoneAuth = async (phone: string, newPin: string): Prom
   await AsyncStorage.setItem(LOCAL_PHONE_KEY, key);
 
   return { success: true };
+};
+
+// ── OTP verification attempt tracking ──────────────────────
+// Stored at otpAttempts/{phone}: { count, confirmationCreatedAt }
+// Invalidates the current OTP after 5 wrong tries, forcing a fresh send —
+// this is what stops brute-force guessing of a 4-6 digit code.
+const MAX_VERIFY_ATTEMPTS = 5;
+
+export const recordFailedOtpAttempt = async (phone: string): Promise<{ attemptsLeft: number; blocked: boolean }> => {
+  const key = normalizePhone(phone);
+  const ref = database().ref('otpAttempts/' + key);
+  const snap = await ref.once('value');
+  const record = snap.val();
+  const newCount = (record?.count ?? 0) + 1;
+  await ref.set({ count: newCount, lastAttemptAt: Date.now() });
+  const blocked = newCount >= MAX_VERIFY_ATTEMPTS;
+  return { attemptsLeft: Math.max(0, MAX_VERIFY_ATTEMPTS - newCount), blocked };
+};
+
+export const resetOtpAttempts = async (phone: string) => {
+  const key = normalizePhone(phone);
+  await database().ref('otpAttempts/' + key).remove();
+};
+
+// ── Rewarded-ad-gated resend ────────────────────────────────
+// Returns which OTP attempt number this send is (1st, 2nd, 3rd within the
+// 24h window) so the UI knows whether to show an ad gate before sending.
+export const getOtpSendNumber = async (phone: string): Promise<number> => {
+  const key = normalizePhone(phone);
+  const ref = database().ref('otpLimits/' + key);
+  const snap = await ref.once('value');
+  const record = snap.val();
+  const now = Date.now();
+  if (!record || now - (record.windowStart ?? 0) >= OTP_WINDOW_MS) {
+    return 1; // fresh window, this would be the 1st send
+  }
+  return (record.count ?? 0) + 1; // 2nd, 3rd, ... within the current window
 };
