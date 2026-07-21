@@ -20,6 +20,8 @@ import BattingSetupScreen from "./src/screens/match/BattingSetupScreen";
 import HistoryScreen from "./src/screens/match/HistoryScreen";
 import LiveViewScreen from "./src/screens/match/LiveViewScreen";
 import LiveStreamScreen from "./src/screens/match/LiveStreamScreen";
+import MyLiveStreamsScreen from "./src/screens/match/MyLiveStreamsScreen";
+import StreamingPlansScreen from "./src/screens/match/StreamingPlansScreen";
 import PublicMatchScreen from "./src/screens/match/PublicMatchScreen";
 import CommentaryScreen from "./src/screens/match/CommentaryScreen";
 import ProfileScreen from "./src/screens/settings/ProfileScreen";
@@ -124,6 +126,8 @@ export default function App() {
         <Stack.Screen name="History"          component={HistoryScreen} />
         <Stack.Screen name="LiveView"         component={LiveViewScreen} />
         <Stack.Screen name="LiveStream"       component={LiveStreamScreen} />
+        <Stack.Screen name="MyLiveStreams"    component={MyLiveStreamsScreen} />
+        <Stack.Screen name="StreamingPlans"   component={StreamingPlansScreen} />
         <Stack.Screen name="PublicMatch"      component={PublicMatchScreen} />
         <Stack.Screen name="Commentary"       component={CommentaryScreen} />
 

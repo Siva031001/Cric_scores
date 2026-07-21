@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Image, StatusBar, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory } from '../../utils/firebase';
+import { AdBanner } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import AppIcon from '../../components/AppIcon';
 

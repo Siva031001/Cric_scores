@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal } from 'react-native';
-import { getMatchHistory } from '../../utils/firebase';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native';import { getMatchHistory } from '../../utils/firebase';
+import { AdBanner, AdRewardedGate } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
@@ -63,7 +63,8 @@ const getPartnerships = (inn: any, players: any[]) => {
 };
 
 type SortKey = 'runs' | 'avg' | 'sr' | 'wickets' | 'eco' | 'bowlAvg';
-type DateFilter = 'all' | '30' | '90';
+type DateFilter = 'today' | 'week' | 'month60' | 'custom' | 'lifetime';
+const FREE_TIERS: DateFilter[] = ['today', 'week'];
 
 export default function MatchHistoryDetailScreen({ navigation }: any) {
   const [matches, setMatches] = useState<any[]>([]);
@@ -72,10 +73,13 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   const [filter, setFilter] = useState<string>('all');
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all'|'tournament'|'normal'>('all');
   const [ballTypeFilter, setBallTypeFilter] = useState<'all'|'Leather Ball'|'Tennis Ball'>('all');
-  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('week');
   const [showMatchTypeDropdown, setShowMatchTypeDropdown] = useState(false);
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [showBallTypeDropdown, setShowBallTypeDropdown] = useState(false);
+  const [pendingDateFilter, setPendingDateFilter] = useState<DateFilter | null>(null);
+  const [showDateAdConfirm, setShowDateAdConfirm] = useState(false);
+  const [showDateAdRewarded, setShowDateAdRewarded] = useState(false);
   const [batSort, setBatSort] = useState<SortKey>('runs');
   const [bolSort, setBolSort] = useState<SortKey>('wickets');
 
@@ -98,10 +102,30 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
     );
   }
 
+  const handleSelectDateFilter = (tier: DateFilter) => {
+    setShowDateDropdown(false);
+    if (FREE_TIERS.includes(tier)) {
+      setDateFilter(tier);
+    } else {
+      // 30/60 days, Custom range, and Lifetime all require watching a
+      // rewarded ad first, since they scan more historical data.
+      setPendingDateFilter(tier);
+      setShowDateAdConfirm(true);
+    }
+  };
+
   const now = Date.now();
-  const dateFilteredMatches = dateFilter === 'all'
-    ? matches
-    : matches.filter((m: any) => (now - (m.createdAt ?? 0)) <= parseInt(dateFilter) * 24 * 60 * 60 * 1000);
+  const DAY = 24 * 60 * 60 * 1000;
+  const dateFilteredMatches = (() => {
+    switch (dateFilter) {
+      case 'today': return matches.filter((m: any) => (now - (m.createdAt ?? 0)) <= DAY);
+      case 'week': return matches.filter((m: any) => (now - (m.createdAt ?? 0)) <= 7 * DAY);
+      case 'month60': return matches.filter((m: any) => (now - (m.createdAt ?? 0)) <= 60 * DAY);
+      case 'lifetime': return matches;
+      case 'custom': return matches; // TODO: wire a date-range picker if a custom UI is added later
+      default: return matches.filter((m: any) => (now - (m.createdAt ?? 0)) <= 7 * DAY);
+    }
+  })();
 
   const typeFilteredMatches = matchTypeFilter === 'all'
     ? dateFilteredMatches
@@ -318,7 +342,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
     </TouchableOpacity>
     <TouchableOpacity style={s.dropdownBtn} onPress={() => setShowDateDropdown(true)}>
       <Text style={s.dropdownBtnTxt}>
-        {dateFilter === 'all' ? 'All Time' : dateFilter === '30' ? '30 Days' : '90 Days'}
+        {dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? 'Last 7 Days' : dateFilter === 'month60' ? 'Last 60 Days' : dateFilter === 'custom' ? 'Custom Range' : 'Lifetime'}
       </Text>
       <Text style={s.dropdownArrow}>▼</Text>
     </TouchableOpacity>
@@ -347,9 +371,18 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   <Modal visible={showDateDropdown} transparent animationType="fade">
     <TouchableOpacity style={s.dropdownOverlay} activeOpacity={1} onPress={() => setShowDateDropdown(false)}>
       <View style={s.dropdownMenu}>
-        {([['all','All Time'],['30','30 Days'],['90','90 Days']] as const).map(([k, l]) => (
-          <TouchableOpacity key={k} style={s.dropdownItem} onPress={() => { setDateFilter(k as DateFilter); setShowDateDropdown(false); }}>
+        {([['today','Today'],['week','Last 7 Days']] as const).map(([k, l]) => (
+          <TouchableOpacity key={k} style={s.dropdownItem} onPress={() => handleSelectDateFilter(k as DateFilter)}>
             <Text style={[s.dropdownItemTxt, dateFilter === k && { color: COLORS.primary, fontWeight: 'bold' }]}>{l}</Text>
+          </TouchableOpacity>
+        ))}
+        <View style={{ height: 1, backgroundColor: COLORS.border, marginVertical: 4 }} />
+        {([['month60','Last 60 Days'],['custom','Custom Date Range'],['lifetime','Lifetime Statistics']] as const).map(([k, l]) => (
+          <TouchableOpacity key={k} style={s.dropdownItem} onPress={() => handleSelectDateFilter(k as DateFilter)}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[s.dropdownItemTxt, dateFilter === k && { color: COLORS.primary, fontWeight: 'bold' }]}>{l}</Text>
+              <AppIcon emoji="🎥" size={12} color={COLORS.textMuted} />
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -639,11 +672,51 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                 })}
               </>
             )}
+            
           </View>
         )}
+        
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.border }}>
+        <AdBanner />
+      </View>
+
+      <Modal visible={showDateAdConfirm} transparent animationType="fade">
+        <View style={s.dropdownOverlay}>
+          <View style={[s.dropdownMenu, { padding: SPACING.lg, minWidth: 280 }]}>
+            <Text style={{ color: COLORS.text, fontSize: 16, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 }}>Unlock Extended History</Text>
+            <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 16 }}>
+              Watch a short ad to view {pendingDateFilter === 'month60' ? 'the last 60 days' : pendingDateFilter === 'custom' ? 'a custom date range' : 'your lifetime stats'}.
+            </Text>
+            <AdBanner />
+            <TouchableOpacity
+              style={{ backgroundColor: COLORS.primary, padding: 14, borderRadius: RADIUS.md, alignItems: 'center', marginTop: 16 }}
+              onPress={() => { setShowDateAdConfirm(false); setShowDateAdRewarded(true); }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Watch Ad & Continue</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{ padding: 12, alignItems: 'center' }} onPress={() => { setShowDateAdConfirm(false); setPendingDateFilter(null); }}>
+              <Text style={{ color: COLORS.textMuted, fontSize: 13 }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <AdRewardedGate
+        visible={showDateAdRewarded}
+        onComplete={() => {
+          setShowDateAdRewarded(false);
+          if (pendingDateFilter) setDateFilter(pendingDateFilter);
+          setPendingDateFilter(null);
+        }}
+        onSkip={() => {
+          setShowDateAdRewarded(false);
+          setPendingDateFilter(null);
+          Alert.alert('Ad Skipped', 'Please watch the complete advertisement to unlock this date range.');
+        }}
+      />
     </View>
   );
 }

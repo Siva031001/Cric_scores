@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, 
 import { getMyTeams, deleteTeam } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import { AdBanner } from '../../components/AdPlaceholder';
 
 export default function MyTeamsScreen({ navigation, route }: any) {
   const selectMode = route?.params?.selectMode ?? false;
@@ -132,6 +133,9 @@ export default function MyTeamsScreen({ navigation, route }: any) {
           renderItem={({ item }) => <TeamCard item={item} />}
         />
       )}
+      <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.border }}>
+        <AdBanner />
+      </View>
     </View>
   );
 }

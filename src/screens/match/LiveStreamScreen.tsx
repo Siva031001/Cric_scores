@@ -49,6 +49,30 @@ export default function LiveStreamScreen({ navigation }: any) {
             </View>
             <Text style={s.optArrow}>›</Text>
           </TouchableOpacity>
+
+          {/* NEW: My Live Streams — organizer's stream history/status view */}
+          <TouchableOpacity style={s.optionCard} onPress={() => navigation.navigate("MyLiveStreams")}>
+            <View style={[s.optIcon, {backgroundColor: COLORS.purple + "33"}]}>
+              <Text style={[s.optIconTxt, {color: COLORS.purple}]}>📊</Text>
+            </View>
+            <View style={s.optInfo}>
+              <Text style={s.optTitle}>My Live Streams</Text>
+              <Text style={s.optSub}>View active, scheduled, completed, and draft live streams.</Text>
+            </View>
+            <Text style={s.optArrow}>›</Text>
+          </TouchableOpacity>
+
+          {/* NEW: Streaming Plans — pricing page, Coming Soon */}
+          <TouchableOpacity style={s.optionCard} onPress={() => navigation.navigate("StreamingPlans")}>
+            <View style={[s.optIcon, {backgroundColor: COLORS.teal + "33"}]}>
+              <Text style={[s.optIconTxt, {color: COLORS.teal}]}>💎</Text>
+            </View>
+            <View style={s.optInfo}>
+              <Text style={s.optTitle}>Streaming Plans</Text>
+              <Text style={s.optSub}>Unlock more live matches and premium score themes.</Text>
+            </View>
+            <Text style={s.optArrow}>›</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={s.howBox}>

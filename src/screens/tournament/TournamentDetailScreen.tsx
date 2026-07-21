@@ -264,7 +264,6 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   return (
     <View style={styles.container}>
       <Header
-  <Header
   title={tournament.name}
   onBack={() => { setShowStatsInterstitial(false); navigation.goBack(); }}
   rightText="Info"

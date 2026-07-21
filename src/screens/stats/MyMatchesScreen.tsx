@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { getMyLinkedPlayerId, getMatchesForPlayer } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import { AdBanner } from '../../components/AdPlaceholder';
 
 export default function MyMatchesScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
@@ -46,6 +47,9 @@ export default function MyMatchesScreen({ navigation }: any) {
           <TouchableOpacity style={s.startBtn} onPress={() => navigation.navigate('MyTeams')}>
             <Text style={s.startBtnTxt}>Go to Teams</Text>
           </TouchableOpacity>
+        </View>
+        <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.border }}>
+          <AdBanner />
         </View>
       </View>
     );
@@ -320,6 +324,9 @@ export default function MyMatchesScreen({ navigation }: any) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.border }}>
+        <AdBanner />
+      </View>
     </View>
   );
 }
