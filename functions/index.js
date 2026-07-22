@@ -37,57 +37,8 @@ exports.verifyPhoneNotClaimed = functions.https.onCall(async (data, context) => 
   return { available: true };
 });
 
-const crypto = require('crypto');
-// Razorpay key ID/secret should be set via: firebase functions:config:set razorpay.key_id="..." razorpay.key_secret="..."
-// then read here as functions.config().razorpay.key_id / key_secret — NEVER hardcode secrets in this file.
-
-const Razorpay = require('razorpay'); // npm install razorpay (in functions/ folder)
-
-const STREAM_PACKAGES = {
-  pkg_1: { matches: 1, amountPaise: 9900 },   // ₹99
-  pkg_2: { matches: 2, amountPaise: 19900 },  // ₹199
-  pkg_5: { matches: 5, amountPaise: 44900 },  // ₹449
-  pkg_10: { matches: 10, amountPaise: 79900 }, // ₹799
-};
-
-// Creates a Razorpay order server-side, with the amount fixed by package ID
-// — the client can never influence the actual charged amount.
-exports.createStreamOrder = functions.https.onCall(async (data, context) => {
-  const pkg = STREAM_PACKAGES[data.packageId];
-  if (!pkg) throw new functions.https.HttpsError('invalid-argument', 'Invalid package');
-
-  const config = functions.config();
-  const razorpay = new Razorpay({ key_id: config.razorpay.key_id, key_secret: config.razorpay.key_secret });
-
-  const order = await razorpay.orders.create({
-    amount: pkg.amountPaise,
-    currency: 'INR',
-    receipt: 'stream_' + Date.now(),
-  });
-
-  return { orderId: order.id, amount: pkg.amountPaise, keyId: config.razorpay.key_id };
-});
-
-// Verifies the payment signature server-side (mandatory — never trust a
-// client-reported "payment succeeded") before crediting stream matches.
-exports.verifyStreamPayment = functions.https.onCall(async (data, context) => {
-  const { orderId, paymentId, signature, packageId, uid } = data;
-  const pkg = STREAM_PACKAGES[packageId];
-  if (!pkg) throw new functions.https.HttpsError('invalid-argument', 'Invalid package');
-
-  const config = functions.config();
-  const expectedSignature = crypto
-    .createHmac('sha256', config.razorpay.key_secret)
-    .update(orderId + '|' + paymentId)
-    .digest('hex');
-
-  if (expectedSignature !== signature) {
-    throw new functions.https.HttpsError('permission-denied', 'Payment verification failed');
-  }
-
-  // Credit the matches only after signature is confirmed valid.
-  const creditRef = admin.database().ref('users/' + uid + '/streamCredits');
-  await creditRef.transaction((current) => (current ?? 0) + pkg.matches);
-
-  return { success: true, creditsAdded: pkg.matches };
-});
+// NOTE: Paid live-streaming (createStreamOrder / verifyStreamPayment via
+// Razorpay) intentionally deferred until payment integration is actually
+// being wired up. Re-add those two functions + `npm install razorpay` in
+// this folder, plus `firebase functions:config:set razorpay.key_id=... 
+// razorpay.key_secret=...` with real keys, when that phase begins.

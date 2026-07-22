@@ -75,7 +75,7 @@ export default function MyLiveStreamsScreen({ navigation }: any) {
             <TouchableOpacity
               key={m.id}
               style={s.card}
-              onPress={() => navigation.navigate(m.status === 'completed' ? 'Scorecard' : 'Scoring', { matchId: m.id })}
+              onPress={() => navigation.navigate(m.status === 'completed' ? 'Scorecard' : 'StreamingDashboard', { matchId: m.id })}
             >
               <View style={s.cardTop}>
                 <Text style={s.cardTeams}>{m.team1} vs {m.team2}</Text>

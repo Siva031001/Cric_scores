@@ -37,6 +37,8 @@ import { createNavigationContainerRef } from "@react-navigation/native";
 import { Alert } from "react-native";
 import { subscribeToSessionValidity, logoutLocalSession } from "./src/utils/pinAuthService";
 import JoinAsCaptainScreen from "./src/screens/tournament/JoinAsCaptainScreen";
+import StreamingDashboardScreen from "./src/screens/match/StreamingDashboardScreen";
+
 
 // NOTE: The old src/screens/LeaderboardScreen.tsx has been intentionally removed.
 // It imported from a non-existent '../utils/leaderboard' utility and was dead code
@@ -128,6 +130,7 @@ export default function App() {
         <Stack.Screen name="LiveStream"       component={LiveStreamScreen} />
         <Stack.Screen name="MyLiveStreams"    component={MyLiveStreamsScreen} />
         <Stack.Screen name="StreamingPlans"   component={StreamingPlansScreen} />
+        <Stack.Screen name="StreamingDashboard" component={StreamingDashboardScreen} />
         <Stack.Screen name="PublicMatch"      component={PublicMatchScreen} />
         <Stack.Screen name="Commentary"       component={CommentaryScreen} />
 
