@@ -166,6 +166,15 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
           )}
         </View>
 
+        {match.streamUrl && (
+  <TouchableOpacity
+    style={[s.btn, { backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, marginTop: 8 }]}
+    onPress={() => navigation.navigate('ThemeSelector', { matchId, match, currentThemeId: match.streamThemeId ?? 'classic' })}
+  >
+    <Text style={[s.btnTxt, { color: COLORS.text }]}>🎨 Change Overlay Theme</Text>
+  </TouchableOpacity>
+)}
+
         {/* Streaming Controls */}
         <View style={s.card}>
           <Text style={s.cardTitle}>Streaming Controls</Text>

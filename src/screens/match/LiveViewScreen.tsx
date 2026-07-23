@@ -5,6 +5,9 @@ import { subscribeToMatch } from '../../utils/firebase';
 import { getOversString, getRunRate, getRequiredRunRate } from '../../utils/cricketLogic';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import LiveScoreOverlay from '../../components/LiveScoreOverlay';
+import { getBallByBall, getCurrentPartnership, getWormData, getWinProbability } from '../../utils/matchAnalytics';
+import WormGraph from '../../components/WormGraph';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -13,6 +16,7 @@ export default function LiveViewScreen({ navigation }: any) {
   const [match, setMatch] = useState<any>(null);
   const [watching, setWatching] = useState(false);
   const [videoVisible, setVideoVisible] = useState(true);
+  const [viewTab, setViewTab] = useState<'live'|'analytics'>('live');
 
   const joinMatch = () => {
     if (matchId.trim().length < 4) { Alert.alert('Error', 'Please enter a valid Match ID'); return; }
@@ -105,17 +109,9 @@ export default function LiveViewScreen({ navigation }: any) {
                   <Text style={s.videoPlaceholderTxt}>Video Paused</Text>
                 </View>
               )}
-              {/* Score overlay on top of video */}
-              <View style={s.videoOverlay} pointerEvents="none">
-                <View style={s.overlayLeft}>
-                  <Text style={s.overlayScore}>{inn?.runs ?? 0}/{inn?.wickets ?? 0}</Text>
-                  <Text style={s.overlayOvers}>{getOversString(inn?.overs ?? 0, inn?.balls ?? 0)} ov</Text>
-                </View>
-                <View style={s.overlayRight}>
-                  <Text style={s.overlayTeam}>{match.currentInnings === 1 ? match.team1 : match.team2}</Text>
-                  <Text style={s.overlayRR}>RR {getRunRate(inn?.runs ?? 0, inn?.overs ?? 0, inn?.balls ?? 0)}</Text>
-                  {tgt && <Text style={s.overlayTgt}>Need {Math.max(0, tgt - (inn?.runs ?? 0))}</Text>}
-                </View>
+              {/* Themed score overlay on top of video */}
+              <View style={{ position: 'absolute', bottom: 8, left: 8, right: 8 }} pointerEvents="none">
+                <LiveScoreOverlay match={match} themeId={match.streamThemeId ?? 'classic'} />
               </View>
             </View>
             <TouchableOpacity style={s.videoToggle} onPress={() => setVideoVisible(!videoVisible)}>
@@ -226,6 +222,77 @@ export default function LiveViewScreen({ navigation }: any) {
           <Text style={s.extrasDtl}>W:{inn?.extras?.wides ?? 0}  NB:{inn?.extras?.noBalls ?? 0}  B:{inn?.extras?.byes ?? 0}  LB:{inn?.extras?.legByes ?? 0}</Text>
         </View>
 
+        {/* ── VIEW TABS: Live / Analytics ── */}
+        <View style={s.viewTabs}>
+          <TouchableOpacity style={[s.viewTab, viewTab === 'live' && s.viewTabActive]} onPress={() => setViewTab('live')}>
+            <Text style={[s.viewTabTxt, viewTab === 'live' && s.viewTabTxtActive]}>Live</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.viewTab, viewTab === 'analytics' && s.viewTabActive]} onPress={() => setViewTab('analytics')}>
+            <Text style={[s.viewTabTxt, viewTab === 'analytics' && s.viewTabTxtActive]}>Analytics</Text>
+          </TouchableOpacity>
+        </View>
+
+        {viewTab === 'live' && (() => {
+          const partnership = getCurrentPartnership(inn);
+          const ballByBall = getBallByBall(inn, 12);
+          return (
+            <>
+              {/* Current Partnership */}
+              <View style={s.analyticsCard}>
+                <Text style={s.analyticsTitle}>Current Partnership</Text>
+                <Text style={s.partnershipTxt}>{partnership.runs} runs ({partnership.balls} balls)</Text>
+              </View>
+
+              {/* Ball-by-Ball feed */}
+              <View style={s.analyticsCard}>
+                <Text style={s.analyticsTitle}>Ball-by-Ball</Text>
+                {ballByBall.map((b: any, i: number) => (
+                  <View key={i} style={s.bbRow}>
+                    <Text style={s.bbOver}>{b.over}.{b.ball ?? ''}</Text>
+                    <Text style={s.bbResult}>{b.result}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          );
+        })()}
+
+        {viewTab === 'analytics' && (() => {
+          const worm = getWormData(match);
+          const winProb = getWinProbability(match);
+          return (
+            <>
+              {/* Worm Graph */}
+              <View style={s.analyticsCard}>
+                <Text style={s.analyticsTitle}>Worm Graph</Text>
+                <WormGraph
+                  innings1Points={worm.innings1}
+                  innings2Points={worm.innings2}
+                  totalOvers={match.totalOvers}
+                  team1Name={match.team1}
+                  team2Name={match.team2}
+                />
+              </View>
+
+              {/* Win Probability */}
+              {winProb && (
+                <View style={s.analyticsCard}>
+                  <Text style={s.analyticsTitle}>Win Probability</Text>
+                  <View style={s.winProbBar}>
+                    <View style={[s.winProbFill, { flex: winProb.team1, backgroundColor: COLORS.blue }]} />
+                    <View style={[s.winProbFill, { flex: winProb.team2, backgroundColor: COLORS.primary }]} />
+                  </View>
+                  <View style={s.winProbLabels}>
+                    <Text style={s.winProbLabel}>{match.team1} {winProb.team1}%</Text>
+                    <Text style={s.winProbLabel}>{match.team2} {winProb.team2}%</Text>
+                  </View>
+                  <Text style={s.winProbNote}>Estimate based on required run rate and wickets in hand — not a statistical prediction.</Text>
+                </View>
+              )}
+            </>
+          );
+        })()}
+
         {/* ── NO STREAM PLACEHOLDER ── */}
         {!hasStream && (
           <View style={s.noStreamBox}>
@@ -330,4 +397,21 @@ const s = StyleSheet.create({
   noStreamBadgeTxt: { color: COLORS.textSecondary, fontSize: 11, fontWeight: 'bold', letterSpacing: 1 },
   noStreamTxt: { color: COLORS.textSecondary, fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
   noStreamSub: { color: COLORS.textMuted, fontSize: 12 },
+
+  viewTabs: { flexDirection: 'row', marginHorizontal: SPACING.md, marginTop: 8, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, padding: 3, gap: 3 },
+  viewTab: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, alignItems: 'center' },
+  viewTabActive: { backgroundColor: COLORS.primary },
+  viewTabTxt: { color: COLORS.textSecondary, fontSize: 12, fontWeight: 'bold' },
+  viewTabTxtActive: { color: '#fff' },
+  analyticsCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: 8, borderRadius: RADIUS.md, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border },
+  analyticsTitle: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold', marginBottom: 8, letterSpacing: 0.5 },
+  partnershipTxt: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
+  bbRow: { flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: COLORS.border + '55' },
+  bbOver: { color: COLORS.textMuted, fontSize: 12, width: 50 },
+  bbResult: { color: COLORS.text, fontSize: 13, fontWeight: 'bold' },
+  winProbBar: { flexDirection: 'row', height: 24, borderRadius: RADIUS.round, overflow: 'hidden', marginBottom: 8 },
+  winProbFill: { height: '100%' },
+  winProbLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  winProbLabel: { color: COLORS.text, fontSize: 12, fontWeight: 'bold' },
+  winProbNote: { color: COLORS.textMuted, fontSize: 10, fontStyle: 'italic' },
 });

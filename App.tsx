@@ -38,6 +38,8 @@ import { Alert } from "react-native";
 import { subscribeToSessionValidity, logoutLocalSession } from "./src/utils/pinAuthService";
 import JoinAsCaptainScreen from "./src/screens/tournament/JoinAsCaptainScreen";
 import StreamingDashboardScreen from "./src/screens/match/StreamingDashboardScreen";
+import ThemeSelectorScreen from "./src/screens/match/ThemeSelectorScreen";
+
 
 
 // NOTE: The old src/screens/LeaderboardScreen.tsx has been intentionally removed.
@@ -131,6 +133,7 @@ export default function App() {
         <Stack.Screen name="MyLiveStreams"    component={MyLiveStreamsScreen} />
         <Stack.Screen name="StreamingPlans"   component={StreamingPlansScreen} />
         <Stack.Screen name="StreamingDashboard" component={StreamingDashboardScreen} />
+        <Stack.Screen name="ThemeSelector" component={ThemeSelectorScreen} />
         <Stack.Screen name="PublicMatch"      component={PublicMatchScreen} />
         <Stack.Screen name="Commentary"       component={CommentaryScreen} />
 
