@@ -23,7 +23,6 @@ import LiveStreamScreen from "./src/screens/match/LiveStreamScreen";
 import MyLiveStreamsScreen from "./src/screens/match/MyLiveStreamsScreen";
 import StreamingPlansScreen from "./src/screens/match/StreamingPlansScreen";
 import PublicMatchScreen from "./src/screens/match/PublicMatchScreen";
-import CommentaryScreen from "./src/screens/match/CommentaryScreen";
 import ProfileScreen from "./src/screens/settings/ProfileScreen";
 import ProfileEditScreen from "./src/screens/settings/ProfileEditScreen";
 import SettingsScreen from "./src/screens/settings/SettingsScreen";
@@ -39,6 +38,7 @@ import { subscribeToSessionValidity, logoutLocalSession } from "./src/utils/pinA
 import JoinAsCaptainScreen from "./src/screens/tournament/JoinAsCaptainScreen";
 import StreamingDashboardScreen from "./src/screens/match/StreamingDashboardScreen";
 import ThemeSelectorScreen from "./src/screens/match/ThemeSelectorScreen";
+import CameraModeScreen from "./src/screens/match/CameraModeScreen";
 
 
 
@@ -134,8 +134,9 @@ export default function App() {
         <Stack.Screen name="StreamingPlans"   component={StreamingPlansScreen} />
         <Stack.Screen name="StreamingDashboard" component={StreamingDashboardScreen} />
         <Stack.Screen name="ThemeSelector" component={ThemeSelectorScreen} />
+        <Stack.Screen name="CameraMode"    component={CameraModeScreen} />
         <Stack.Screen name="PublicMatch"      component={PublicMatchScreen} />
-        <Stack.Screen name="Commentary"       component={CommentaryScreen} />
+      
 
         {/* -- Stats -- */}
         <Stack.Screen name="MyMatches"        component={MyMatchesScreen} />

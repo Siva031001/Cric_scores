@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView, Share } from 'react-native';
-import { subscribeToMatch, updateMatch } from '../../utils/firebase';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView, Share, Modal } from 'react-native';import { subscribeToMatch, updateMatch, getCurrentUser } from '../../utils/firebase';
 import { validateStreamSource } from '../../utils/liveStreamValidation';
+import { subscribeToNetworkHealth } from '../../utils/networkHealth';
 import { getOversString } from '../../utils/cricketLogic';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import ShareMatchSheet from '../../components/ShareMatchSheet';
+
 
 export default function StreamingDashboardScreen({ route, navigation }: any) {
   const { matchId } = route.params ?? {};
@@ -12,6 +14,12 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
   const [streamInput, setStreamInput] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [durationSec, setDurationSec] = useState(0);
+  const [showShareSheet, setShowShareSheet] = useState(false);
+  const [netHealth, setNetHealth] = useState('Good');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [commentsEnabled, setCommentsEnabled] = useState(true);
 
   useEffect(() => {
     if (!matchId) return;
@@ -27,9 +35,30 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
     return () => clearInterval(t);
   }, [match?.isStreaming, match?.streamStartedAt]);
 
+  useEffect(() => {
+    if (match) {
+      setEditTitle(match.streamTitle ?? '');
+      setEditDesc(match.streamDescription ?? '');
+      setCommentsEnabled(match.commentsEnabled ?? true);
+    }
+  }, [match?.streamTitle, match?.streamDescription, match?.commentsEnabled]);
+
+  useEffect(() => {
+    const unsub = subscribeToNetworkHealth((status) => {
+      setNetHealth(status);
+      if (status === 'Poor' || status === 'Disconnected') {
+        Alert.alert('Weak Connection', 'Your internet connection is unstable — streaming quality may drop.');
+      }
+    });
+    return unsub;
+  }, []);
+
   if (!match) {
     return <View style={s.center}><Text style={s.loadingTxt}>Loading match…</Text></View>;
   }
+  
+  const isOrganizer = match.scorerId === getCurrentUser()?.uid;
+  
 
   const formatDuration = (sec: number) => {
     const h = Math.floor(sec / 3600);
@@ -134,10 +163,22 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
             </View>
             <View style={s.metric}>
               <Text style={s.metricLabel}>Connection</Text>
-              <Text style={[s.metricValue, { color: COLORS.primary }]}>Good</Text>
+              <Text style={[s.metricValue, { color: netHealth === 'Poor' || netHealth === 'Disconnected' ? COLORS.red : COLORS.primary }]}>{netHealth}</Text>
             </View>
           </View>
           <Text style={s.metricNote}>Viewer count and stream health require YouTube Data API integration — shown as placeholders until that's connected.</Text>
+        </View>
+
+        {/* Viewer Statistics */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Viewer Statistics</Text>
+          <Text style={s.metricNote}>Detailed viewer stats (peak viewers, average watch time, likes, comments, country/device breakdown) require YouTube Data API integration — a separate setup step (YouTube channel + API credentials). Placeholder shown until that's connected.</Text>
+        </View>
+
+        {/* Sponsor Banner (future monetization) */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Sponsor Banner</Text>
+          <Text style={s.metricNote}>Coming soon — local sponsors will be able to display a banner on this tournament's live stream and scorecard.</Text>
         </View>
 
         {/* YouTube Connection */}
@@ -175,7 +216,36 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
   </TouchableOpacity>
 )}
 
+        {/* Streaming Quality */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Streaming Quality</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {[
+              { key: '360p', label: '360p', dataPerHour: '~150 MB/hr' },
+              { key: '480p', label: '480p', dataPerHour: '~300 MB/hr' },
+              { key: '720p', label: '720p', dataPerHour: '~800 MB/hr' },
+              { key: '1080p', label: '1080p', dataPerHour: '~1.6 GB/hr' },
+              { key: 'auto', label: 'Auto', dataPerHour: 'Adjusts automatically' },
+            ].map((q) => (
+              <TouchableOpacity
+                key={q.key}
+                style={[s.qualityChip, match.streamQuality === q.key && s.qualityChipActive]}
+                onPress={() => updateMatch(matchId, { streamQuality: q.key })}
+              >
+                <Text style={[s.qualityChipTxt, match.streamQuality === q.key && { color: '#fff' }]}>{q.label}</Text>
+                <Text style={s.qualityChipSub}>{q.dataPerHour}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Organizer: Edit Stream Details */}
+        <TouchableOpacity style={[s.btn, { backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border }]} onPress={() => setShowEditModal(true)}>
+          <Text style={[s.btnTxt, { color: COLORS.text }]}>✏️ Edit Stream Details</Text>
+        </TouchableOpacity>
+
         {/* Streaming Controls */}
+        {isOrganizer ? (
         <View style={s.card}>
           <Text style={s.cardTitle}>Streaming Controls</Text>
           <View style={s.controlsGrid}>
@@ -199,20 +269,52 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
                 <Text style={s.controlBtnTxt}>⏹ End Live</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={[s.controlBtn, s.controlBtnOutline]} onPress={handleShareLink}>
+            <TouchableOpacity style={[s.controlBtn, s.controlBtnOutline]} onPress={() => setShowShareSheet(true)}>
               <Text style={s.controlBtnOutlineTxt}>Share Live Link</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.controlBtn, s.controlBtnOutline]} onPress={handleCopyLink}>
               <Text style={s.controlBtnOutlineTxt}>Copy Match Link</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={[s.controlBtn, s.controlBtnOutline]} onPress={() => Alert.alert('Coming Soon', 'Automatic recording of highlights, full match, and short clips will be available in a future update.')}>
+              <Text style={s.controlBtnOutlineTxt}>🎬 Recording (Coming Soon)</Text>
+            </TouchableOpacity>
           </View>
         </View>
+        ) : (
+          <View style={s.card}>
+            <Text style={s.metricNote}>Only the match organizer can control streaming. You have read-only access.</Text>
+          </View>
+        )}
 
         <TouchableOpacity style={s.scoringLink} onPress={() => navigation.navigate('Scoring', { matchId })}>
           <Text style={s.scoringLinkTxt}>Go to Scoring Screen →</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
+
+        <Modal visible={showEditModal} transparent animationType="slide">
+          <View style={s.modalOverlay}>
+            <View style={s.modalBox}>
+              <Text style={s.cardTitle}>Edit Stream</Text>
+              <TextInput style={s.input} placeholder="Stream title" value={editTitle} onChangeText={setEditTitle} placeholderTextColor={COLORS.textMuted} />
+              <TextInput style={[s.input, { height: 80 }]} placeholder="Description" value={editDesc} onChangeText={setEditDesc} multiline placeholderTextColor={COLORS.textMuted} />
+              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }} onPress={() => setCommentsEnabled(!commentsEnabled)}>
+                <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: COLORS.primary, backgroundColor: commentsEnabled ? COLORS.primary : 'transparent' }} />
+                <Text style={{ color: COLORS.text }}>Enable Comments</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.btn} onPress={async () => {
+                await updateMatch(matchId, { streamTitle: editTitle, streamDescription: editDesc, commentsEnabled });
+                setShowEditModal(false);
+              }}>
+                <Text style={s.btnTxt}>Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ padding: 12, alignItems: 'center' }} onPress={() => setShowEditModal(false)}>
+                <Text style={{ color: COLORS.textMuted }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+        <ShareMatchSheet visible={showShareSheet} onClose={() => setShowShareSheet(false)} match={match} matchId={matchId} />
       </ScrollView>
     </View>
   );
@@ -250,4 +352,11 @@ const s = StyleSheet.create({
   controlBtnOutlineTxt: { color: COLORS.text, fontWeight: 'bold', fontSize: 13 },
   scoringLink: { alignItems: 'center', padding: 12 },
   scoringLinkTxt: { color: COLORS.primary, fontWeight: 'bold' },
+  qualityChip: { backgroundColor: COLORS.card2, padding: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, minWidth: 90, alignItems: 'center' },
+  qualityChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  qualityChipTxt: { color: COLORS.text, fontWeight: 'bold', fontSize: 12 },
+  qualityChipSub: { color: COLORS.textMuted, fontSize: 9, marginTop: 2 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: SPACING.lg },
+  modalBox: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.lg },
 });
+  

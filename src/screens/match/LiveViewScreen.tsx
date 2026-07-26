@@ -231,6 +231,29 @@ export default function LiveViewScreen({ navigation }: any) {
             <Text style={[s.viewTabTxt, viewTab === 'analytics' && s.viewTabTxtActive]}>Analytics</Text>
           </TouchableOpacity>
         </View>
+        {match.lastMilestone && Date.now() - match.lastMilestone.ts < 15000 && (
+  <View style={s.milestoneBanner}>
+    <Text style={s.milestoneTxt}>🎉 {match.lastMilestone.playerName}: {match.lastMilestone.text}</Text>
+  </View>
+)}
+
+        <TouchableOpacity style={s.linkBtn} onPress={() => navigation.navigate('Scorecard', { matchId: matchId.toUpperCase() })}>
+  <Text style={s.linkBtnTxt}>📊 View Full Scorecard</Text>
+</TouchableOpacity>
+{match.tournamentId && (
+  <TouchableOpacity style={s.linkBtn} onPress={() => navigation.navigate('TournamentLeaderboard', { tournamentId: match.tournamentId })}>
+    <Text style={s.linkBtnTxt}>🏆 View Tournament Points Table</Text>
+  </TouchableOpacity>
+)}
+
+<View style={s.analyticsCard}>
+  <Text style={s.analyticsTitle}>🤖 AI Commentary</Text>
+  {inn?.latestCommentaryText ? (
+    <Text style={{ color: COLORS.text, fontSize: 14 }}>{inn.latestCommentaryText}</Text>
+  ) : (
+    <Text style={{ color: COLORS.textMuted, fontSize: 12, fontStyle: 'italic' }}>Commentary will appear here once scoring begins.</Text>
+  )}
+</View>
 
         {viewTab === 'live' && (() => {
           const partnership = getCurrentPartnership(inn);
@@ -414,4 +437,8 @@ const s = StyleSheet.create({
   winProbLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   winProbLabel: { color: COLORS.text, fontSize: 12, fontWeight: 'bold' },
   winProbNote: { color: COLORS.textMuted, fontSize: 10, fontStyle: 'italic' },
+  linkBtn: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: 8, padding: 14, borderRadius: RADIUS.md, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
+  linkBtnTxt: { color: COLORS.primary, fontWeight: 'bold', fontSize: 13 },
+  milestoneBanner: { backgroundColor: COLORS.yellow + '33', margin: SPACING.md, padding: 14, borderRadius: RADIUS.md, borderWidth: 2, borderColor: COLORS.yellow, alignItems: 'center' },
+  milestoneTxt: { color: COLORS.yellow, fontWeight: 'bold', fontSize: 14 },
 });

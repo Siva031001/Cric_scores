@@ -12,9 +12,15 @@ setGlobalOptions({ maxInstances: 10 });
 // verified against pinAuth/{phone} — loginWithPin/createPinAccount already
 // do that check before calling this.
 exports.mintPhoneSessionToken = functions.https.onCall(async (data, context) => {
-  const phone = (data.phone || '').replace(/\D/g, '');
+  // Defensive: some client/server callable-protocol version mismatches wrap
+  // the actual payload one level deeper as data.data — handle both shapes.
+  const rawPhone = data?.phone ?? data?.data?.phone ?? '';
+  const phone = String(rawPhone).replace(/\D/g, '');
+
+  console.log('mintPhoneSessionToken - rawPhone:', rawPhone, 'parsedPhone:', phone);
+
   if (!/^\d{10}$/.test(phone)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number');
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number: received "' + rawPhone + '"');
   }
   const stableUid = 'phone_' + phone;
   const customToken = await admin.auth().createCustomToken(stableUid);
@@ -26,7 +32,8 @@ exports.mintPhoneSessionToken = functions.https.onCall(async (data, context) => 
 // phone number" flow — rejects if pinAuth/{newPhone} already exists for
 // someone else, satisfying "cannot switch to another user's number."
 exports.verifyPhoneNotClaimed = functions.https.onCall(async (data, context) => {
-  const newPhone = (data.newPhone || '').replace(/\D/g, '');
+  const rawNewPhone = data?.newPhone ?? data?.data?.newPhone ?? '';
+  const newPhone = String(rawNewPhone).replace(/\D/g, '');
   if (!/^\d{10}$/.test(newPhone)) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number');
   }

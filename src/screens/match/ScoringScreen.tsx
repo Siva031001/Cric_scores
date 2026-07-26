@@ -19,6 +19,8 @@ import Header from "../../components/Header";
 import AppIcon from '../../components/AppIcon';
 import { useFocusEffect } from "@react-navigation/native";
 import ScorecardScreen from "./ScorecardScreen";
+import { getBallCommentary } from '../../utils/aiCommentary';
+import { detectMilestone } from '../../utils/milestoneDetector';
 
 
 export default function ScoringScreen({ route, navigation }: any) {
@@ -342,6 +344,25 @@ useEffect(() => {
         setTimeout(() => setShowNewBowler(true), 50);
         return;
       }
+
+      // AI Commentary — fire-and-forget, never blocks scoring.
+      try {
+        const batterName = battingRoster?.find((p: any) => p.id === inn.strikerId)?.name ?? 'Batter';
+        const bowlerName = bowlingRoster?.find((p: any) => p.id === inn.currentBowlerId)?.name ?? 'Bowler';
+        const line = getBallCommentary(result, batterName, bowlerName);
+        upd = { ...upd, latestCommentaryText: line, latestCommentaryTs: Date.now() };
+      } catch {}
+
+      // Milestone detection (50/100/150/200) — compares runs before vs after this ball.
+      try {
+        const prevRuns = inn?.batsmanStats?.[statKey(inn.strikerId)]?.runs ?? 0;
+        const newRuns = upd?.batsmanStats?.[statKey(inn.strikerId)]?.runs ?? 0;
+        const milestone = detectMilestone(prevRuns, newRuns);
+        if (milestone) {
+          const batterName = battingRoster?.find((p: any) => p.id === inn.strikerId)?.name ?? 'Batter';
+          await updateMatch(matchId, { lastMilestone: { text: milestone, playerName: batterName, ts: Date.now() } });
+        }
+      } catch {}
 
       await updateMatch(matchId, { [key]: upd });
     } catch (e: any) { Alert.alert("Error", e?.message); }

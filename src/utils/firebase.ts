@@ -38,6 +38,11 @@ export const getUserProfile = async () => {
   return snap.val();
 };
 
+export const isMatchOrganizer = (match) => {
+  const user = getCurrentUser();
+  return !!user && match?.scorerId === user.uid;
+};
+
 export const subscribeToProfile = (callback) => {
   const user = getCurrentUser();
   if (!user) return () => {};
