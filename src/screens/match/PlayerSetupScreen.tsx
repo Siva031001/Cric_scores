@@ -5,7 +5,8 @@ import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
 
 export default function PlayerSetupScreen({ route, navigation }: any) {
-  const { team1, team2, overs, venue, ballType, team1Players, team2Players, team1Logo, team2Logo, tournamentId, tournamentMatchId } = route.params;
+  const { team1, team2, overs, venue, ballType, team1Players, team2Players, team1Logo, team2Logo, tournamentId, tournamentMatchId, playersPerSide } = route.params;
+  const requiredCount = playersPerSide ?? 11;
   const [selected1, setSelected1] = useState<number[]>([]);
   const [selected2, setSelected2] = useState<number[]>([]);
   const [activeTeam, setActiveTeam] = useState<1|2>(1);
@@ -17,15 +18,15 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
     const sel = team === 1 ? selected1 : selected2;
     const setSel = team === 1 ? setSelected1 : setSelected2;
     if (sel.includes(id)) { setSel(sel.filter(s => s !== id)); }
-    else { if (sel.length >= 11) { Alert.alert("Max 11", "Select exactly 11 players"); return; } setSel([...sel, id]); }
+        else { if (sel.length >= requiredCount) { Alert.alert(`Max ${requiredCount}`, `Select exactly ${requiredCount} players`); return; } setSel([...sel, id]); }
   };
 
   const handleNext = () => {
     if (activeTeam === 1) {
-      if (selected1.length !== 11) { Alert.alert("Error", "Select exactly 11 for " + team1 + ". Selected: " + selected1.length); return; }
+     if (selected1.length !== requiredCount) { Alert.alert("Error", `Select exactly ${requiredCount} for ` + team1 + ". Selected: " + selected1.length); return; }
       setActiveTeam(2);
     } else {
-      if (selected2.length !== 11) { Alert.alert("Error", "Select exactly 11 for " + team2 + ". Selected: " + selected2.length); return; }
+            if (selected2.length !== requiredCount) { Alert.alert("Error", `Select exactly ${requiredCount} for ` + team2 + ". Selected: " + selected2.length); return; }
       setStep("toss");
     }
   };
@@ -35,7 +36,7 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
     if (!tossChoice) { Alert.alert("Error", "Select Bat or Bowl"); return; }
     const playing1 = (team1Players as Player[]).filter(p => selected1.includes(p.id));
     const playing2 = (team2Players as Player[]).filter(p => selected2.includes(p.id));
-    navigation.navigate("BattingSetup", { team1, team2, overs, venue, ballType, team1Players: playing1, team2Players: playing2, team1Logo, team2Logo, tossWinner, tossChoice, tournamentId, tournamentMatchId });
+        navigation.navigate("BattingSetup", { team1, team2, overs, venue, ballType, team1Players: playing1, team2Players: playing2, team1Logo, team2Logo, tossWinner, tossChoice, tournamentId, tournamentMatchId, playersPerSide: requiredCount });
   };
 
   if (step === "toss") {
@@ -95,7 +96,7 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={st.hint}>Select 11 players for {teamName} ({selected.length}/11)</Text>
+        <Text style={st.hint}>Select {requiredCount} players for {teamName} ({selected.length}/{requiredCount})</Text>
       {(players as Player[]).map(player => {
         const isSel = selected.includes(player.id);
         return (

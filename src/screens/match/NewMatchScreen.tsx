@@ -14,7 +14,8 @@ export default function NewMatchScreen({ route, navigation }: any) {
   const [team1Data, setTeam1Data] = useState<Team | null>(null);
   const [team2Data, setTeam2Data] = useState<Team | null>(null);
   const [overs, setOvers] = useState('20');
-  const [ballType, setBallType] = useState<'Leather Ball'|'Tennis Ball'>('Tennis Ball');
+  const [ballType, setBallType] = useState<'Leather Ball'|'Tennis Ball'|'Turf'>('Tennis Ball');
+  const [playersPerSide, setPlayersPerSide] = useState(11);
   const [venue, setVenue] = useState('');
   const [myTeams, setMyTeams] = useState<Team[]>([]);
   const [searching1, setSearching1] = useState(false);
@@ -96,6 +97,7 @@ export default function NewMatchScreen({ route, navigation }: any) {
       overs,
       venue,
       ballType,
+      playersPerSide: ballType === 'Turf' ? playersPerSide : 11,
       team1Players: team1Data.players,
       team2Players: team2Data.players,
       team1Logo: team1Data.logo,
@@ -239,8 +241,24 @@ export default function NewMatchScreen({ route, navigation }: any) {
       
       <View style={styles.fieldBox}>
         <Text style={styles.fieldLabel}>🏏 Ball Type</Text>
+        {ballType === 'Turf' && (
+  <View style={{ marginTop: 12 }}>
+    <Text style={styles.label}>Players Per Side</Text>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+      {[4, 5, 6, 7, 8, 9, 10, 11].map((n) => (
+        <TouchableOpacity
+          key={n}
+          style={[styles.oversBtn, playersPerSide === n && styles.oversBtnActive]}
+          onPress={() => setPlayersPerSide(n)}
+        >
+          <Text style={[styles.oversBtnText, playersPerSide === n && styles.oversBtnTextActive]}>{n}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </View>
+)}
           <View style={styles.oversRow}>
-        {(['Leather Ball','Tennis Ball'] as const).map(b => (
+        {(['Leather Ball','Tennis Ball','Turf'] as const).map(b => (
       <TouchableOpacity
         key={b}
         style={[styles.oversBtn, ballType === b && styles.oversBtnActive]}

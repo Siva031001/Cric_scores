@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { resolveInviteCode } from '../../utils/firebase';
+import { resolveInviteCode, getTournamentPreview } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 
@@ -22,11 +22,10 @@ export default function JoinAsCaptainScreen({ navigation }: any) {
         Alert.alert('Already Submitted', `The squad for "${result.teamName}" has already been submitted.`);
         return;
       }
-      navigation.navigate('CreateTeam', {
-        captainInviteMode: true,
-        inviteTournamentId: result.tournamentId,
-        inviteTeamId: result.teamId,
-        inviteTeamName: result.teamName,
+      const preview = await getTournamentPreview(result.tournamentId);
+      navigation.navigate('TournamentInvitePreview', {
+        preview,
+        inviteResult: result,
       });
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Could not verify invite code');

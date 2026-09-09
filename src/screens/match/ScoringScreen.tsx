@@ -39,6 +39,12 @@ export default function ScoringScreen({ route, navigation }: any) {
   const [showRunOutPicker, setShowRunOutPicker] = useState(false);
   const [showRunOutFielder, setShowRunOutFielder] = useState(false);
   const [runOutWhoSelected, setRunOutWhoSelected] = useState<"striker"|"nonStriker"|null>(null);
+  const [showRunOutRuns, setShowRunOutRuns] = useState(false);
+  const [runOutRuns, setRunOutRuns] = useState(0);
+  // Tracks which crease position (striker/non-striker) is actually vacant
+  // after a wicket, so selectNewBatsman fills the correct slot — critical
+  // for non-striker run-outs, where the striker never left the crease.
+  const vacantSlotRef = useRef<'striker'|'nonStriker'>('striker');
   const [showOpenerSelect, setShowOpenerSelect] = useState(false);
   const [openerStep, setOpenerStep] = useState<"striker"|"nonStriker"|"bowler">("striker");
   const [opener1Id, setOpener1Id] = useState<number|null>(null);
@@ -114,7 +120,8 @@ useEffect(() => {
     setOpener1Id(null); setOpener2Id(null); setOpener3Id(null);
     setShowOpenerSelect(true);
   }
-  const inn1Complete = (match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers;
+  const allOutThreshold = (match.playersPerSide ?? 11) - 1;
+  const inn1Complete = (match.innings1?.wickets ?? 0) >= allOutThreshold || (match.innings1?.overs ?? 0) >= match.totalOvers;
   if (
     match.currentInnings === 1 &&
     match.status === "live" &&
@@ -192,7 +199,7 @@ useEffect(() => {
     remainingBatters: any[],
     overCompletedOnThisBall: boolean
   ) => {
-    const allOutNow = remainingBatters.length === 0 || updInn.wickets >= 10;
+    const allOutNow = remainingBatters.length === 0 || updInn.wickets >= ((match.playersPerSide ?? 11) - 1);
     const oversCompleteNow = updInn.overs >= match.totalOvers;
 
     if (allOutNow || oversCompleteNow) {
@@ -249,7 +256,7 @@ useEffect(() => {
     if (typeof result !== "string") return;
     if (match.status === "completed") { setSaving(false); return; }
     const guardInn = match.currentInnings === 1 ? match.innings1 : match.innings2;
-    if ((guardInn?.overs ?? 0) >= match.totalOvers || (guardInn?.wickets ?? 0) >= 10) {
+    if ((guardInn?.overs ?? 0) >= match.totalOvers || (guardInn?.wickets ?? 0) >= ((match.playersPerSide ?? 11) - 1)) {
       setSaving(false);
       return;
     }
@@ -271,7 +278,7 @@ useEffect(() => {
 
       const isWicket = result === "W";
       const overJustCompleted = upd.balls === 0 && upd.overs > inn.overs;
-      const allOut = upd.wickets >= 10;
+      const allOut = upd.wickets >= ((match.playersPerSide ?? 11) - 1);
       const oversComplete = upd.overs >= match.totalOvers;
       let targetReached = false;
       let chaseWinner = "";
@@ -414,36 +421,57 @@ useEffect(() => {
   const handleRunOutWho = (who: "striker" | "nonStriker") => {
     setShowRunOutPicker(false);
     setRunOutWhoSelected(who);
+    setShowRunOutRuns(true);
+  };
+
+  const handleRunOutRunsSelect = (runs: number) => {
+    setRunOutRuns(runs);
+    setShowRunOutRuns(false);
     setShowRunOutFielder(true);
   };
 
   const handleRunOutFielderSelect = async (fielderName: string) => {
     if (!match || saving || !runOutWhoSelected) return;
     const who = runOutWhoSelected;
+    const runsCompleted = runOutRuns;
     setShowRunOutFielder(false);
     setRunOutWhoSelected(null);
+    setRunOutRuns(0);
     setSaving(true);
     try {
       const key = match.currentInnings === 1 ? "innings1" : "innings2";
       const inn = match[key];
+      // The striker at the START of this delivery always faced the ball and
+      // ran, regardless of which end ends up dismissed — they get credited
+      // with the ball faced and any runs completed before the run-out.
+      const strikerIdAtDelivery = inn.strikerId;
       const dismissedId = who === "striker" ? inn.strikerId : inn.nonStrikerId;
-      // The partner who was NOT run out � always the "other" batsman at the crease.
-      // Recording this correctly (instead of always inn.nonStrikerId) is required so
-      // the Best Partnerships feature and Undo replay can tell the two batsmen apart
-      // when the NON-STRIKER is the one run out.
+      // The partner who was NOT run out   always the "other" batsman at the crease.
       const survivingPartnerId = who === "striker" ? inn.nonStrikerId : inn.strikerId;
       const dismissedGid = (match.currentInnings === 1 ? match.team1Players : match.team2Players)?.find((p: any) => p.id === dismissedId)?.globalPlayerId ?? null;
-      const updBatStats = {
-        ...inn.batsmanStats,
-        [statKey(dismissedId)]: {
-          ...(inn.batsmanStats?.[statKey(dismissedId)] ?? { playerId: dismissedId, runs: 0, balls: 0, fours: 0, sixes: 0 }),
-          balls: (inn.batsmanStats?.[statKey(dismissedId)]?.balls ?? 0) + 1,
-          isOut: true,
-          dismissalType: "Run Out",
-          fielderName: fielderName,
-          globalPlayerId: dismissedGid,
-        },
+
+      const updBatStats = { ...inn.batsmanStats };
+
+      const strikerEntry = updBatStats[statKey(strikerIdAtDelivery)] ?? { playerId: strikerIdAtDelivery, runs: 0, balls: 0, fours: 0, sixes: 0 };
+      updBatStats[statKey(strikerIdAtDelivery)] = {
+        ...strikerEntry,
+        balls: (strikerEntry.balls ?? 0) + 1,
+        runs: (strikerEntry.runs ?? 0) + runsCompleted,
       };
+
+      // Mark whichever batsman is actually out as dismissed. If the striker
+      // was run out, this is the SAME entry updated above; if the
+      // non-striker was run out, this is a separate entry that never faced
+      // the ball, so it only gets the dismissal fields, not runs/balls.
+      const dismissedExisting = updBatStats[statKey(dismissedId)] ?? { playerId: dismissedId, runs: 0, balls: 0, fours: 0, sixes: 0 };
+      updBatStats[statKey(dismissedId)] = {
+        ...dismissedExisting,
+        isOut: true,
+        dismissalType: "Run Out",
+        fielderName: fielderName,
+        globalPlayerId: dismissedGid,
+      };
+
       const bowlingRosterRO = match.currentInnings === 1 ? match.team2Players : match.team1Players;
       const updFieldStats = { ...(inn.fieldingStats ?? {}) };
       if (fielderName && fielderName !== "Skip") {
@@ -458,18 +486,27 @@ useEffect(() => {
       }
       const updInn: any = {
         ...inn,
+        runs: (inn.runs ?? 0) + runsCompleted,
         wickets: (inn.wickets ?? 0) + 1,
         balls: (inn.balls ?? 0) + 1,
         batsmanStats: updBatStats,
         fieldingStats: updFieldStats,
-        ballHistory: [...(inn.ballHistory ?? []), { result: "W(RO)", over: inn.overs, ball: inn.balls, batsmanId: dismissedId, nonStrikerIdBefore: survivingPartnerId, bowlerId: inn.currentBowlerId, fielderName }],
+        ballHistory: [...(inn.ballHistory ?? []), { result: runsCompleted > 0 ? `${runsCompleted}W(RO)` : "W(RO)", over: inn.overs, ball: inn.balls, batsmanId: dismissedId, nonStrikerIdBefore: survivingPartnerId, bowlerId: inn.currentBowlerId, fielderName }],
       };
+      // If an odd number of runs were completed before the run-out, the two
+      // batsmen crossed and swapped ends — reflect that before determining
+      // which crease position is now vacant for the incoming batsman.
+      if (runsCompleted % 2 === 1) {
+        const t = updInn.strikerId; updInn.strikerId = updInn.nonStrikerId; updInn.nonStrikerId = t;
+      }
+      vacantSlotRef.current = (updInn.strikerId === dismissedId) ? 'striker' : 'nonStriker';
+
       const overCompletedOnThisBall = updInn.balls >= 6;
       if (overCompletedOnThisBall) { updInn.balls = 0; updInn.overs = (updInn.overs ?? 0) + 1; }
       const batP = match.currentInnings === 1 ? match.team1Players : match.team2Players;
       const rem = batP.filter((p: any) => {
         const bs = updInn.batsmanStats?.[statKey(p.id)];
-        return !bs?.isOut && p.id !== (who === "striker" ? updInn.nonStrikerId : updInn.strikerId);
+        return !bs?.isOut && p.id !== (vacantSlotRef.current === "striker" ? updInn.nonStrikerId : updInn.strikerId);
       });
       await finishWicketBall(key, updInn, rem, overCompletedOnThisBall);
     } catch (e: any) { Alert.alert("Error", e?.message); setSaving(false); }
@@ -500,6 +537,7 @@ useEffect(() => {
         upd.fieldingStats = updField;
       }
       const dismissedId = inn.strikerId;
+      vacantSlotRef.current = 'striker';
       if (upd.batsmanStats?.[statKey(dismissedId)]) {
         upd.batsmanStats[statKey(dismissedId)] = { ...upd.batsmanStats[statKey(dismissedId)], dismissalType: wicketType, fielderName, bowlerId: inn.currentBowlerId };
       }
@@ -519,20 +557,21 @@ useEffect(() => {
   const handleUndo = async () => {
     if (!match || saving) return;
     setSaving(true);
-    // Reset the innings-transition gate so that if this undo takes us back
-    // before the innings boundary, "Start 2nd Innings" will work again.
-      openerSelectionDoneRef.current = false;
+    openerSelectionDoneRef.current = false;
     try {
   const key = match.currentInnings === 1 ? "innings1" : "innings2";
-    const undoneInn = undoLastBall(match[key]);
+    const rebuiltInn = undoLastBall(match[key]);
+
+    // undoLastBall fully rebuilds batsmanStats/bowlerStats from ballHistory
+    // via createEmptyBatsmanStats/createEmptyBowlerStats, which never carry
+    // globalPlayerId — re-stamp immediately so the linkage isn't lost for
+    // however long it takes until the next ball is scored.
+    const battingRoster = match.currentInnings === 1 ? match.team1Players : match.team2Players;
+    const bowlingRoster = match.currentInnings === 1 ? match.team2Players : match.team1Players;
+    const undoneInn = stampGlobalPlayerIds(rebuiltInn, battingRoster, bowlingRoster);
+
     await updateMatch(matchId, { [key]: undoneInn });
 
-    // NEW: if undo landed exactly back on an over boundary (balls === 0,
-    // at least one over bowled, overs remaining, not all out), the bowler
-    // who was selected for the over that just got undone is stale — the
-    // very first ball of that over no longer exists. Re-open the New
-    // Bowler picker, exactly as if the over had just completed normally,
-    // so the user is forced to (re)select before the next delivery.
     const atOverBoundary =
       (undoneInn.balls ?? 0) === 0 &&
       (undoneInn.overs ?? 0) > 0 &&
@@ -593,6 +632,9 @@ useEffect(() => {
       setShowOpenerSelect(false);
       openerSelectionDoneRef.current = true;
       const tgt = (inningsData?.runs ?? 0) + 1;
+      const strikerGid = match.team2Players?.find((p: any) => p.id === s1)?.globalPlayerId ?? null;
+      const nonStrikerGid = match.team2Players?.find((p: any) => p.id === s2)?.globalPlayerId ?? null;
+      const bowlerGid = match.team1Players?.find((p: any) => p.id === id)?.globalPlayerId ?? null;
       const updInn2 = {
   ...match.innings2,
 
@@ -600,13 +642,17 @@ useEffect(() => {
   nonStrikerId: s2,
   currentBowlerId: id,
 
+  // Stamp globalPlayerId at creation time — don't rely solely on the next
+  // ball's stampGlobalPlayerIds call, since a batter/bowler whose entry is
+  // created but who never faces/bowls another delivery before the innings
+  // or match ends would otherwise be invisible in My Matches/History.
   batsmanStats: {
-    [statKey(s1)]: createEmptyBatsmanStats(s1),
-    [statKey(s2)]: createEmptyBatsmanStats(s2),
+    [statKey(s1)]: { ...createEmptyBatsmanStats(s1), globalPlayerId: strikerGid },
+    [statKey(s2)]: { ...createEmptyBatsmanStats(s2), globalPlayerId: nonStrikerGid },
   },
 
   bowlerStats: {
-    [statKey(id)]: createEmptyBowlerStats(id),
+    [statKey(id)]: { ...createEmptyBowlerStats(id), globalPlayerId: bowlerGid },
   },
 
   ballHistory: [],
@@ -654,9 +700,10 @@ useEffect(() => {
     const inn = match[key];
     const updInn = {
       ...inn,
-      strikerId: id,
+      ...(vacantSlotRef.current === 'nonStriker' ? { nonStrikerId: id } : { strikerId: id }),
       ballHistory: [...(inn.ballHistory ?? []), { type: "NEW_BATSMAN", newBatsmanId: id }],
     };
+    vacantSlotRef.current = 'striker'; // reset to the normal default for the next wicket
     await updateMatch(matchId, { [key]: updInn });
     setPendingWicket(false);
     if (pendingBowlerAfterWicketRef.current) {
@@ -1138,6 +1185,20 @@ useEffect(() => {
               );
             })}
           </ScrollView>
+        </View></View>
+      </Modal>
+
+      <Modal visible={showRunOutRuns} transparent animationType="slide">
+        <View style={s.mOverlay}><View style={s.modal}>
+          <Text style={s.mTitle}>How many runs were completed?</Text>
+          {[0, 1, 2, 3].map((n) => (
+            <TouchableOpacity key={n} style={[s.endBtn, { borderColor: COLORS.yellow, marginBottom: 10 }]} onPress={() => handleRunOutRunsSelect(n)}>
+              <Text style={s.endBtnTxt}>{n} run{n === 1 ? '' : 's'}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={s.cancelBtn} onPress={() => { setShowRunOutRuns(false); setRunOutWhoSelected(null); }}>
+            <Text style={s.cancelTxt}>Cancel</Text>
+          </TouchableOpacity>
         </View></View>
       </Modal>
 

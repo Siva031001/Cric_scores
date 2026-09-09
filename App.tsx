@@ -39,6 +39,8 @@ import JoinAsCaptainScreen from "./src/screens/tournament/JoinAsCaptainScreen";
 import StreamingDashboardScreen from "./src/screens/match/StreamingDashboardScreen";
 import ThemeSelectorScreen from "./src/screens/match/ThemeSelectorScreen";
 import CameraModeScreen from "./src/screens/match/CameraModeScreen";
+import TournamentInvitePreviewScreen from "./src/screens/tournament/TournamentInvitePreviewScreen";
+
 
 
 
@@ -158,6 +160,7 @@ export default function App() {
         <Stack.Screen name="CreateTournament" component={CreateTournamentScreen} />
         <Stack.Screen name="TournamentLeaderboard" component={TournamentLeaderboardScreen} />
         <Stack.Screen name="JoinAsCaptain" component={JoinAsCaptainScreen} />
+        <Stack.Screen name="TournamentInvitePreview" component={TournamentInvitePreviewScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   FlatList, ActivityIndicator,
 } from 'react-native';
-import { getMyTournaments } from '../../utils/firebase';
+import { getMyTournaments, getCurrentUser } from '../../utils/firebase';
 import { Tournament } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
@@ -14,12 +14,20 @@ export default function MyTournamentScreen({ navigation }: any) {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+    useEffect(() => {
     const unsub = navigation.addListener('focus', async () => {
       setLoading(true);
       try {
         const data = await getMyTournaments();
-        setTournaments(data);
+        // This screen represents tournaments the user PLAYS in, not ones
+        // they organize — organizer-owned tournaments are already shown
+        // separately via the Homepage's own "My Tournaments" filter chip.
+        // If a tournament is both created by the user and they're also a
+        // participant, organizer ownership takes priority (it's excluded
+        // here and only appears in the organizer view).
+        const myUid = getCurrentUser()?.uid;
+        const playedTournaments = data.filter((t: any) => t.createdBy !== myUid);
+        setTournaments(playedTournaments);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     });

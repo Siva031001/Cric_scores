@@ -4,6 +4,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory } from '../../utils/firebase';
 import { AdBanner } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { getPublicTournaments, searchPublicTournaments, getHomePageTournaments, getTournamentDisplayStatus } from '../../utils/firebase';
+import LiveTournamentCarousel from '../../components/LiveTournamentCarousel';
 import AppIcon from '../../components/AppIcon';
 
 export default function HomeScreen({ navigation }: any) {
@@ -15,6 +17,12 @@ export default function HomeScreen({ navigation }: any) {
   const [teams, setTeams] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [liveMatches, setLiveMatches] = useState<any[]>([]);
+  const [publicTournaments, setPublicTournaments] = useState<any[]>([]);
+  const [tournamentFilter, setTournamentFilter] = useState<'all'|'live'|'upcoming'|'completed'|'mine'>('all');
+
+  useEffect(() => {
+  getPublicTournaments().then(setPublicTournaments).catch(() => setPublicTournaments([]));
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -57,10 +65,21 @@ export default function HomeScreen({ navigation }: any) {
       if (match.team1?.toLowerCase().includes(q) || match.team2?.toLowerCase().includes(q) || (match.venue ?? '').toLowerCase().includes(q))
         results.push({ type: 'match', data: match });
     });
+    // Tournaments are included here too, since the search results view
+    // below replaces the whole home screen (including the tournament
+    // carousel) while searching - without this, tournament search would
+    // find nothing even when matching tournaments exist.
+    publicTournaments.forEach((t: any) => {
+      if (
+        (t.name ?? '').toLowerCase().includes(q) ||
+        (t.organisationName ?? '').toLowerCase().includes(q) ||
+        (t.venue ?? '').toLowerCase().includes(q)
+      ) {
+        results.push({ type: 'tournament', data: t });
+      }
+    });
     setSearchResults(results);
   };
-
-  
 
   // Live Match (id:'live') REMOVED as requested
   const MENU = [
@@ -68,6 +87,7 @@ export default function HomeScreen({ navigation }: any) {
     { id: 'teams', icon: '👥', label: 'Teams', sub: 'My & Other Teams', screen: 'MyTeams', color: COLORS.teal },
     { id: 'tournament', icon: '🏆', label: 'My Tournaments', sub: 'View tournaments', screen: 'MyTournament', color: COLORS.yellow },
     { id: 'create_t', icon: '➕', label: 'Create Tournament', sub: 'Organise a tournament', screen: 'CreateTournament', color: COLORS.orange },
+    { id: 'join_captain', icon: '✉️', label: 'Join as Captain', sub: 'Enter a tournament invite code', screen: 'JoinAsCaptain', color: COLORS.blue },
     { id: 'history', icon: '📋', label: 'Match History', sub: 'Detailed stats per match', screen: 'MatchHistoryDetail', color: COLORS.purple },
     { id: 'livestream', icon: '📡', label: 'YouTube Live', sub: 'Stream live match', screen: 'LiveStream', color: COLORS.red },
     { id: 'settings', icon: '⚙️', label: 'Settings', sub: 'Profile & preferences', screen: 'Settings', color: COLORS.textSecondary },
@@ -108,14 +128,15 @@ export default function HomeScreen({ navigation }: any) {
                 <TouchableOpacity style={st.searchResultItem} onPress={() => {
                   setSearch(''); setSearching(false); setSearchResults([]);
                   if (item.type === 'team') navigation.navigate('TeamDetail', { teamId: item.data.id });
+                  else if (item.type === 'tournament') navigation.navigate('TournamentDetail', { tournamentId: item.data.id, viewOnly: item.data.createdBy !== getCurrentUser()?.uid });
                   else navigation.navigate('Scorecard', { matchId: item.data.id });
                 }}>
-                  <AppIcon emoji={item.type === 'team' ? '👥' : '🏏'} size={22} color={COLORS.text} />
+                  <AppIcon emoji={item.type === 'team' ? '👥' : item.type === 'tournament' ? '🏆' : '🏏'} size={22} color={COLORS.text} />
                   <View style={{ flex: 1 }}>
-                    <Text style={st.searchResultTitle}>{item.type === 'team' ? item.data.name : item.data.team1 + ' vs ' + item.data.team2}</Text>
-                    <Text style={st.searchResultSub}>{item.type === 'team' ? (item.data.players?.length ?? 0) + ' players' : item.data.venue ?? 'Match'}</Text>
+                    <Text style={st.searchResultTitle}>{item.type === 'team' ? item.data.name : item.type === 'tournament' ? item.data.name : item.data.team1 + ' vs ' + item.data.team2}</Text>
+                    <Text style={st.searchResultSub}>{item.type === 'team' ? (item.data.players?.length ?? 0) + ' players' : item.type === 'tournament' ? (item.data.venue ?? 'Tournament') : item.data.venue ?? 'Match'}</Text>
                   </View>
-                  <Text style={st.searchResultType}>{item.type === 'team' ? 'Team' : 'Match'}</Text>
+                  <Text style={st.searchResultType}>{item.type === 'team' ? 'Team' : item.type === 'tournament' ? 'Tournament' : 'Match'}</Text>
                 </TouchableOpacity>
               )} />
           )}
@@ -139,6 +160,55 @@ export default function HomeScreen({ navigation }: any) {
               ))}
             </View>
           )}
+
+          {/* Public Tournament Discovery */}
+          <View style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: SPACING.lg, marginBottom: 10 }}>
+              <Text style={[st.liveSectionTitle, { marginBottom: 0 }]}>Discover Tournaments</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 6, marginHorizontal: SPACING.lg, marginBottom: 10 }}>
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'live', label: 'Live Now' },
+                { key: 'upcoming', label: 'Upcoming' },
+                { key: 'completed', label: 'Completed' },
+                { key: 'mine', label: 'My Tournaments' },
+              ].map((f) => (
+                <TouchableOpacity
+                  key={f.key}
+                  onPress={() => setTournamentFilter(f.key as any)}
+                  style={{
+                    paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.round,
+                    backgroundColor: tournamentFilter === f.key ? COLORS.primary : COLORS.card2,
+                  }}
+                >
+                  <Text style={{ color: tournamentFilter === f.key ? '#fff' : COLORS.textSecondary, fontSize: 11, fontWeight: 'bold' }}>{f.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <LiveTournamentCarousel
+              tournaments={(() => {
+                // Home poster carousel: Live + Upcoming only, date-derived —
+                // completed tournaments never appear here automatically,
+                // regardless of the stored status field. The "Completed"
+                // filter chip is an explicit override for anyone who wants
+                // to look back at old tournaments on purpose.
+                let list = tournamentFilter === 'completed'
+                  ? publicTournaments.filter((t) => getTournamentDisplayStatus(t) === 'completed')
+                  : getHomePageTournaments(publicTournaments);
+
+                if (tournamentFilter === 'live') list = list.filter((t) => getTournamentDisplayStatus(t) === 'live');
+                else if (tournamentFilter === 'upcoming') list = list.filter((t) => getTournamentDisplayStatus(t) === 'upcoming');
+                else if (tournamentFilter === 'mine') list = list.filter((t) => t.createdBy === getCurrentUser()?.uid);
+
+                if (search) list = searchPublicTournaments(list, search);
+                return list;
+              })()}
+              onPress={(t) => navigation.navigate('TournamentDetail', { tournamentId: t.id, viewOnly: t.createdBy !== getCurrentUser()?.uid })}
+            />
+          </View>
+
           <TouchableOpacity style={st.featuredBtn} onPress={() => navigation.navigate('NewMatch')}>
             <View style={st.featuredLeft}>
               <AppIcon emoji="🏏" size={32} color="#fff" />

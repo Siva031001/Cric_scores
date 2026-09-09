@@ -12,7 +12,7 @@ export type WicketType =
 export type BattingStyle = 'Right Hand' | 'Left Hand';
 export type PlayerRole = 'Batter' | 'Bowler' | 'Wicket Keeper' | 'All Rounder';
 export type MatchFormat = '6 Overs' | '8 Overs' | '20 Overs' | '50 Overs' | 'Custom';
-export type BallType = 'Leather Ball' | 'Tennis Ball';
+export type BallType = 'Leather Ball' | 'Tennis Ball' | 'Turf';
 
 export interface Player {
   id: number;
@@ -246,4 +246,16 @@ export interface CareerFieldingStats {
   catches: number;
   stumpings: number;
   runOuts: number;
+}
+
+export interface Tournament {
+  // ...existing fields...
+  scorers?: { [phone: string]: { uid: string; name: string; assignedAt: number } };
+  teamLockMode?: 'manual' | 'onStart' | 'afterLeague' | 'beforeKnockout';
+  teamsLocked?: boolean;
+}
+
+export interface TournamentMatch {
+  // ...existing fields...
+  assignedScorerPhone?: string | null;
 }

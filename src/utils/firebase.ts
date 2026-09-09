@@ -366,9 +366,9 @@ export const getMyLinkedPlayerId = async () => {
   return foundId;
 };
 
-export const retroactivelyLinkGuestPlayers = async (phoneNumber: string, globalPlayerId: string) => {
+export const retroactivelyLinkGuestPlayers = async (phoneNumber: string) => {
   const key = phoneNumber.replace(/\D/g, '');
-  if (!key || !globalPlayerId) return;
+  if (!key) return;
   const user = getCurrentUser();
   if (!user) return;
   const snap = await database().ref('players').orderByChild('phoneNumber').equalTo(key).once('value');
@@ -376,7 +376,7 @@ export const retroactivelyLinkGuestPlayers = async (phoneNumber: string, globalP
   snap.forEach((child: any) => {
     const v = child.val();
     if (v?.playerType === 'GUEST' && v?.accountId == null) {
-      updates[child.key + '/accountId'] = user.uid;   // ← was globalPlayerId, must be Firebase uid
+      updates[child.key + '/accountId'] = user.uid;
       updates[child.key + '/playerType'] = 'REGISTERED';
       updates[child.key + '/linkedAt'] = Date.now();
     }
@@ -795,11 +795,10 @@ export const arePoolsComplete = (tournament) => {
 
 // Returns each pool's qualifiers ranked by points then NRR, labeled with
 // their rank (1 = winner, 2 = runner-up, ...) so fixtures can be seeded.
-const getPoolQualifiers = (pool) => {
+export const getPoolQualifiers = (pool) => {
   const sorted = [...(pool.standings ?? [])].sort((a, b) => b.points - a.points || (b.nrr ?? 0) - (a.nrr ?? 0));
   return sorted.slice(0, pool.qualifyCount).map((t, idx) => ({ ...t, poolRank: idx + 1, poolName: pool.poolName }));
 };
-
 // Cross-pool seeding: pairs rank 1 from one pool against rank 2 from the
 // next pool (standard "avoid same-pool teams meeting early" seeding),
 // wrapping around when qualifier counts are uneven across pools.
@@ -1029,6 +1028,15 @@ export const submitCaptainTeam = async (tournamentId, teamId, players) => {
     teams: updatedTeams,
     captainInvites: updatedInvites,
   });
+
+  // NEW: index this tournament under the captain's OWN account too, so it
+  // shows up in their My Tournaments list — not just the organizer's.
+  // getMyTournaments() only reads users/{uid}/tournaments, which is
+  // otherwise only populated for the organizer at createTournament time.
+  const user = getCurrentUser();
+  if (user) {
+    await database().ref(`users/${user.uid}/tournaments/${tournamentId}`).set(true);
+  }
 };
 
 // Organizer's optional explicit approval step — marks the invite approved.
@@ -1049,6 +1057,28 @@ export const deleteTournament = async (tournamentId) => {
   if (!user) throw new Error('Not authenticated');
   await database().ref(`tournaments/${tournamentId}`).remove();
   await database().ref(`users/${user.uid}/tournaments/${tournamentId}`).remove();
+};
+
+
+// Returns a read-only preview of a tournament for a captain who has an
+// invite code but isn't yet a participant — just enough info to orient
+// them (name, venue, dates, existing teams + their rosters) without
+// exposing organizer-only controls.
+export const getTournamentPreview = async (tournamentId) => {
+  const snap = await database().ref(`tournaments/${tournamentId}`).once('value');
+  const t = snap.val();
+  if (!t) return null;
+  return {
+    name: t.name,
+    venue: t.venue,
+    startDate: t.startDate,
+    endDate: t.endDate,
+    tournamentFormat: t.tournamentFormat,
+    teams: (t.teams ?? []).map((team) => ({
+      teamName: team.teamName,
+      players: (team.players ?? []).map((p) => ({ name: p.name })),
+    })),
+  };
 };
 
 // ───────────────────────────────────────────────────────────
@@ -1083,4 +1113,251 @@ export const getMatchHistoryTiered = async (tier, customStart, customEnd) => {
     default: cutoff = now - DAY;
   }
   return allMatches.filter((m) => (m.createdAt ?? 0) >= cutoff);
+};
+
+// ───────────────────────────────────────────────────────────
+// ROLES: Organizer / Captain / Scorer
+// ───────────────────────────────────────────────────────────
+
+export const getMyTournamentRole = (tournament) => {
+  const user = getCurrentUser();
+  if (!user) return null;
+  if (tournament.createdBy === user.uid) return 'organizer';
+  const isScorer = Object.values(tournament.scorers ?? {}).some((s) => s.uid === user.uid);
+  if (isScorer) return 'scorer';
+  const isCaptain = (tournament.captainInvites ?? []).some(
+    (inv) => inv.status !== 'pending' && tournament.teams?.some((t) => t.teamId === inv.teamId)
+  );
+  // Note: this checks "is ANY captain invite fulfilled" as a coarse signal;
+  // for precise "is THIS user the captain of THIS team," compare against
+  // the invite's linked account — see isMyAssignedTeam below for that.
+  return isCaptain ? 'captain' : null;
+};
+
+// Precise check: does this specific team belong to the currently signed-in
+// captain? Compares the team's captain-invite submission against my own
+// linked player/account, since captainInvites don't store accountId
+// directly — they're resolved via the phone number used to submit.
+export const isMyAssignedTeam = async (tournament, teamId) => {
+  const user = getCurrentUser();
+  if (!user) return false;
+  const myPlayerId = await getMyLinkedPlayerId();
+  if (!myPlayerId) return false;
+  const team = (tournament.teams ?? []).find((t) => t.teamId === teamId);
+  if (!team) return false;
+  return (team.players ?? []).some((p) => p.globalPlayerId === myPlayerId && p.isCaptain);
+};
+
+// ───────────────────────────────────────────────────────────
+// SCORER ASSIGNMENT
+// ───────────────────────────────────────────────────────────
+
+export const assignScorer = async (tournamentId, phone, name) => {
+  const key = phone.replace(/\D/g, '');
+  const stableUid = 'phone_' + key;
+  await database().ref(`tournaments/${tournamentId}/scorers/${key}`).set({
+    uid: stableUid,
+    name: name || key,
+    assignedAt: Date.now(),
+  });
+};
+
+export const removeScorer = async (tournamentId, phone) => {
+  const key = phone.replace(/\D/g, '');
+  await database().ref(`tournaments/${tournamentId}/scorers/${key}`).remove();
+};
+
+export const isAssignedScorer = (tournament) => {
+  const user = getCurrentUser();
+  if (!user) return false;
+  return Object.values(tournament.scorers ?? {}).some((s) => s.uid === user.uid);
+};
+
+// ───────────────────────────────────────────────────────────
+// TEAM LOCK
+// ───────────────────────────────────────────────────────────
+
+export const setTeamLockMode = async (tournamentId, mode) => {
+  await database().ref(`tournaments/${tournamentId}`).update({ teamLockMode: mode });
+};
+
+export const setTeamsLocked = async (tournamentId, locked) => {
+  await database().ref(`tournaments/${tournamentId}`).update({ teamsLocked: locked });
+};
+
+// Central check used before any captain-side player edit — returns true if
+// the tournament's current teamLockMode+state means rosters can't be
+// changed anymore.
+export const areTeamsLockedNow = (tournament) => {
+  if (tournament.teamsLocked) return true; // manual lock always wins
+  const mode = tournament.teamLockMode;
+  if (mode === 'onStart') return tournament.status === 'live' || tournament.status === 'completed';
+  if (mode === 'afterLeague') {
+    // "League stage" here means all pool matches complete (Pool+Knockout)
+    // or, for a plain League format, treat as equivalent to onStart.
+    return tournament.tournamentFormat === 'Pool + Knockout'
+      ? arePoolsComplete(tournament)
+      : (tournament.status === 'live' || tournament.status === 'completed');
+  }
+  if (mode === 'beforeKnockout') return (tournament.knockoutFixtures ?? []).length > 0;
+  return false; // 'manual' mode with teamsLocked=false, or no mode set
+};
+
+// ───────────────────────────────────────────────────────────
+// MATCH ASSIGNMENT — only the assigned scorer can score a given match
+// ───────────────────────────────────────────────────────────
+
+export const assignScorerToMatch = async (tournamentId, matchId, phone) => {
+  const key = phone ? phone.replace(/\D/g, '') : null;
+  const snap = await database().ref(`tournaments/${tournamentId}`).once('value');
+  const tournament = snap.val();
+  if (!tournament) throw new Error('Tournament not found');
+  const updatedMatches = (tournament.matches ?? []).map((m) =>
+    m.id === matchId ? { ...m, assignedScorerPhone: key } : m
+  );
+  await database().ref(`tournaments/${tournamentId}`).update({ matches: updatedMatches });
+};
+
+// True if the current signed-in user is allowed to score this specific
+// match: the organizer always can; a scorer only if THIS match is
+// specifically assigned to their phone (or if the match has no assignment
+// at all, i.e. assignment is optional per-match, not mandatory).
+export const canScoreThisMatch = (tournament, match) => {
+  const user = getCurrentUser();
+  if (!user) return false;
+  if (tournament.createdBy === user.uid) return true;
+  if (!match.assignedScorerPhone) return true; // unassigned matches remain open to any assigned tournament scorer
+  const stableUidForAssigned = 'phone_' + match.assignedScorerPhone;
+  return user.uid === stableUidForAssigned;
+};
+
+// ───────────────────────────────────────────────────────────
+// TEAM REGISTRATION STATUS / PROGRESS
+// ───────────────────────────────────────────────────────────
+
+// Returns one of: 'pending' | 'captainJoined' | 'playersAdded' | 'complete' | 'locked'
+export const getTeamRegistrationStatus = (tournament, team) => {
+  if (tournament.teamsLocked) return 'locked';
+  const invite = (tournament.captainInvites ?? []).find((inv) => inv.teamId === team.teamId);
+  const playerCount = (team.players ?? []).length;
+  if (!invite) {
+    // Team was added directly by organizer (no captain invite flow) —
+    // judge completeness purely by player count.
+    return playerCount >= 11 ? 'complete' : (playerCount > 0 ? 'playersAdded' : 'pending');
+  }
+  if (invite.status === 'pending') return 'pending';
+  if (playerCount >= 11) return 'complete';
+  return 'playersAdded'; // captain joined and started adding, but <11 so far
+};
+
+export const getTeamProgressLabel = (team) => {
+  const count = (team.players ?? []).length;
+  return `${count} / 11 players`;
+};
+
+// ───────────────────────────────────────────────────────────
+// PUBLIC TOURNAMENT DISCOVERY
+// ───────────────────────────────────────────────────────────
+
+export const getPublicTournaments = async () => {
+  const snap = await database().ref('tournaments').orderByChild('createdAt').once('value');
+  const list = [];
+  snap.forEach((child) => {
+    list.push({ id: child.key, ...child.val() });
+  });
+  // Priority: Live > Upcoming > Completed, most recent first within each group.
+  const priority = (t) => (t.status === 'live' ? 0 : t.status === 'upcoming' ? 1 : 2);
+  return list.sort((a, b) => {
+    const pa = priority(a), pb = priority(b);
+    if (pa !== pb) return pa - pb;
+    return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+  });
+};
+
+export const searchPublicTournaments = (tournaments, query) => {
+  const q = query.trim().toLowerCase();
+  if (!q) return tournaments;
+  return tournaments.filter((t) =>
+    (t.name ?? '').toLowerCase().includes(q) ||
+    (t.organisationName ?? '').toLowerCase().includes(q) ||
+    (t.venue ?? '').toLowerCase().includes(q)
+  );
+};
+
+// ───────────────────────────────────────────────────────────
+// DATE-BASED TOURNAMENT STATUS (Home page display only)
+// ───────────────────────────────────────────────────────────
+// This is additive — it does NOT replace tournament.status, which is
+// still used elsewhere (bracket gating, organizer-set match state, etc.).
+// It exists purely to answer "should this show on the Home carousel,
+// and as Live or Upcoming" based on actual dates, per spec Section 20/21.
+
+const parseTournamentDate = (dateStr) => {
+  if (!dateStr) return null;
+  // Tournament dates are entered as DD/MM/YYYY throughout the app.
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return null;
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  if (!day || !month || !year) return null;
+  return new Date(year, month - 1, day);
+};
+
+export const getTournamentDisplayStatus = (tournament) => {
+  const start = parseTournamentDate(tournament.startDate);
+  const end = parseTournamentDate(tournament.endDate);
+  if (!start || !end) return tournament.status ?? 'upcoming'; // fallback if dates are malformed/missing
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999); // inclusive through the full end date
+
+  if (now < start) return 'upcoming';
+  if (now <= end) return 'live';
+  return 'completed';
+};
+
+// Home carousel: only Live + Upcoming, sorted Live first. Search and
+// MyTournaments/organizer views are unaffected — they keep using
+// getPublicTournaments() directly, unfiltered.
+export const getHomePageTournaments = (tournaments) => {
+  return tournaments
+    .filter((t) => getTournamentDisplayStatus(t) !== 'completed')
+    .sort((a, b) => {
+      const pa = getTournamentDisplayStatus(a) === 'live' ? 0 : 1;
+      const pb = getTournamentDisplayStatus(b) === 'live' ? 0 : 1;
+      return pa - pb;
+    });
+};
+
+// ───────────────────────────────────────────────────────────
+// DEFAULT TEST TEAM — a single, shared, non-owned fallback opponent
+// ───────────────────────────────────────────────────────────
+const TEST_TEAM_ID = 'test-team-default';
+
+export const getOrCreateTestTeam = async () => {
+  const snap = await database().ref(`teams/${TEST_TEAM_ID}`).once('value');
+  if (snap.exists()) return snap.val();
+
+  const testTeam = {
+    id: TEST_TEAM_ID,
+    name: 'Test Team',
+    logo: null,
+    isTestTeam: true, // never treated as "my team"; never migrated/linked to any real account
+    ownerId: null,
+    players: Array.from({ length: 12 }, (_, i) => ({
+      id: i,
+      name: `Player ${i + 1}`,
+      // Deliberately no phoneNumber and no globalPlayerId — these players
+      // must never be linkable to a real phone-based account, so they can
+      // never pollute a real user's My Matches / Match History / stats.
+      playerType: 'guest',
+      globalPlayerId: null,
+    })),
+    createdAt: Date.now(),
+  };
+  await database().ref(`teams/${TEST_TEAM_ID}`).set(testTeam);
+  return testTeam;
 };

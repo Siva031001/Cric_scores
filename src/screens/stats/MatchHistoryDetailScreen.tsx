@@ -8,7 +8,14 @@ import AppIcon from '../../components/AppIcon';
 // -- Ball-result run helper (mirrors cricketLogic's rotation logic but
 // returns TOTAL runs added to the team for a ball, used for partnerships) --
 const getBallTotalRuns = (result: string) => {
-  if (!result || result === 'W' || result.startsWith('W(')) return 0;
+  if (!result) return 0;
+  if (result === 'W' || result.startsWith('W(')) return 0;
+  // Run-out with completed runs is formatted "1W(RO)" / "2W(RO)" / "3W(RO)"
+  // (runs prefixed before the wicket marker) — extract the leading digit(s)
+  // as runs completed before the dismissal. Without this, run-outs with
+  // completed runs were silently counted as 0, undercounting partnerships.
+  const runOutMatch = result.match(/^(\d+)W\(/);
+  if (runOutMatch) return parseInt(runOutMatch[1]);
   if (/^\d+$/.test(result)) return parseInt(result);
   if (result.startsWith('WD')) return result === 'WD' ? 1 : 1 + (parseInt(result.replace('WD', '')) || 0);
   if (result.startsWith('NB')) return result === 'NB' ? 1 : 1 + (parseInt(result.replace('NB', '')) || 0);
@@ -17,7 +24,14 @@ const getBallTotalRuns = (result: string) => {
   if (result.startsWith('PEN')) return parseInt(result.replace('PEN', '')) || 0;
   return 0;
 };
-const isWicketResult = (result: string) => result === 'W' || (result ?? '').startsWith('W(');
+const isWicketResult = (result: string) => {
+  if (!result) return false;
+  if (result === 'W' || result.startsWith('W(')) return true;
+  // Same run-out-with-runs format as above — without this, a run-out with
+  // completed runs was never recognized as a wicket at all, so the
+  // partnership never closed and incorrectly merged into the next one.
+  return /^\d+W\(/.test(result);
+};
 
 // -- Reconstruct partnerships for one innings from ballHistory --
 const getPartnerships = (inn: any, players: any[]) => {
@@ -72,7 +86,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   const [tab, setTab] = useState<'overview'|'batting'|'bowling'|'fielding'>('overview');
   const [filter, setFilter] = useState<string>('all');
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all'|'tournament'|'normal'>('all');
-  const [ballTypeFilter, setBallTypeFilter] = useState<'all'|'Leather Ball'|'Tennis Ball'>('all');
+  const [ballTypeFilter, setBallTypeFilter] = useState<'all'|'Leather Ball'|'Tennis Ball'|'Turf'>('all');
   const [dateFilter, setDateFilter] = useState<DateFilter>('week');
   const [showMatchTypeDropdown, setShowMatchTypeDropdown] = useState(false);
   const [showDateDropdown, setShowDateDropdown] = useState(false);
@@ -237,9 +251,19 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
   const allPartnerships: any[] = [];
   typeFilteredMatches.forEach((m: any) => {
+    // Process BOTH innings — team1/team1Players always corresponds to
+    // whoever batted in innings1, team2/team2Players to whoever batted in
+    // innings2 (same convention used throughout ScoringScreen). Previously
+    // only innings1 was processed, silently dropping every partnership
+    // formed while chasing.
     if (m.innings1) {
       getPartnerships(m.innings1, m.team1Players).forEach((p: any) =>
         allPartnerships.push({ ...p, teamName: m.team1, opponent: m.team2, date: m.matchDate })
+      );
+    }
+    if (m.innings2) {
+      getPartnerships(m.innings2, m.team2Players).forEach((p: any) =>
+        allPartnerships.push({ ...p, teamName: m.team2, opponent: m.team1, date: m.matchDate })
       );
     }
   });
@@ -392,7 +416,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   <Modal visible={showBallTypeDropdown} transparent animationType="fade">
     <TouchableOpacity style={s.dropdownOverlay} activeOpacity={1} onPress={() => setShowBallTypeDropdown(false)}>
       <View style={s.dropdownMenu}>
-        {(['all','Leather Ball','Tennis Ball'] as const).map(bt => (
+        {(['all','Leather Ball','Tennis Ball','Turf'] as const).map(bt => (
           <TouchableOpacity key={bt} style={s.dropdownItem} onPress={() => { setBallTypeFilter(bt); setShowBallTypeDropdown(false); }}>
             <Text style={[s.dropdownItemTxt, ballTypeFilter === bt && { color: COLORS.primary, fontWeight: 'bold' }]}>
               {bt === 'all' ? 'Match Type' : bt}

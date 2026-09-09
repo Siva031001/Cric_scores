@@ -6,6 +6,7 @@ import { Player } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
+import database from '@react-native-firebase/database';
 
 
 const ROLES = ['Batter', 'Bowler', 'Wicket Keeper', 'All Rounder'];
@@ -216,6 +217,7 @@ const confirmNamePrompt = useCallback(() => {
 
     const fromTournament = route.params?.fromTournament ?? false;
     const tournamentIdParam = route.params?.tournamentId ?? null;
+
     const handleSave = async () => {
     const name = teamNameRef.current.trim();
     if (!name) { Alert.alert('Error', 'Please enter team name'); return; }
@@ -252,7 +254,14 @@ const confirmNamePrompt = useCallback(() => {
       }
       const formattedTeamName = formatTeamName(name);
       if (captainInviteMode) {
-        const { submitCaptainTeam } = require('../../utils/firebase');
+        const { submitCaptainTeam, areTeamsLockedNow } = require('../../utils/firebase');
+        const tSnap = await database().ref(`tournaments/${inviteTournamentId}`).once('value');
+        const tournamentSnapshot = tSnap.val();
+        if (tournamentSnapshot && areTeamsLockedNow(tournamentSnapshot)) {
+          Alert.alert('Team Locked', 'The organizer has locked team rosters — players can no longer be added or changed.');
+          setSaving(false);
+          return;
+        }
         await submitCaptainTeam(inviteTournamentId, inviteTeamId, finalPlayers);
         Alert.alert('Submitted!', `Your squad for "${inviteTeamName}" has been submitted to the organizer.`, [
           { text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }) },

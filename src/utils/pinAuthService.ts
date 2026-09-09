@@ -76,8 +76,16 @@ await database().ref(`pinAuth/${key}`).set({
   // block account creation — log and continue.
   try {
     const { ensureMyPlayerLinked, retroactivelyLinkGuestPlayers } = require('./firebase');
-    const globalPlayerId = await ensureMyPlayerLinked('',key);
-    await retroactivelyLinkGuestPlayers(key, globalPlayerId);
+    // Must run BEFORE ensureMyPlayerLinked — this promotes any existing
+    // GUEST player record for this phone number (created when someone
+    // else, e.g. an organizer, added this phone number to a team before
+    // this account existed) to REGISTERED + this account's uid. If we
+    // called ensureMyPlayerLinked first, it would find no player linked
+    // to this uid yet and create a brand-new empty one, leaving two
+    // player records under the same account — one empty, one with the
+    // real match history — with no reliable way to tell them apart later.
+    await retroactivelyLinkGuestPlayers(key);
+    await ensureMyPlayerLinked('', key);
   } catch (e) {
     console.warn('Retroactive guest-player linking failed:', e);
   }
@@ -154,6 +162,9 @@ export const subscribeToSessionValidity = (
 export const logoutLocalSession = async () => {
   await AsyncStorage.removeItem(LOCAL_SESSION_KEY);
   await AsyncStorage.removeItem(LOCAL_PHONE_KEY);
+  if (auth().currentUser) {
+    await auth().signOut();
+  }
 };
 
 // Change PIN — requires the current PIN for verification.
@@ -280,9 +291,15 @@ export const resetPinWithPhoneAuth = async (phone: string, newPin: string): Prom
     lastLoginAt: Date.now(),
   });
 
-  if (!auth().currentUser) {
-    await auth().signInAnonymously();
+  // Sign in with the same stable, phone-derived uid used everywhere else —
+  // NOT anonymous auth, or this account gets disconnected from its own
+  // teams/matches/profile the moment PIN reset is used.
+  if (auth().currentUser) {
+    await auth().signOut();
   }
+  const functionsMod = require('@react-native-firebase/functions').default;
+  const { data: tokenData } = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
+  await auth().signInWithCustomToken(tokenData.token);
 
   await AsyncStorage.setItem(LOCAL_SESSION_KEY, newSessionId);
   await AsyncStorage.setItem(LOCAL_PHONE_KEY, key);

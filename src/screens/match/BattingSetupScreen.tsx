@@ -15,8 +15,10 @@ export default function BattingSetupScreen({ route, navigation }: any) {
   const {
     team1, team2, overs, venue, ballType,
     team1Players, team2Players,
+    team1Logo, team2Logo,
     tossWinner, tossChoice,
     tournamentId, tournamentMatchId,
+    playersPerSide
   } = route.params;
 
   // Determine batting and bowling teams based on toss
@@ -90,6 +92,7 @@ export default function BattingSetupScreen({ route, navigation }: any) {
         status: 'live',
         tournamentId: tournamentId ?? null,
         tournamentMatchId: tournamentMatchId ?? null,
+        playersPerSide: playersPerSide ?? 11,
       });
       navigation.replace('Scoring', { matchId });
     } catch (e: any) {
