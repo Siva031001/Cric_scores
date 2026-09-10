@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { subscribeToMatch } from '../../utils/firebase';
-import { getOversString, getRunRate, getRequiredRunRate } from '../../utils/cricketLogic';
+import { getOversString, getRunRate, getRequiredRunRate, statKey } from '../../utils/cricketLogic';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 import LiveScoreOverlay from '../../components/LiveScoreOverlay';
@@ -70,9 +70,13 @@ export default function LiveViewScreen({ navigation }: any) {
   const batP = match.currentInnings === 1 ? match.team1Players : match.team2Players;
   const bolP = match.currentInnings === 1 ? match.team2Players : match.team1Players;
   const tgt = match.currentInnings === 2 ? match.innings1.runs + 1 : null;
-  const ss = inn?.batsmanStats?.[inn?.strikerId];
-  const ns = inn?.batsmanStats?.[inn?.nonStrikerId];
-  const bws = inn?.bowlerStats?.[inn?.currentBowlerId];
+  // Stats are keyed `p<id>` (statKey) so Firebase stores the map as an object
+  // instead of converting it to a sparse array. Indexing with the bare
+  // numeric id returns undefined, which is why the striker, non-striker and
+  // bowler figures used to show as zeros for spectators.
+  const ss = inn?.batsmanStats?.[statKey(inn?.strikerId)];
+  const ns = inn?.batsmanStats?.[statKey(inn?.nonStrikerId)];
+  const bws = inn?.bowlerStats?.[statKey(inn?.currentBowlerId)];
   const hasStream = match.isStreaming && match.streamUrl;
 
   const getName = (players: any[], id: number) =>
@@ -218,8 +222,8 @@ export default function LiveViewScreen({ navigation }: any) {
 
         {/* ── EXTRAS ── */}
         <View style={s.extrasCard}>
-          <Text style={s.extrasLbl}>Extras: {(inn?.extras?.wides ?? 0)+(inn?.extras?.noBalls ?? 0)+(inn?.extras?.byes ?? 0)+(inn?.extras?.legByes ?? 0)}</Text>
-          <Text style={s.extrasDtl}>W:{inn?.extras?.wides ?? 0}  NB:{inn?.extras?.noBalls ?? 0}  B:{inn?.extras?.byes ?? 0}  LB:{inn?.extras?.legByes ?? 0}</Text>
+          <Text style={s.extrasLbl}>Extras: {(inn?.extras?.wides ?? 0)+(inn?.extras?.noBalls ?? 0)+(inn?.extras?.byes ?? 0)+(inn?.extras?.legByes ?? 0)+(inn?.extras?.penalty ?? 0)}</Text>
+          <Text style={s.extrasDtl}>W:{inn?.extras?.wides ?? 0}  NB:{inn?.extras?.noBalls ?? 0}  B:{inn?.extras?.byes ?? 0}  LB:{inn?.extras?.legByes ?? 0}  PTY:{inn?.extras?.penalty ?? 0}</Text>
         </View>
 
         {/* ── VIEW TABS: Live / Analytics ── */}
@@ -256,7 +260,7 @@ export default function LiveViewScreen({ navigation }: any) {
 </View>
 
         {viewTab === 'live' && (() => {
-          const partnership = getCurrentPartnership(inn);
+          const partnership = getCurrentPartnership(inn, match);
           const ballByBall = getBallByBall(inn, 12);
           return (
             <>

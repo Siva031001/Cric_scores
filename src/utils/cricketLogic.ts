@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Innings, BallResult, BatsmanStats, BowlerStats } from "../types/cricket";
 
 // ── Stat-map key helper ──────────────────────────────────────
@@ -12,17 +11,17 @@ import { Innings, BallResult, BatsmanStats, BowlerStats } from "../types/cricket
 // producing corrupted partial stat objects. Prefixing the key with "p"
 // makes it a non-numeric string key, which Firebase always stores as a
 // plain object, never an array.
-export const statKey = (id) => "p" + id;
+export const statKey = (id: number): string => "p" + id;
 
-export const createEmptyBatsmanStats = (playerId) => ({
+export const createEmptyBatsmanStats = (playerId: number): BatsmanStats => ({
   playerId, runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false, dots: 0,
 });
 
-export const createEmptyBowlerStats = (playerId) => ({
+export const createEmptyBowlerStats = (playerId: number): BowlerStats => ({
   playerId, overs: 0, balls: 0, runs: 0, wickets: 0, wides: 0, noBalls: 0, maidens: 0, dots: 0,
 });
 
-export const createEmptyInnings = (strikerId = 0, nonStrikerId = 1, currentBowlerId = 0) => ({
+export const createEmptyInnings = (strikerId = 0, nonStrikerId = 1, currentBowlerId = 0): Innings => ({
   runs: 0, wickets: 0, overs: 0, balls: 0, ballHistory: [],
   strikerId, nonStrikerId, currentBowlerId,
   batsmanStats: {
@@ -34,7 +33,7 @@ export const createEmptyInnings = (strikerId = 0, nonStrikerId = 1, currentBowle
 });
 
 // ICC: works out how many runs rotate the strike for a given ball result.
-export const getStrikeRotationRuns = (result) => {
+export const getStrikeRotationRuns = (result: BallResult): number => {
   if (result === "W") return 0;
   if (result.match(/^\d+$/)) return parseInt(result);
   if (result.startsWith("WD")) return result === "WD" ? 0 : (parseInt(result.replace("WD", "")) || 0);
@@ -44,13 +43,13 @@ export const getStrikeRotationRuns = (result) => {
   return 0;
 };
 
-export const isLegalDelivery = (result) => {
+export const isLegalDelivery = (result: BallResult): boolean => {
   if (result.startsWith("WD") || result.startsWith("NB")) return false;
   if (result.startsWith("PEN")) return false;
   return true;
 };
 
-export const processBall = (innings, result) => {
+export const processBall = (innings: Innings, result: BallResult): Innings => {
   const inn = {
     ...innings,
     ballHistory: [...(innings.ballHistory ?? [])],
@@ -166,7 +165,7 @@ export const processBall = (innings, result) => {
   return inn;
 };
 
-export const undoLastBall = (innings) => {
+export const undoLastBall = (innings: Innings): Innings => {
   const history = [...(innings.ballHistory ?? [])];
   if (history.length === 0) return innings;
 
@@ -235,25 +234,26 @@ export const undoLastBall = (innings) => {
   return rebuilt;
 };
 
-export const shouldRotateStrike = (result) => getStrikeRotationRuns(result) % 2 !== 0;
-export const getOversString = (overs, balls) => `${overs}.${balls}`;
-export const getRunRate = (runs, overs, balls) => {
+export const shouldRotateStrike = (result: BallResult): boolean => getStrikeRotationRuns(result) % 2 !== 0;
+export const getOversString = (overs: number, balls: number): string => `${overs}.${balls}`;
+export const getRunRate = (runs: number, overs: number, balls: number): string => {
   const total = overs + balls / 6;
   if (total === 0) return "0.00";
+  if (total < 0) return "0.00"; // guard against corrupted data
   return (runs / total).toFixed(2);
 };
-export const getRequiredRunRate = (target, runs, totalOvers, overs, balls) => {
+export const getRequiredRunRate = (target: number, runs: number, totalOvers: number, overs: number, balls: number): string => {
   const remaining = target - runs;
   const oversLeft = totalOvers - overs - balls / 6;
   if (oversLeft <= 0) return "---";
   return (remaining / oversLeft).toFixed(2);
 };
-export const getStrikeRate = (runs, balls) => {
+export const getStrikeRate = (runs: number, balls: number): string => {
   if (balls === 0) return "0.00";
   return ((runs / balls) * 100).toFixed(1);
 };
 
-export const getMatchResult = (match) => {
+export const getMatchResult = (match: any): string => {
   if (!match) return "";
   const status = match.winner ?? match.status ?? "";
   if (!status || status === "live") return "";
@@ -284,16 +284,16 @@ export const getMatchResult = (match) => {
   return status;
 };
 
-export const getNBBatterRuns = (result) => {
+export const getNBBatterRuns = (result: BallResult): number => {
   if (!result.startsWith('NB')) return 0;
   return result === 'NB' ? 0 : parseInt(result.replace('NB', '')) || 0;
 };
-export const getWDBatterRuns = (result) => {
+export const getWDBatterRuns = (result: BallResult): number => {
   if (!result.startsWith('WD')) return 0;
   return result === 'WD' ? 0 : parseInt(result.replace('WD', '')) || 0;
 };
 
-export const calculateNRR = (runsScored, oversFaced, runsConceded, oversBowled) => {
+export const calculateNRR = (runsScored: number, oversFaced: number, runsConceded: number, oversBowled: number): number => {
   const scoredRate = oversFaced > 0 ? runsScored / oversFaced : 0;
   const concededRate = oversBowled > 0 ? runsConceded / oversBowled : 0;
   return scoredRate - concededRate;

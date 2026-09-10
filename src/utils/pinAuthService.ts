@@ -1,4 +1,3 @@
-// @ts-nocheck
 // ── PIN Auth Service ──────────────────────────────────────────
 // Handles phone+PIN account creation/login and single-active-device
 // session enforcement, backed by Firebase Realtime Database.

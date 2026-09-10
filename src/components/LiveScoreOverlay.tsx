@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { getOversString, getRunRate, getRequiredRunRate } from '../utils/cricketLogic';
+import { getOversString, getRunRate, getRequiredRunRate, statKey } from '../utils/cricketLogic';
 import { getTheme } from '../utils/streamThemes';
 
 interface Props {
@@ -14,9 +14,13 @@ export default function LiveScoreOverlay({ match, themeId = 'classic' }: Props) 
   const batP = match?.currentInnings === 1 ? match?.team1Players : match?.team2Players;
   const bolP = match?.currentInnings === 1 ? match?.team2Players : match?.team1Players;
   const tgt = match?.currentInnings === 2 ? (match?.innings1?.runs ?? 0) + 1 : null;
-  const ss = inn?.batsmanStats?.[inn?.strikerId];
-  const ns = inn?.batsmanStats?.[inn?.nonStrikerId];
-  const bws = inn?.bowlerStats?.[inn?.currentBowlerId];
+  // Stats are stored keyed `p<id>` (statKey) so Firebase keeps the map as an
+  // object rather than converting it to a sparse array. Indexing with the
+  // bare numeric id returns undefined, which is why these figures used to
+  // render as zeros on the stream overlay.
+  const ss = inn?.batsmanStats?.[statKey(inn?.strikerId)];
+  const ns = inn?.batsmanStats?.[statKey(inn?.nonStrikerId)];
+  const bws = inn?.bowlerStats?.[statKey(inn?.currentBowlerId)];
 
   const nameOf = (players: any[], id: number) => players?.find((p: any) => p.id === id)?.name ?? ('P' + (id + 1));
 

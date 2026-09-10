@@ -1,4 +1,3 @@
-// @ts-nocheck
 import CryptoJS from 'crypto-js';
 
 // Generates a random hex string without relying on native crypto module.

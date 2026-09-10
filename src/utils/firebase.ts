@@ -1,4 +1,22 @@
-﻿// @ts-nocheck
+﻿import database from '@react-native-firebase/database';
+import auth from '@react-native-firebase/auth';
+import { Match, Tournament, Team, Player, PlayerMaster, MOMCandidate, BallResult, BatsmanStats, BowlerStats } from '../types/cricket';
+// ── Rules engine ─────────────────────────────────────────────
+// Tournament points, NRR and tie-breaking are engine concerns. This module
+// only reads and writes; it never recomputes a cricket rule itself.
+import {
+  applyMatchToStandings,
+  poolQualifiers as enginePoolQualifiers,
+  sortStandings,
+  DEFAULT_TIE_BREAKERS,
+} from '../engine';
+import type {
+  CompetitionRules,
+  MatchOutcome,
+  NRRInput,
+  StandingRow,
+  TieBreaker,
+} from '../engine';
 
 // ── Name Formatting Helpers ──────────────────────────────────
 export const toInitCap = (str: string): string => {
@@ -12,9 +30,16 @@ export const formatTeamName = (name: string): string => {
   return toInitCap(trimmed);
 };
 export const formatPlayerName = (name: string): string => toInitCap(name.trim());
-// ─────────────────────────────────────────────────────────────
-import database from '@react-native-firebase/database';
-import auth from '@react-native-firebase/auth';
+
+// ── Unique ID generator with collision retry ────────────────
+const generateUniqueId = async (path: string, makeId: () => string, maxAttempts = 5): Promise<string> => {
+  for (let i = 0; i < maxAttempts; i++) {
+    const candidate = makeId();
+    const snap = await database().ref(path + '/' + candidate).once('value');
+    if (!snap.exists()) return candidate;
+  }
+  throw new Error(`Failed to generate unique ID for ${path} after ${maxAttempts} attempts`);
+};
 
 export const signInAnonymously = async () => {
   const userCredential = await auth().signInAnonymously();
@@ -59,13 +84,13 @@ export const deleteAccount = async () => {
   await user.delete();
 };
 
-export const saveTeam = async (teamData) => {
+export const saveTeam = async (teamData: any): Promise<string> => {
   const user = getCurrentUser();
   if (!user) throw new Error('Not authenticated');
   const existing = await getMyTeams();
   const duplicate = existing.find(t => t.name?.toLowerCase() === teamData.name?.toLowerCase());
   if (duplicate) throw new Error('Team already exists: ' + teamData.name);
-  const teamId = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const teamId = await generateUniqueId('users/' + user.uid + '/teams', () => Math.random().toString(36).substring(2, 8).toUpperCase());
   await database().ref(`users/${user.uid}/teams/${teamId}`).set({
     ...teamData,
     id: teamId,
@@ -87,13 +112,13 @@ export const getMyTeams = async () => {
   if (!user) return [];
   const snap = await database().ref(`users/${user.uid}/teams`).once('value');
   const teams = [];
-  snap.forEach(child => teams.push(child.val()));
+  snap.forEach(child => { teams.push(child.val()); return undefined; });
   return teams;
 };
 
-export const findTeamByName = async (name) => {
+export const findTeamByName = async (name: string): Promise<Team | null> => {
   const teams = await getMyTeams();
-  return teams.find(t => t.name.toLowerCase() === name.toLowerCase()) ?? null;
+  return teams.find(t => t?.name?.toLowerCase?.() === name.toLowerCase()) ?? null;
 };
 
 export const deleteTeam = async (teamId) => {
@@ -102,10 +127,10 @@ export const deleteTeam = async (teamId) => {
   await database().ref(`users/${user.uid}/teams/${teamId}`).remove();
 };
 
-export const createMatch = async (matchData) => {
+export const createMatch = async (matchData: any): Promise<string> => {
   const user = getCurrentUser();
   if (!user) throw new Error('Not authenticated');
-  const matchId = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const matchId = await generateUniqueId('matches', () => Math.random().toString(36).substring(2, 8).toUpperCase());
   await database().ref(`matches/${matchId}`).set({
     ...matchData, id: matchId, scorerId: user.uid, createdAt: Date.now(),
     tournamentId: matchData.tournamentId ?? null,
@@ -113,12 +138,9 @@ export const createMatch = async (matchData) => {
   });
   await database().ref(`users/${user.uid}/matches/${matchId}`).set(true);
 
-  // NEW: index this match under every participating player's globalPlayerId,
-  // so each player's own My Matches / Match History can find it — not just
-  // the account that happened to score it.
   const allPlayers = [...(matchData.team1Players ?? []), ...(matchData.team2Players ?? [])];
-  const playerIndexUpdates = {};
-  allPlayers.forEach((p) => {
+  const playerIndexUpdates: Record<string, boolean> = {};
+  allPlayers.forEach((p: any) => {
     if (p?.globalPlayerId) {
       playerIndexUpdates[`playerMatchIndex/${p.globalPlayerId}/${matchId}`] = true;
     }
@@ -139,11 +161,15 @@ export const updateMatch = async (matchId, data) => {
   await database().ref(`matches/${matchId}`).update(data);
 };
 
-export const subscribeToMatch = (matchId, callback) => {
+export const subscribeToMatch = (matchId: string, callback: (data: Match) => void, onError?: (error: Error) => void) => {
   const ref = database().ref(`matches/${matchId}`);
-  const listener = (snap) => callback(snap.val());
-  ref.on('value', listener);
-  return () => ref.off('value', listener);   // ✅ removes only THIS listener
+  const listener = (snap: any) => callback(snap.val());
+  const errorListener = (error: any) => {
+    if (onError) onError(error);
+    else console.error('subscribeToMatch error:', error);
+  };
+  ref.on('value', listener, errorListener);
+  return () => ref.off('value', listener);
 };
 
 // ── getMatchHistory — parallel reads via Promise.all ────────
@@ -160,7 +186,7 @@ export const getMatchHistory = async () => {
   if (!user) return [];
   const indexSnap = await database().ref(`users/${user.uid}/matches`).once('value');
   const matchIds: string[] = [];
-  indexSnap.forEach(child => matchIds.push(child.key));
+  indexSnap.forEach(child => { matchIds.push(child.key as string); return undefined; });
   const ids = matchIds.reverse().slice(0, 50);
   if (ids.length === 0) return [];
   const snaps = await Promise.all(
@@ -175,7 +201,7 @@ export const getLiveMatches = async () => {
   if (!user) return [];
   const indexSnap = await database().ref(`users/${user.uid}/matches`).once('value');
   const matchIds: string[] = [];
-  indexSnap.forEach(child => matchIds.push(child.key));
+  indexSnap.forEach(child => { matchIds.push(child.key as string); return undefined; });
   const ids = matchIds.reverse().slice(0, 20);
   if (ids.length === 0) return [];
   const snaps = await Promise.all(
@@ -229,12 +255,14 @@ export const deletePool = async (tournamentId, poolId) => {
   await database().ref(`tournaments/${tournamentId}`).update({ pools });
 };
 
-export const renamePool = async (tournamentId, poolId, newName) => {
+export const renamePool = async (tournamentId: string, poolId: string, newName: string): Promise<void> => {
+  const trimmed = newName.trim();
+  if (!trimmed) throw new Error('Pool name cannot be empty');
   const snap = await database().ref(`tournaments/${tournamentId}`).once('value');
   const tournament = snap.val();
   if (!tournament) throw new Error('Tournament not found');
-  const pools = (tournament.pools ?? []).map((p) =>
-    p.poolId === poolId ? { ...p, poolName: newName.trim() } : p
+  const pools = (tournament.pools ?? []).map((p: any) =>
+    p.poolId === poolId ? { ...p, poolName: trimmed } : p
   );
   await database().ref(`tournaments/${tournamentId}`).update({ pools });
 };
@@ -323,7 +351,7 @@ export const getMyTournaments = async () => {
   if (!user) return [];
   const indexSnap = await database().ref(`users/${user.uid}/tournaments`).once('value');
   const ids: string[] = [];
-  indexSnap.forEach(child => ids.push(child.key));
+  indexSnap.forEach(child => { ids.push(child.key as string); return undefined; });
   if (ids.length === 0) return [];
   const snaps = await Promise.all(ids.map(id => database().ref(`tournaments/${id}`).once('value')));
   return snaps.map(s => s.val()).filter(Boolean);
@@ -357,33 +385,46 @@ export const createPlayerMaster = async (name, type, phoneNumber = null) => {
   return playerId;
 };
 
-export const getMyLinkedPlayerId = async () => {
+export const getMyLinkedPlayerId = async (): Promise<string | null> => {
   const user = getCurrentUser();
   if (!user) return null;
   const snap = await database().ref('players').orderByChild('accountId').equalTo(user.uid).once('value');
-  let foundId = null;
-  snap.forEach(child => { if (!foundId) foundId = child.key; });
+  let foundId: string | null = null;
+  let count = 0;
+  snap.forEach((child: any) => {
+    count++;
+    if (!foundId) foundId = child.key;
+    return undefined;
+  });
+  if (count > 1) console.warn(`[Data Integrity] Multiple players linked to accountId ${user.uid}; using first match`);
   return foundId;
 };
 
-export const retroactivelyLinkGuestPlayers = async (phoneNumber: string) => {
+export const retroactivelyLinkGuestPlayers = async (phoneNumber: string): Promise<void> => {
   const key = phoneNumber.replace(/\D/g, '');
   if (!key) return;
   const user = getCurrentUser();
   if (!user) return;
   const snap = await database().ref('players').orderByChild('phoneNumber').equalTo(key).once('value');
   const updates: Record<string, any> = {};
+  const guestPlayers: any[] = [];
   snap.forEach((child: any) => {
     const v = child.val();
     if (v?.playerType === 'GUEST' && v?.accountId == null) {
-      updates[child.key + '/accountId'] = user.uid;
-      updates[child.key + '/playerType'] = 'REGISTERED';
-      updates[child.key + '/linkedAt'] = Date.now();
+      guestPlayers.push({ id: child.key, ...v });
     }
+    return undefined;
   });
-  if (Object.keys(updates).length > 0) {
-    await database().ref('players').update(updates);
+  if (guestPlayers.length === 0) return;
+  if (guestPlayers.length > 1) {
+    console.warn(`[Data Integrity] Multiple GUEST players for phone ${key}; linking only the most recent`);
+    guestPlayers.sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
   }
+  const mostRecent = guestPlayers[0];
+  updates[mostRecent.id + '/accountId'] = user.uid;
+  updates[mostRecent.id + '/playerType'] = 'REGISTERED';
+  updates[mostRecent.id + '/linkedAt'] = Date.now();
+  await database().ref('players').update(updates);
 };
 
 export const ensureMyPlayerLinked = async (displayName, phoneNumber = null) => {
@@ -410,6 +451,7 @@ export const searchGuestPlayers = async (query) => {
   snap.forEach(child => {
     const v = child.val();
     if (v?.playerType === 'GUEST' && v?.name?.toLowerCase().includes(q)) results.push(v);
+    return undefined;
   });
   return results;
 };
@@ -429,18 +471,15 @@ export const linkPlayerToAccount = async (playerId, phoneNumber = null) => {
   });
 };
 
-export const getMatchesForPlayer = async (globalPlayerId) => {
+export const getMatchesForPlayer = async (globalPlayerId: string): Promise<Match[]> => {
   if (!globalPlayerId) return [];
-  // Use the player-scoped index (populated in createMatch) instead of the
-  // scorer-scoped users/{uid}/matches index — this is what makes matches
-  // visible to every participant, not just whoever scored the match.
   const indexSnap = await database().ref('playerMatchIndex/' + globalPlayerId).once('value');
   const matchIds: string[] = [];
-  indexSnap.forEach(child => matchIds.push(child.key));
+  indexSnap.forEach((child: any) => { matchIds.push(child.key as string); return undefined; });
   if (matchIds.length === 0) return [];
   const snaps = await Promise.all(matchIds.map(id => database().ref('matches/' + id).once('value')));
   return snaps.map(s => s.val()).filter(Boolean)
-    .sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    .sort((a: any, b: any) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
 };
 
 // ───────────────────────────────────────────────────────────
@@ -471,6 +510,7 @@ export const createGuestPlayerByPhone = async (phoneNumber: string, displayName:
   let existingId: string | null = null;
   existingSnap.forEach((child: any) => {
     if (!existingId && child.val()?.playerType === 'GUEST') existingId = child.key;
+    return undefined;
   });
   if (existingId) {
     await database().ref('players/' + existingId).update({ name: displayName });
@@ -498,6 +538,7 @@ export const getPlayerMasterByAccountPhone = async (phoneNumber: string) => {
   snap.forEach((child: any) => {
     const v = child.val();
     if (v?.playerType === 'REGISTERED' && !found) found = { ...v, id: child.key };
+    return undefined;
   });
   return found;
 };
@@ -506,102 +547,174 @@ export const getPlayerMasterByAccountPhone = async (phoneNumber: string) => {
 // ───────────────────────────────────────────────────────────
 // TOURNAMENT MATCH COMPLETION
 // ───────────────────────────────────────────────────────────
+// Points, NRR and bracket progression are computed from the engine's
+// STRUCTURED MatchOutcome.
+//
+// Nothing in this path parses an English result sentence. The previous
+// implementation did (`winner.includes(team1 + ' won')`), which awarded
+// points to BOTH sides whenever one team name was a suffix of the other
+// ("CSK" / "Super CSK"), and recorded a loss for both sides on an
+// abandoned match because neither name matched.
 
-const calcOvers = (overs, balls) => (overs ?? 0) + (balls ?? 0) / 6;
+/** Converts a stored tournament team row into an engine standings row. */
+const toStandingRow = (t: any): StandingRow => ({
+  teamId: t.teamId ?? t.teamName ?? '',
+  teamName: t.teamName ?? '',
+  played: Number(t.played) || 0,
+  won: Number(t.won) || 0,
+  lost: Number(t.lost) || 0,
+  tied: Number(t.tied) || 0,
+  noResult: Number(t.noResult) || 0,
+  points: Number(t.points) || 0,
+  nrrRunsFor: Number(t.nrrRunsFor) || 0,
+  nrrOversFor: Number(t.nrrOversFor) || 0,
+  nrrRunsAgainst: Number(t.nrrRunsAgainst) || 0,
+  nrrOversAgainst: Number(t.nrrOversAgainst) || 0,
+  nrr: Number(t.nrr) || 0,
+  ...(t.seed != null ? { seed: Number(t.seed) } : {}),
+});
 
-// Shared points/NRR calculator, reused for both the overall team list AND
-// pool-scoped standings, so the exact same formula updates both consistently.
-const computeUpdatedStanding = (t, { team1, team2, runs1, runs2, denomOvers1, denomOvers2, isTie, team1Won, team2Won }) => {
-  if (t.teamName !== team1 && t.teamName !== team2) return t;
-  const isTeam1 = t.teamName === team1;
-  const ownRuns = isTeam1 ? runs1 : runs2;
-  const oppRuns = isTeam1 ? runs2 : runs1;
-  const ownOvers = isTeam1 ? denomOvers1 : denomOvers2;
-  const oppOvers = isTeam1 ? denomOvers2 : denomOvers1;
+/** Merges an updated standings row back onto the stored team object, so
+ *  fields the engine does not own (logo, players) are preserved. */
+const mergeStandingRow = (original: any, row: StandingRow) => ({
+  ...original,
+  played: row.played,
+  won: row.won,
+  lost: row.lost,
+  tied: row.tied,
+  noResult: row.noResult,
+  points: row.points,
+  nrrRunsFor: row.nrrRunsFor,
+  nrrOversFor: row.nrrOversFor,
+  nrrRunsAgainst: row.nrrRunsAgainst,
+  nrrOversAgainst: row.nrrOversAgainst,
+  nrr: row.nrr,
+});
 
-  const won = isTie ? false : (isTeam1 ? team1Won : team2Won);
-  const lost = isTie ? false : !won;
-
-  const prevRunsFor = t.nrrRunsFor ?? 0;
-  const prevOversFor = t.nrrOversFor ?? 0;
-  const prevRunsAgainst = t.nrrRunsAgainst ?? 0;
-  const prevOversAgainst = t.nrrOversAgainst ?? 0;
-  const newRunsFor = prevRunsFor + ownRuns;
-  const newOversFor = prevOversFor + ownOvers;
-  const newRunsAgainst = prevRunsAgainst + oppRuns;
-  const newOversAgainst = prevOversAgainst + oppOvers;
-  const newNrr = (newOversFor > 0 ? newRunsFor / newOversFor : 0) - (newOversAgainst > 0 ? newRunsAgainst / newOversAgainst : 0);
-
-  return {
-    ...t,
-    played: (t.played ?? 0) + 1,
-    won: (t.won ?? 0) + (won ? 1 : 0),
-    lost: (t.lost ?? 0) + (lost ? 1 : 0),
-    tied: (t.tied ?? 0) + (isTie ? 1 : 0),
-    points: (t.points ?? 0) + (won ? 2 : isTie ? 1 : 0),
-    nrrRunsFor: newRunsFor,
-    nrrOversFor: newOversFor,
-    nrrRunsAgainst: newRunsAgainst,
-    nrrOversAgainst: newOversAgainst,
-    nrr: newNrr,
-  };
+/** The tie-break order this tournament is played under. */
+export const tieBreakersFor = (tournament: any): TieBreaker[] => {
+  const configured = tournament?.tieBreakerRules;
+  return Array.isArray(configured) && configured.length > 0
+    ? (configured as TieBreaker[])
+    : DEFAULT_TIE_BREAKERS;
 };
 
-export const completeTournamentMatch = async (tournamentId, tournamentMatchId, matchResult) => {
+export interface TournamentSyncInput {
+  /** Structured result from the engine. Never a sentence. */
+  outcome: MatchOutcome;
+  /** Both sides' NRR contribution, or null for a no result / abandonment. */
+  nrrInputs: [NRRInput, NRRInput] | null;
+  rules: CompetitionRules;
+  team1: string;
+  team2: string;
+  matchId?: string | null;
+}
+
+/**
+ * Folds a finished match into its tournament: standings, the fixture's
+ * status, pool standings where applicable, and knockout progression.
+ *
+ * Safe to call for any result type. A no result or abandonment updates
+ * `played` and points but contributes nothing to run rate.
+ */
+export const completeTournamentMatch = async (
+  tournamentId: string,
+  tournamentMatchId: string,
+  input: TournamentSyncInput
+): Promise<void> => {
   if (!tournamentId || !tournamentMatchId) return;
+  if (!input?.outcome || !input.team1 || !input.team2) {
+    console.warn('[completeTournamentMatch] called without a structured outcome', input);
+    return;
+  }
+  // A match still in progress has no result to record.
+  if (input.outcome.resultType === 'IN_PROGRESS') return;
+
   const tSnap = await database().ref(`tournaments/${tournamentId}`).once('value');
   const tournament = tSnap.val();
   if (!tournament) return;
 
-  const { team1, team2, innings1, innings2, winner, matchId, totalOvers } = matchResult;
-  const runs1 = innings1?.runs ?? 0;
-  const runs2 = innings2?.runs ?? 0;
-  const oversFaced1 = calcOvers(innings1?.overs, innings1?.balls);
-  const oversFaced2 = calcOvers(innings2?.overs, innings2?.balls);
-  const allOut1 = (innings1?.wickets ?? 0) >= 10;
-  const allOut2 = (innings2?.wickets ?? 0) >= 10;
-  const denomOvers1 = allOut1 ? (totalOvers ?? oversFaced1) : oversFaced1;
-  const denomOvers2 = allOut2 ? (totalOvers ?? oversFaced2) : oversFaced2;
+  // ── Idempotency guard ──
+  // Standings accumulate, so applying the same finished match twice would
+  // double a team's points and NRR. Undo-then-recomplete, a retry after a
+  // dropped connection, or two scorers finishing the same fixture can all
+  // trigger a second call. If the fixture is already recorded as completed
+  // for this match, there is nothing to add.
+  const alreadyRecorded = [
+    ...(tournament.matches ?? []),
+    ...(tournament.pools ?? []).flatMap((p: any) => p.matches ?? []),
+    ...(tournament.knockoutFixtures ?? []),
+  ].some(
+    (f: any) =>
+      f?.id === tournamentMatchId &&
+      f?.status === 'completed' &&
+      (input.matchId == null || f?.matchId === input.matchId)
+  );
+  if (alreadyRecorded) return;
 
-  const isTie = winner === 'Match tied';
-  const team1Won = !isTie && winner?.includes(team1 + ' won');
-  const team2Won = !isTie && winner?.includes(team2 + ' won');
+  const { outcome, nrrInputs, rules, team1, team2 } = input;
+  const matchId = input.matchId ?? null;
+  // Kept for display and backward compatibility only; never parsed back.
+  const winnerText = outcome.text;
 
-  const ctx = { team1, team2, runs1, runs2, denomOvers1, denomOvers2, isTie, team1Won, team2Won };
+  const applyTo = (rows: any[]) => {
+    const asRows = rows.map(toStandingRow);
+    const updated = applyMatchToStandings(asRows, {
+      outcome,
+      nrrInputs,
+      rules,
+      team1,
+      team2,
+    });
+    return rows.map((original, i) => mergeStandingRow(original, updated[i]));
+  };
 
-  const updatedTeams = (tournament.teams ?? []).map((t) => computeUpdatedStanding(t, ctx));
+  // Overall tournament table. For a Pool + Knockout tournament this is the
+  // cross-pool table; each pool keeps its own standings below.
+  const updatedTeams = applyTo(tournament.teams ?? []);
 
-  // Try the overall tournament.matches list first...
+  const fixturePatch = {
+    status: 'completed',
+    matchId,
+    winner: winnerText,
+    result: outcome,
+  };
+
+  // Try the overall fixture list first...
   let matchedInOverall = false;
-  const updatedMatches = (tournament.matches ?? []).map((m) => {
-    if (m.id === tournamentMatchId) { matchedInOverall = true; return { ...m, status: 'completed', matchId, winner }; }
+  const updatedMatches = (tournament.matches ?? []).map((m: any) => {
+    if (m.id === tournamentMatchId) {
+      matchedInOverall = true;
+      return { ...m, ...fixturePatch };
+    }
     return m;
   });
 
-  // ...and if not found there, this match belongs to a pool — locate and
-  // update that pool's own matches + standings instead.
+  // ...otherwise the fixture belongs to a pool, so update that pool's own
+  // fixtures and standings.
   let updatedPools = tournament.pools ?? [];
   if (!matchedInOverall && updatedPools.length > 0) {
-    updatedPools = updatedPools.map((p) => {
-      const matchIndex = (p.matches ?? []).findIndex((m) => m.id === tournamentMatchId);
-      if (matchIndex === -1) return p;
-      const newPoolMatches = p.matches.map((m) =>
-        m.id === tournamentMatchId ? { ...m, status: 'completed', matchId, winner } : m
-      );
-      const newStandings = (p.standings ?? []).map((t) => computeUpdatedStanding(t, ctx));
-      return { ...p, matches: newPoolMatches, standings: newStandings };
+    updatedPools = updatedPools.map((p: any) => {
+      const found = (p.matches ?? []).some((m: any) => m.id === tournamentMatchId);
+      if (!found) return p;
+      return {
+        ...p,
+        matches: p.matches.map((m: any) =>
+          m.id === tournamentMatchId ? { ...m, ...fixturePatch } : m
+        ),
+        standings: applyTo(p.standings ?? []),
+      };
     });
   }
 
-  // Third path: this tournamentMatchId belongs to a knockout fixture.
+  // Third path: a knockout fixture.
   let updatedFixtures = tournament.knockoutFixtures ?? [];
-  if (!matchedInOverall && updatedFixtures.length > 0) {
-    const fixture = updatedFixtures.find((f) => f.id === tournamentMatchId);
-    if (fixture) {
-      updatedFixtures = updatedFixtures.map((f) =>
-        f.id === tournamentMatchId ? { ...f, status: 'completed', matchId, winner } : f
-      );
-    }
+  const isKnockoutFixture =
+    !matchedInOverall && updatedFixtures.some((f: any) => f.id === tournamentMatchId);
+  if (isKnockoutFixture) {
+    updatedFixtures = updatedFixtures.map((f: any) =>
+      f.id === tournamentMatchId ? { ...f, ...fixturePatch } : f
+    );
   }
 
   await database().ref(`tournaments/${tournamentId}`).update({
@@ -611,13 +724,11 @@ export const completeTournamentMatch = async (tournamentId, tournamentMatchId, m
     knockoutFixtures: updatedFixtures,
   });
 
-  // After saving, advance the winner into the next round's placeholder slot.
-  const completedFixture = updatedFixtures.find((f) => f.id === tournamentMatchId && f.status === 'completed');
-  if (completedFixture) {
-    const winningTeamName = winner.includes(team1 + ' won') ? team1 : winner.includes(team2 + ' won') ? team2 : null;
-    if (winningTeamName) {
-      await advanceWinnerInBracket(tournamentId, tournamentMatchId, winningTeamName);
-    }
+  // Advance the winner into whichever later-round slot was waiting on this
+  // fixture. Taken straight from the structured outcome — including a
+  // Super Over winner, which the old string test could not recognise.
+  if (isKnockoutFixture && outcome.winnerTeam) {
+    await advanceWinnerInBracket(tournamentId, tournamentMatchId, outcome.winnerTeam);
   }
 };
 
@@ -629,18 +740,18 @@ const buildMatchSummaryPrompt = (match) => {
   const i1 = match.innings1 ?? {};
   const i2 = match.innings2 ?? {};
 
-  const topBatter = (inn, players) => {
-    const entries = Object.values(inn.batsmanStats ?? {});
+  const topBatter = (inn: any, players: any[]) => {
+    const entries = Object.values(inn.batsmanStats ?? {}) as Array<BatsmanStats | null>;
     const best = entries.filter(Boolean).sort((a, b) => (b?.runs ?? 0) - (a?.runs ?? 0))[0];
     if (!best || (best.runs ?? 0) === 0) return null;
-    const name = players?.find(p => p.id === best.playerId)?.name ?? 'A batter';
+    const name = players?.find((p: any) => p.id === best.playerId)?.name ?? 'A batter';
     return name + ' (' + best.runs + ' off ' + best.balls + ')';
   };
-  const topBowler = (inn, players) => {
-    const entries = Object.values(inn.bowlerStats ?? {});
+  const topBowler = (inn: any, players: any[]) => {
+    const entries = Object.values(inn.bowlerStats ?? {}) as Array<BowlerStats | null>;
     const best = entries.filter(Boolean).sort((a, b) => (b?.wickets ?? 0) - (a?.wickets ?? 0))[0];
     if (!best || (best.wickets ?? 0) === 0) return null;
-    const name = players?.find(p => p.id === best.playerId)?.name ?? 'A bowler';
+    const name = players?.find((p: any) => p.id === best.playerId)?.name ?? 'A bowler';
     return name + ' (' + best.wickets + '/' + best.runs + ')';
   };
 
@@ -795,9 +906,23 @@ export const arePoolsComplete = (tournament) => {
 
 // Returns each pool's qualifiers ranked by points then NRR, labeled with
 // their rank (1 = winner, 2 = runner-up, ...) so fixtures can be seeded.
-export const getPoolQualifiers = (pool) => {
-  const sorted = [...(pool.standings ?? [])].sort((a, b) => b.points - a.points || (b.nrr ?? 0) - (a.nrr ?? 0));
-  return sorted.slice(0, pool.qualifyCount).map((t, idx) => ({ ...t, poolRank: idx + 1, poolName: pool.poolName }));
+export const getPoolQualifiers = (pool, tournament?: any) => {
+  // Ranked by the competition's configured tie-break order. Previously this
+  // was hard-coded to points-then-NRR, which is only one of several valid
+  // orderings across competitions.
+  const rows = (pool.standings ?? []).map(toStandingRow);
+  const ranked = enginePoolQualifiers(
+    rows,
+    pool.qualifyCount ?? rows.length,
+    tieBreakersFor(tournament),
+    {},
+    pool.poolName
+  );
+  // Re-attach the original stored objects so callers keep any extra fields.
+  return ranked.map((r, idx) => {
+    const original = (pool.standings ?? []).find((s: any) => s.teamName === r.teamName) ?? {};
+    return { ...original, ...r, poolRank: idx + 1, poolName: pool.poolName };
+  });
 };
 // Cross-pool seeding: pairs rank 1 from one pool against rank 2 from the
 // next pool (standard "avoid same-pool teams meeting early" seeding),
@@ -996,7 +1121,7 @@ export const createCaptainInvite = async (tournamentId, teamName) => {
 export const resolveInviteCode = async (inviteCode) => {
   const snap = await database().ref('tournaments').orderByChild('createdAt').once('value');
   const children = [];
-  snap.forEach((child) => { children.push(child); return false; });
+  snap.forEach((child) => { children.push(child); return undefined; });
 
   for (const child of children) {
     const t = child.val();
@@ -1123,7 +1248,8 @@ export const getMyTournamentRole = (tournament) => {
   const user = getCurrentUser();
   if (!user) return null;
   if (tournament.createdBy === user.uid) return 'organizer';
-  const isScorer = Object.values(tournament.scorers ?? {}).some((s) => s.uid === user.uid);
+  const scorerList = Object.values(tournament.scorers ?? {}) as Array<{ uid?: string }>;
+  const isScorer = scorerList.some((s) => s.uid === user.uid);
   if (isScorer) return 'scorer';
   const isCaptain = (tournament.captainInvites ?? []).some(
     (inv) => inv.status !== 'pending' && tournament.teams?.some((t) => t.teamId === inv.teamId)
@@ -1170,7 +1296,8 @@ export const removeScorer = async (tournamentId, phone) => {
 export const isAssignedScorer = (tournament) => {
   const user = getCurrentUser();
   if (!user) return false;
-  return Object.values(tournament.scorers ?? {}).some((s) => s.uid === user.uid);
+  const scorerList = Object.values(tournament.scorers ?? {}) as Array<{ uid?: string }>;
+  return scorerList.some((s) => s.uid === user.uid);
 };
 
 // ───────────────────────────────────────────────────────────
@@ -1264,6 +1391,7 @@ export const getPublicTournaments = async () => {
   const list = [];
   snap.forEach((child) => {
     list.push({ id: child.key, ...child.val() });
+    return undefined;
   });
   // Priority: Live > Upcoming > Completed, most recent first within each group.
   const priority = (t) => (t.status === 'live' ? 0 : t.status === 'upcoming' ? 1 : 2);

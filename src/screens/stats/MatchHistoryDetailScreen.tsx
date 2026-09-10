@@ -1,80 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native';import { getMatchHistory } from '../../utils/firebase';
+import { getPartnerships } from '../../utils/matchAnalytics';
 import { AdBanner, AdRewardedGate } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 
-// -- Ball-result run helper (mirrors cricketLogic's rotation logic but
-// returns TOTAL runs added to the team for a ball, used for partnerships) --
-const getBallTotalRuns = (result: string) => {
-  if (!result) return 0;
-  if (result === 'W' || result.startsWith('W(')) return 0;
-  // Run-out with completed runs is formatted "1W(RO)" / "2W(RO)" / "3W(RO)"
-  // (runs prefixed before the wicket marker) — extract the leading digit(s)
-  // as runs completed before the dismissal. Without this, run-outs with
-  // completed runs were silently counted as 0, undercounting partnerships.
-  const runOutMatch = result.match(/^(\d+)W\(/);
-  if (runOutMatch) return parseInt(runOutMatch[1]);
-  if (/^\d+$/.test(result)) return parseInt(result);
-  if (result.startsWith('WD')) return result === 'WD' ? 1 : 1 + (parseInt(result.replace('WD', '')) || 0);
-  if (result.startsWith('NB')) return result === 'NB' ? 1 : 1 + (parseInt(result.replace('NB', '')) || 0);
-  if (result.startsWith('LB')) return parseInt(result.replace('LB', '')) || 0;
-  if (result.startsWith('B')) return parseInt(result.replace('B', '')) || 0;
-  if (result.startsWith('PEN')) return parseInt(result.replace('PEN', '')) || 0;
-  return 0;
-};
-const isWicketResult = (result: string) => {
-  if (!result) return false;
-  if (result === 'W' || result.startsWith('W(')) return true;
-  // Same run-out-with-runs format as above — without this, a run-out with
-  // completed runs was never recognized as a wicket at all, so the
-  // partnership never closed and incorrectly merged into the next one.
-  return /^\d+W\(/.test(result);
-};
-
-// -- Reconstruct partnerships for one innings from ballHistory --
-const getPartnerships = (inn: any, players: any[]) => {
-  const history = inn?.ballHistory ?? [];
-  const out: any[] = [];
-  if (history.length === 0) return out;
-
-  const nameOf = (id: number) => players?.find((p: any) => p.id === id)?.name ?? ('P' + (id + 1));
-
-  let a: number | null = null;
-  let b: number | null = null;
-  let runs = 0;
-  let balls = 0;
-  let survivor: number | null = null;
-
-  history.forEach((h: any) => {
-    if (h.type === 'NEW_BATSMAN') {
-      if (survivor !== null) {
-        a = survivor;
-        b = h.newBatsmanId;
-        survivor = null;
-        runs = 0;
-        balls = 0;
-      }
-      return;
-    }
-    if (a === null) { a = h.batsmanId; b = h.nonStrikerIdBefore; }
-    runs += getBallTotalRuns(h.result);
-    if (!(h.result ?? '').startsWith('WD') && !(h.result ?? '').startsWith('NB')) balls += 1;
-
-    if (isWicketResult(h.result)) {
-      out.push({ names: nameOf(a as number) + ' & ' + nameOf(b as number), runs, balls, unbeaten: false });
-      const dismissedId = h.batsmanId;
-      survivor = dismissedId === a ? b : a;
-      a = null; b = null;
-    }
-  });
-
-  if (a !== null && b !== null && (runs > 0 || balls > 0)) {
-    out.push({ names: nameOf(a as number) + ' & ' + nameOf(b as number), runs, balls, unbeaten: true });
-  }
-  return out;
-};
+// Partnerships come from the rules engine.
+//
+// This screen used to carry its own ball-result parser and partnership
+// reconstruction — the third copy in the codebase, and the only one that
+// handled run-outs correctly. The engine now owns both, so all three views
+// (Live, Scorecard, Match History) agree by construction instead of by
+// three separate implementations happening to match.
+const partnershipsFor = (inn: any, players: any[], match: any) =>
+  getPartnerships(inn, { ...match, team1Players: players, team2Players: players }).map(p => ({
+    names: p.label,
+    runs: p.runs,
+    balls: p.balls,
+    unbeaten: p.unbeaten,
+  }));
 
 type SortKey = 'runs' | 'avg' | 'sr' | 'wickets' | 'eco' | 'bowlAvg';
 type DateFilter = 'today' | 'week' | 'month60' | 'custom' | 'lifetime';
@@ -155,6 +100,15 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
     .filter((m: any) => m.status === 'completed')
     .slice(0, 5)
     .map((m: any) => {
+      // Structured result first; the sentence is only a legacy fallback.
+      const r = m.result;
+      if (r) {
+        if (r.resultType === 'NO_RESULT' || r.resultType === 'ABANDONED') return null;
+        if (r.resultType === 'TIE') return 'T';
+        // A Super Over decides who progressed, so it reads as a W or an L.
+        if (r.winnerTeam) return r.winnerTeam === m.team1 ? 'W' : 'L';
+        return null;
+      }
       const w = m.winner ?? '';
       if (w.toLowerCase().includes('tied') || w.toLowerCase().includes('tie')) return 'T';
       if (w.includes(m.team1 + ' won')) return 'W';
@@ -257,12 +211,12 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
     // only innings1 was processed, silently dropping every partnership
     // formed while chasing.
     if (m.innings1) {
-      getPartnerships(m.innings1, m.team1Players).forEach((p: any) =>
+      partnershipsFor(m.innings1, m.team1Players, m).forEach((p: any) =>
         allPartnerships.push({ ...p, teamName: m.team1, opponent: m.team2, date: m.matchDate })
       );
     }
     if (m.innings2) {
-      getPartnerships(m.innings2, m.team2Players).forEach((p: any) =>
+      partnershipsFor(m.innings2, m.team2Players, m).forEach((p: any) =>
         allPartnerships.push({ ...p, teamName: m.team2, opponent: m.team1, date: m.matchDate })
       );
     }

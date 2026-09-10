@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, Text, TouchableOpacity, Pressable, StyleSheet, Alert, ScrollView, Share, ActivityIndicator, Modal, TextInput } from "react-native";
 import { WebView } from "react-native-webview";
-import { subscribeToMatch, updateMatch, completeTournamentMatch } from "../../utils/firebase";import {
-  processBall,
-  undoLastBall,
+import { subscribeToMatch, updateMatch } from "../../utils/firebase";
+// Only formatting and stat-map helpers remain from the old module. The
+// scoring functions (processBall, undoLastBall, getStrikeRotationRuns,
+// getNBBatterRuns, getWDBatterRuns) are deliberately NOT imported: the rules
+// engine owns those now, and importing them here would leave a second
+// scoring path reachable from this screen.
+import {
   getOversString,
   getRunRate,
   getRequiredRunRate,
-  getNBBatterRuns,
-  getWDBatterRuns,
-  getStrikeRotationRuns,
   statKey,
   createEmptyBatsmanStats,
   createEmptyBowlerStats,
@@ -21,7 +22,73 @@ import { useFocusEffect } from "@react-navigation/native";
 import ScorecardScreen from "./ScorecardScreen";
 import { getBallCommentary } from '../../utils/aiCommentary';
 import { detectMilestone } from '../../utils/milestoneDetector';
+// ── Rules engine ─────────────────────────────────────────────
+// This screen owns NO cricket rules. It describes what the scorer tapped and
+// the engine decides legality, extras, strike rotation, wickets, over
+// completion, free hits, retirement and match completion.
+import type {
+  DismissalType,
+  RetirementType,
+  RunAttribution,
+  ScoringAction,
+} from '../../engine';
+import { DEFAULT_PENALTY_REASONS } from '../../engine';
+import { loadMatch } from '../../engine/persistence';
+import {
+  applyScoringAction,
+  undoLastAction,
+  concludeMatchWithoutResult,
+  suspendMatchForStoppage,
+  startSuperOver,
+} from '../../utils/matchEngine';
 
+
+/**
+ * Maps the wicket labels the scorer sees onto engine dismissal codes.
+ * "Retired" is deliberately absent — retirement is not a delivery and is
+ * routed to the retirement prompt instead.
+ */
+const DISMISSAL_MAP: Record<string, DismissalType> = {
+  Bowled: 'BOWLED',
+  Caught: 'CAUGHT',
+  LBW: 'LBW',
+  'Run Out': 'RUN_OUT',
+  Stumped: 'STUMPED',
+  'Hit Wicket': 'HIT_WICKET',
+  'Timed Out': 'TIMED_OUT',
+  'Obstructing the Field': 'OBSTRUCTING_FIELD',
+  'Hit the Ball Twice': 'HIT_BALL_TWICE',
+};
+
+/** Quick-run buttons. 5 is included; anything else goes through "More". */
+const QUICK_RUNS = [0, 1, 2, 3, 4, 5, 6] as const;
+
+/**
+ * Penalty reasons offered to the scorer. Sourced from the competition's rule
+ * profile at runtime where one is set, so a league with its own playing
+ * conditions is not forced onto this list.
+ */
+const PENALTY_REASONS = DEFAULT_PENALTY_REASONS;
+
+/**
+ * Collapses an action to the token the commentary generator expects.
+ * Commentary is cosmetic, so an approximate token is fine here — the
+ * scorecard never reads it.
+ */
+const commentaryToken = (action: ScoringAction): string => {
+  switch (action.type) {
+    case 'RUNS':
+      return String(action.runs ?? 0);
+    case 'WICKET':
+      return 'W';
+    case 'WIDE':
+      return 'WD';
+    case 'NO_BALL':
+      return 'NB';
+    default:
+      return '0';
+  }
+};
 
 export default function ScoringScreen({ route, navigation }: any) {
   const { matchId } = route.params ?? {};
@@ -54,7 +121,10 @@ export default function ScoringScreen({ route, navigation }: any) {
   const [byeMode, setByeMode] = useState<"B"|"LB"|null>(null);
   const [showPTY, setShowPTY] = useState(false);
   const [showWDRuns, setShowWDRuns] = useState(false);
-  const [freeHit, setFreeHit] = useState(false);
+  // Free hit is no longer local screen state. It is derived and persisted by
+  // the engine (innings.freeHit), which is what makes it survive a reload and
+  // be restored correctly by undo. The old local flag was never set to true,
+  // so the banner could never appear at all.
   const [showNBRuns, setShowNBRuns] = useState(false);
   const [ptyInput, setPtyInput] = useState("5");
   const [showEndMatch, setShowEndMatch] = useState(false);
@@ -69,6 +139,33 @@ export default function ScoringScreen({ route, navigation }: any) {
   const [showVideoOverlay, setShowVideoOverlay] = useState(false);
   const [showScorecardModal, setShowScorecardModal] = useState(false);
 
+  // ── Engine-backed UI state ─────────────────────────────────
+  // "More runs" covers 5 and 7+, which the old six-button row could not
+  // express at all, plus the boundary / overthrow distinction.
+  const [showMoreRuns, setShowMoreRuns] = useState(false);
+  const [moreRunsInput, setMoreRunsInput] = useState("5");
+  const [moreRunsIsBoundary, setMoreRunsIsBoundary] = useState(false);
+  const [moreRunsIsOverthrow, setMoreRunsIsOverthrow] = useState(false);
+  // Short run: the scorer records what was attempted and how many were short.
+  const [showShortRun, setShowShortRun] = useState(false);
+  const [shortAttempted, setShortAttempted] = useState("2");
+  const [shortRunsInput, setShortRunsInput] = useState("1");
+  // Wide and no ball are now entered as a TOTAL, not as "extra beyond one".
+  const [wideTotalInput, setWideTotalInput] = useState("1");
+  const [nbTotalInput, setNbTotalInput] = useState("1");
+  const [showNBAttribution, setShowNBAttribution] = useState(false);
+  const [nbPendingTotal, setNbPendingTotal] = useState(1);
+  // Retirement is two genuinely different outcomes, no longer one "Retired".
+  const [showRetirement, setShowRetirement] = useState(false);
+  const [showReturnToBat, setShowReturnToBat] = useState(false);
+  // Penalty runs now carry a recipient and a reason.
+  const [ptyAwardedTo, setPtyAwardedTo] = useState<'BATTING' | 'FIELDING'>('BATTING');
+  const [ptyReason, setPtyReason] = useState<string>('Unfair Play');
+  // Historical correction.
+  const [showEditBall, setShowEditBall] = useState(false);
+  const [editTargetSeq, setEditTargetSeq] = useState<number | null>(null);
+  const [showSuperOverPrompt, setShowSuperOverPrompt] = useState(false);
+
  useEffect(() => {
   if (!matchId) { setLoading(false); return; }
   const unsub = subscribeToMatch(matchId, (data: any) => {
@@ -77,6 +174,10 @@ export default function ScoringScreen({ route, navigation }: any) {
     setLoading(false);
     if (data?.isLive !== undefined) setIsLive(data.isLive);
     if (data?.streamUrl) { setStreamUrl(data.streamUrl); setIsStreaming(data.isStreaming ?? false); }
+  }, (error: any) => {
+    console.error('Match subscription error:', error);
+    setLoading(false);
+    Alert.alert('Error', 'Failed to load match. Please check your connection and try again.');
   });
   return unsub;
 }, [matchId]);
@@ -140,240 +241,69 @@ useEffect(() => {
   const safeFieldKey = (name: string) =>
     (name || "Unknown").replace(/[.#$\[\]]/g, "_").trim() || "Unknown";
 
-  const rot = (inn: any) => { const t = inn.strikerId; inn.strikerId = inn.nonStrikerId; inn.nonStrikerId = t; };
+  // Strike rotation, globalPlayerId stamping and AI-summary triggering all
+  // moved into the rules engine. Keeping local copies here is what let the
+  // screen and the engine drift apart in the first place.
 
-  const stampGlobalPlayerIds = (
-  innings: any,
-  battingPlayers: any[] = [],
-  bowlingPlayers: any[] = []
-) => {
-
-  const batsmanStats = { ...(innings?.batsmanStats ?? {}) };
-  const bowlerStats = { ...(innings?.bowlerStats ?? {}) };
-
-  const battingMap = new Map(
-    battingPlayers.map((p: any) => [statKey(p.id), p.globalPlayerId ?? null])
-  );
-
-  const bowlingMap = new Map(
-    bowlingPlayers.map((p: any) => [statKey(p.id), p.globalPlayerId ?? null])
-  );
-
-  Object.keys(batsmanStats).forEach((id) => {
-    if (!batsmanStats[id]) return;
-
-    batsmanStats[id] = {
-      ...batsmanStats[id],
-      globalPlayerId: battingMap.get(id) ?? null,
-    };
-  });
-
-  Object.keys(bowlerStats).forEach((id) => {
-    if (!bowlerStats[id]) return;
-
-    bowlerStats[id] = {
-      ...bowlerStats[id],
-      globalPlayerId: bowlingMap.get(id) ?? null,
-    };
-  });
-
-  return {
-    ...innings,
-    batsmanStats,
-    bowlerStats,
-  };
-};
-
-  // AI summary is no longer generated automatically on match completion —
-  // it's now a manual, ad-gated action the user triggers from the
-  // Scorecard screen ("Generate AI Summary" button). This function is kept
-  // as a no-op stub so the existing triggerAISummary(...) call sites below
-  // don't need to be touched individually.
-  const triggerAISummary = (_updatedMatch: any) => {
-    // Intentionally does nothing — see ScorecardScreen's "Generate AI Summary" button.
-  };
-
-  const finishWicketBall = async (
-    key: string,
-    updInn: any,
-    remainingBatters: any[],
-    overCompletedOnThisBall: boolean
-  ) => {
-    const allOutNow = remainingBatters.length === 0 || updInn.wickets >= ((match.playersPerSide ?? 11) - 1);
-    const oversCompleteNow = updInn.overs >= match.totalOvers;
-
-    if (allOutNow || oversCompleteNow) {
-      await updateMatch(matchId, { [key]: updInn });
-
-      if (match.currentInnings === 2) {
-        const runs1 = match.innings1?.runs ?? 0;
-        let result2;
-        if (updInn.runs === runs1) result2 = "Match tied";
-        else if (updInn.runs < runs1) result2 = match.team1 + " won by " + (runs1 - updInn.runs) + " run" + ((runs1 - updInn.runs) !== 1 ? "s" : "");
-        else result2 = match.team2 + " won";
-        await updateMatch(matchId, { status: "completed", winner: result2 });
-        if (match.tournamentId && match.tournamentMatchId) {
-          await completeTournamentMatch(match.tournamentId, match.tournamentMatchId, {
-            team1: match.team1, team2: match.team2, innings1: match.innings1, innings2: updInn,
-            winner: result2, matchId, totalOvers: match.totalOvers,
-          });
-        }
-        // Trigger AI summary � non-blocking
-        triggerAISummary({ ...match, innings2: updInn, status: "completed", winner: result2 });
-        setSaving(false);
-        navigation.replace("Scorecard", { matchId });
-        return;
-      }
-
-      setInningsData(updInn);
-      setShowInningsEnd(true);
-      setSaving(false);
-      return;
-    }
-
-    if (overCompletedOnThisBall) {
-      rot(updInn);
-      await updateMatch(matchId, { [key]: updInn });
-      pendingBowlerAfterWicketRef.current = true;
-      postWicketInnRef.current = updInn;
-      setSaving(false);
-      setTimeout(() => {
-        setPendingBowlerAfterWicket(true);
-        setPendingWicket(true);
-      }, 50);
-      return;
-    }
-
-    await updateMatch(matchId, { [key]: updInn });
-    postWicketInnRef.current = updInn;
-    setPendingWicket(true);
-    setSaving(false);
-  };
-
-  const applyBall = async (result: string) => {
-  console.log('[APPLY BALL CALLED]', result, 'saving=', saving);
-  if (!match || saving) return;
-    if (typeof result !== "string") return;
-    if (match.status === "completed") { setSaving(false); return; }
-    const guardInn = match.currentInnings === 1 ? match.innings1 : match.innings2;
-    if ((guardInn?.overs ?? 0) >= match.totalOvers || (guardInn?.wickets ?? 0) >= ((match.playersPerSide ?? 11) - 1)) {
-      setSaving(false);
-      return;
-    }
+  // ── Engine dispatch ──────────────────────────────────────────
+  // The single route from this screen into the rules engine.
+  //
+  // Everything the old inline path decided by hand — legality, extras
+  // attribution, strike rotation, wickets, over completion, innings and
+  // match completion, free hits, tournament sync — is now decided by
+  // deriveEvent/reduceInnings and persisted atomically by matchEngine.
+  // This function deliberately contains no cricket rules.
+  const dispatchAction = async (action: ScoringAction) => {
+    if (!matchId || saving) return;
     setSaving(true);
     try {
-      const key = match.currentInnings === 1 ? "innings1" : "innings2";
-      const inn = match[key];
-      const battingRoster = match.currentInnings === 1 ? match.team1Players : match.team2Players;
-      const bowlingRoster = match.currentInnings === 1 ? match.team2Players : match.team1Players;
-      let upd = { ...processBall(inn, result) };
-      upd = stampGlobalPlayerIds(upd, battingRoster, bowlingRoster);
+      const res = await applyScoringAction(matchId, action, match ? { raw: match } : {});
 
-      if (result !== "W") {
-        const r = getStrikeRotationRuns(result);
-        if (r % 2 !== 0) rot(upd);
+      if (res.warnings.length > 0) {
+        console.warn("[engine]", res.warnings.map(w => w.message).join(" | "));
       }
 
-      if (!!freeHit && !result.startsWith("WD") && !result.startsWith("NB")) setFreeHit(false);
-
-      const isWicket = result === "W";
-      const overJustCompleted = upd.balls === 0 && upd.overs > inn.overs;
-      const allOut = upd.wickets >= ((match.playersPerSide ?? 11) - 1);
-      const oversComplete = upd.overs >= match.totalOvers;
-      let targetReached = false;
-      let chaseWinner = "";
-      if (match.currentInnings === 2 && !isWicket) {
-        const tgt = (match.innings1?.runs ?? 0) + 1;
-        if (upd.runs >= tgt) {
-          targetReached = true;
-          const wl = ((match.team2Players?.length ?? 11) - 1) - upd.wickets;
-          chaseWinner = match.team2 + " won by " + wl + " wicket" + (wl !== 1 ? "s" : "");
-        }
-      }
-
-      if (isWicket) {
-        const dismissedSid = inn.strikerId;
-        if (upd.batsmanStats?.[statKey(dismissedSid)]) {
-          upd.batsmanStats[statKey(dismissedSid)] = { ...upd.batsmanStats[statKey(dismissedSid)], bowlerId: inn.currentBowlerId };
-        }
-        const bp = match.currentInnings === 1 ? match.team1Players : match.team2Players;
-        const rem = bp.filter((p: any) => { const bs = upd.batsmanStats?.[statKey(p.id)]; return !bs?.isOut && p.id !== upd.nonStrikerId; });
-        await finishWicketBall(key, upd, rem, overJustCompleted);
-        return;
-      }
-
-      if (targetReached) {
-        await updateMatch(matchId, { innings2: upd, status: "completed", winner: chaseWinner });
-        if (match.tournamentId && match.tournamentMatchId) {
-          await completeTournamentMatch(match.tournamentId, match.tournamentMatchId, {
-            team1: match.team1, team2: match.team2, innings1: match.innings1, innings2: upd,
-            winner: chaseWinner, matchId, totalOvers: match.totalOvers,
-          });
-        }
-        // Trigger AI summary � non-blocking
-        triggerAISummary({ ...match, innings2: upd, status: "completed", winner: chaseWinner });
-        setSaving(false);
-        navigation.replace("Scorecard", { matchId });
-        return;
-      }
-
-      if (allOut || oversComplete) {
-        await updateMatch(matchId, { [key]: upd });
-        if (match.currentInnings === 2) {
-          const runs1 = match.innings1?.runs ?? 0;
-          let result2;
-          if (upd.runs === runs1) result2 = "Match tied";
-          else if (upd.runs < runs1) result2 = match.team1 + " won by " + (runs1 - upd.runs) + " run" + ((runs1 - upd.runs) !== 1 ? "s" : "");
-          else result2 = match.team2 + " won";
-          await updateMatch(matchId, { status: "completed", winner: result2 });
-          if (match.tournamentId && match.tournamentMatchId) {
-            await completeTournamentMatch(match.tournamentId, match.tournamentMatchId, {
-              team1: match.team1, team2: match.team2, innings1: match.innings1, innings2: upd,
-              winner: result2, matchId, totalOvers: match.totalOvers,
+      // Commentary and milestones are fire-and-forget: a failure here must
+      // never block or roll back a scored delivery.
+      try {
+        const key = res.innings.isSuperOver
+          ? null
+          : (match?.currentInnings === 2 ? "innings2" : "innings1");
+        if (key) {
+          const batterName = batP?.find((p: any) => p.id === inn?.strikerId)?.name ?? "Batter";
+          const bowlerName = bolP?.find((p: any) => p.id === inn?.currentBowlerId)?.name ?? "Bowler";
+          const commentary = await getBallCommentary(
+            commentaryToken(action),
+            batterName,
+            bowlerName
+          );
+          if (commentary) {
+            await updateMatch(matchId, {
+              [key + "/latestCommentaryText"]: commentary,
+              [key + "/latestCommentaryTs"]: Date.now(),
             });
           }
-          // Trigger AI summary � non-blocking
-          triggerAISummary({ ...match, innings2: upd, status: "completed", winner: result2 });
-          setSaving(false);
-          navigation.replace("Scorecard", { matchId });
-          return;
-        }
-        setInningsData(upd);
-        setShowInningsEnd(true);
-        setSaving(false);
-        return;
-      }
-
-      if (overJustCompleted) {
-        rot(upd);
-        await updateMatch(matchId, { [key]: upd });
-        setSaving(false);
-        setTimeout(() => setShowNewBowler(true), 50);
-        return;
-      }
-
-      // AI Commentary — fire-and-forget, never blocks scoring.
-      try {
-        const batterName = battingRoster?.find((p: any) => p.id === inn.strikerId)?.name ?? 'Batter';
-        const bowlerName = bowlingRoster?.find((p: any) => p.id === inn.currentBowlerId)?.name ?? 'Bowler';
-        const line = getBallCommentary(result, batterName, bowlerName);
-        upd = { ...upd, latestCommentaryText: line, latestCommentaryTs: Date.now() };
-      } catch {}
-
-      // Milestone detection (50/100/150/200) — compares runs before vs after this ball.
-      try {
-        const prevRuns = inn?.batsmanStats?.[statKey(inn.strikerId)]?.runs ?? 0;
-        const newRuns = upd?.batsmanStats?.[statKey(inn.strikerId)]?.runs ?? 0;
-        const milestone = detectMilestone(prevRuns, newRuns);
-        if (milestone) {
-          const batterName = battingRoster?.find((p: any) => p.id === inn.strikerId)?.name ?? 'Batter';
-          await updateMatch(matchId, { lastMilestone: { text: milestone, playerName: batterName, ts: Date.now() } });
+          const prevRuns = inn?.batsmanStats?.[statKey(inn?.strikerId)]?.runs ?? 0;
+          const newRuns = res.innings.batsmanStats?.[statKey(inn?.strikerId)]?.runs ?? 0;
+          const milestone = detectMilestone(prevRuns, newRuns);
+          if (milestone) {
+            await updateMatch(matchId, {
+              lastMilestone: { text: milestone, playerName: batterName, ts: Date.now() },
+            });
+          }
         }
       } catch {}
 
-      await updateMatch(matchId, { [key]: upd });
-    } catch (e: any) { Alert.alert("Error", e?.message); }
-    setSaving(false);
+      if (res.superOverRequired) {
+        setShowSuperOverPrompt(true);
+      } else if (res.matchComplete) {
+        navigation.replace("Scorecard", { matchId });
+      }
+    } catch (e: any) {
+      Alert.alert(e?.code ? "Cannot record that" : "Error", e?.message ?? "Something went wrong");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleLive = async () => {
@@ -406,21 +336,116 @@ useEffect(() => {
     await Share.share({ message: msg });
   };
 
-  const handleRunTap = (r: string) => {
-    if (byeMode) { applyBall(byeMode + r); setByeMode(null); return; }
-    applyBall(r);
+  // ── Scoring actions ──────────────────────────────────────────
+  // Each handler describes only what the scorer indicated. No cricket rule
+  // is applied here.
+
+  const handleRunTap = (r: number) => {
+    if (byeMode) {
+      dispatchAction({ type: byeMode === "LB" ? "LEG_BYE" : "BYE", runs: r });
+      setByeMode(null);
+      return;
+    }
+    // 4 and 6 from the quick row are treated as genuine boundaries, which is
+    // the overwhelmingly common case. Runs that were RUN, or came from an
+    // overthrow, go through "More" so the batter's 4s/6s stay honest.
+    dispatchAction({
+      type: "RUNS",
+      runs: r,
+      boundary: r === 4 ? 4 : r === 6 ? 6 : 0,
+    });
+  };
+
+  const submitMoreRuns = () => {
+    const runs = parseInt(moreRunsInput, 10);
+    if (!Number.isFinite(runs) || runs < 0) {
+      Alert.alert("Invalid runs", "Enter a whole number of runs (0 or more).");
+      return;
+    }
+    setShowMoreRuns(false);
+    dispatchAction({
+      type: "RUNS",
+      runs,
+      boundary: moreRunsIsBoundary && (runs === 4 || runs === 6) ? (runs as 4 | 6) : 0,
+      overthrowRuns: moreRunsIsOverthrow ? runs : 0,
+      runType: moreRunsIsOverthrow ? "OVERTHROW" : undefined,
+    });
+    setMoreRunsIsBoundary(false);
+    setMoreRunsIsOverthrow(false);
+  };
+
+  const submitShortRun = () => {
+    const attempted = parseInt(shortAttempted, 10);
+    const short = parseInt(shortRunsInput, 10);
+    if (!Number.isFinite(attempted) || !Number.isFinite(short)) {
+      Alert.alert("Invalid runs", "Enter whole numbers for attempted and short runs.");
+      return;
+    }
+    setShowShortRun(false);
+    dispatchAction({ type: "RUNS", runs: 0, attemptedRuns: attempted, shortRuns: short });
+  };
+
+  const submitWide = () => {
+    const total = parseInt(wideTotalInput, 10);
+    if (!Number.isFinite(total) || total < 1) {
+      Alert.alert("Invalid wide", "Enter the TOTAL runs from the wide (1 or more).");
+      return;
+    }
+    setShowWDRuns(false);
+    dispatchAction({ type: "WIDE", totalRuns: total });
+  };
+
+  const submitNoBall = () => {
+    const total = parseInt(nbTotalInput, 10);
+    if (!Number.isFinite(total) || total < 1) {
+      Alert.alert("Invalid no ball", "Enter the TOTAL runs from the no ball (1 or more).");
+      return;
+    }
+    setShowNBRuns(false);
+    if (total === 1) {
+      // Nothing beyond the penalty, so there is nothing to attribute.
+      dispatchAction({ type: "NO_BALL", totalRuns: 1, attribution: "BATTER" });
+      return;
+    }
+    // The engine will not guess whose runs these are — ask.
+    setNbPendingTotal(total);
+    setShowNBAttribution(true);
+  };
+
+  const submitNoBallAttribution = (attribution: RunAttribution) => {
+    setShowNBAttribution(false);
+    const beyond = nbPendingTotal - 1;
+    dispatchAction({
+      type: "NO_BALL",
+      totalRuns: nbPendingTotal,
+      attribution,
+      boundary:
+        attribution === "BATTER" && (beyond === 4 || beyond === 6) ? (beyond as 4 | 6) : 0,
+    });
   };
 
   const handleWicketSelect = (type: string) => {
-    setWicketType(type); setShowWicket(false);
-    if (type === "Run Out") { setShowRunOutPicker(true); return; }
-    if (type === "Caught" || type === "Stumped") setShowFielder(true);
-    else applyBall("W");
+    setShowWicket(false);
+    // Retirement is not a delivery and is no longer a single "Retired".
+    if (type === "Retired") {
+      setShowRetirement(true);
+      return;
+    }
+    setWicketType(type);
+    if (type === "Run Out") {
+      setShowRunOutPicker(true);
+      return;
+    }
+    if (type === "Caught" || type === "Stumped") {
+      setShowFielder(true);
+      return;
+    }
+    dispatchAction({ type: "WICKET", dismissal: DISMISSAL_MAP[type] ?? "UNKNOWN" });
   };
 
   const handleRunOutWho = (who: "striker" | "nonStriker") => {
-    setShowRunOutPicker(false);
     setRunOutWhoSelected(who);
+    setShowRunOutPicker(false);
     setShowRunOutRuns(true);
   };
 
@@ -430,162 +455,80 @@ useEffect(() => {
     setShowRunOutFielder(true);
   };
 
-  const handleRunOutFielderSelect = async (fielderName: string) => {
-    if (!match || saving || !runOutWhoSelected) return;
-    const who = runOutWhoSelected;
-    const runsCompleted = runOutRuns;
+  const handleRunOutFielderSelect = (fielderName: string) => {
     setShowRunOutFielder(false);
+    const outId =
+      runOutWhoSelected === "nonStriker" ? inn?.nonStrikerId : inn?.strikerId;
+    dispatchAction({
+      type: "WICKET",
+      dismissal: "RUN_OUT",
+      playerOutId: outId,
+      fielderName,
+      runsCompleted: runOutRuns,
+    });
     setRunOutWhoSelected(null);
     setRunOutRuns(0);
-    setSaving(true);
-    try {
-      const key = match.currentInnings === 1 ? "innings1" : "innings2";
-      const inn = match[key];
-      // The striker at the START of this delivery always faced the ball and
-      // ran, regardless of which end ends up dismissed — they get credited
-      // with the ball faced and any runs completed before the run-out.
-      const strikerIdAtDelivery = inn.strikerId;
-      const dismissedId = who === "striker" ? inn.strikerId : inn.nonStrikerId;
-      // The partner who was NOT run out   always the "other" batsman at the crease.
-      const survivingPartnerId = who === "striker" ? inn.nonStrikerId : inn.strikerId;
-      const dismissedGid = (match.currentInnings === 1 ? match.team1Players : match.team2Players)?.find((p: any) => p.id === dismissedId)?.globalPlayerId ?? null;
-
-      const updBatStats = { ...inn.batsmanStats };
-
-      const strikerEntry = updBatStats[statKey(strikerIdAtDelivery)] ?? { playerId: strikerIdAtDelivery, runs: 0, balls: 0, fours: 0, sixes: 0 };
-      updBatStats[statKey(strikerIdAtDelivery)] = {
-        ...strikerEntry,
-        balls: (strikerEntry.balls ?? 0) + 1,
-        runs: (strikerEntry.runs ?? 0) + runsCompleted,
-      };
-
-      // Mark whichever batsman is actually out as dismissed. If the striker
-      // was run out, this is the SAME entry updated above; if the
-      // non-striker was run out, this is a separate entry that never faced
-      // the ball, so it only gets the dismissal fields, not runs/balls.
-      const dismissedExisting = updBatStats[statKey(dismissedId)] ?? { playerId: dismissedId, runs: 0, balls: 0, fours: 0, sixes: 0 };
-      updBatStats[statKey(dismissedId)] = {
-        ...dismissedExisting,
-        isOut: true,
-        dismissalType: "Run Out",
-        fielderName: fielderName,
-        globalPlayerId: dismissedGid,
-      };
-
-      const bowlingRosterRO = match.currentInnings === 1 ? match.team2Players : match.team1Players;
-      const updFieldStats = { ...(inn.fieldingStats ?? {}) };
-      if (fielderName && fielderName !== "Skip") {
-        const fKey = safeFieldKey(fielderName);
-        const fielderGid = bowlingRosterRO?.find((p: any) => p.name === fielderName)?.globalPlayerId ?? null;
-        updFieldStats[fKey] = {
-          ...(updFieldStats[fKey] ?? { runOuts: 0, catches: 0, stumpings: 0 }),
-          runOuts: (updFieldStats[fKey]?.runOuts ?? 0) + 1,
-          globalPlayerId: fielderGid,
-          displayName: fielderName,
-        };
-      }
-      const updInn: any = {
-        ...inn,
-        runs: (inn.runs ?? 0) + runsCompleted,
-        wickets: (inn.wickets ?? 0) + 1,
-        balls: (inn.balls ?? 0) + 1,
-        batsmanStats: updBatStats,
-        fieldingStats: updFieldStats,
-        ballHistory: [...(inn.ballHistory ?? []), { result: runsCompleted > 0 ? `${runsCompleted}W(RO)` : "W(RO)", over: inn.overs, ball: inn.balls, batsmanId: dismissedId, nonStrikerIdBefore: survivingPartnerId, bowlerId: inn.currentBowlerId, fielderName }],
-      };
-      // If an odd number of runs were completed before the run-out, the two
-      // batsmen crossed and swapped ends — reflect that before determining
-      // which crease position is now vacant for the incoming batsman.
-      if (runsCompleted % 2 === 1) {
-        const t = updInn.strikerId; updInn.strikerId = updInn.nonStrikerId; updInn.nonStrikerId = t;
-      }
-      vacantSlotRef.current = (updInn.strikerId === dismissedId) ? 'striker' : 'nonStriker';
-
-      const overCompletedOnThisBall = updInn.balls >= 6;
-      if (overCompletedOnThisBall) { updInn.balls = 0; updInn.overs = (updInn.overs ?? 0) + 1; }
-      const batP = match.currentInnings === 1 ? match.team1Players : match.team2Players;
-      const rem = batP.filter((p: any) => {
-        const bs = updInn.batsmanStats?.[statKey(p.id)];
-        return !bs?.isOut && p.id !== (vacantSlotRef.current === "striker" ? updInn.nonStrikerId : updInn.strikerId);
-      });
-      await finishWicketBall(key, updInn, rem, overCompletedOnThisBall);
-    } catch (e: any) { Alert.alert("Error", e?.message); setSaving(false); }
   };
 
-  const handleCatchOrStumpFielder = async (fielderName: string) => {
-    if (!match || saving) return;
+  const handleCatchOrStumpFielder = (fielderName: string) => {
     setShowFielder(false);
-    setSaving(true);
-    try {
-      const key = match.currentInnings === 1 ? "innings1" : "innings2";
-      const inn = match[key];
-      const bowlingRoster = match.currentInnings === 1 ? match.team2Players : match.team1Players;
-      const battingRoster = match.currentInnings === 1 ? match.team1Players : match.team2Players;
-      let upd = { ...processBall(inn, "W") };
-      upd = stampGlobalPlayerIds(upd, battingRoster, bowlingRoster);
-      if (fielderName && fielderName !== "Skip") {
-        const statKeyName = wicketType === "Stumped" ? "stumpings" : "catches";
-        const fielderGid = bowlingRoster?.find((p: any) => p.name === fielderName)?.globalPlayerId ?? null;
-        const fKey = safeFieldKey(fielderName);
-        const updField = { ...(upd.fieldingStats ?? {}) };
-        updField[fKey] = {
-          ...(updField[fKey] ?? { catches: 0, runOuts: 0, stumpings: 0 }),
-          [statKeyName]: (updField[fKey]?.[statKeyName] ?? 0) + 1,
-          globalPlayerId: fielderGid,
-          displayName: fielderName,
-        };
-        upd.fieldingStats = updField;
-      }
-      const dismissedId = inn.strikerId;
-      vacantSlotRef.current = 'striker';
-      if (upd.batsmanStats?.[statKey(dismissedId)]) {
-        upd.batsmanStats[statKey(dismissedId)] = { ...upd.batsmanStats[statKey(dismissedId)], dismissalType: wicketType, fielderName, bowlerId: inn.currentBowlerId };
-      }
-      const overJustCompleted = upd.balls === 0 && upd.overs > inn.overs;
-      const bp = match.currentInnings === 1 ? match.team1Players : match.team2Players;
-      const rem = bp.filter((p: any) => { const bs = upd.batsmanStats?.[statKey(p.id)]; return !bs?.isOut && p.id !== upd.nonStrikerId; });
-      await finishWicketBall(key, upd, rem, overJustCompleted);
-    } catch (e: any) { Alert.alert("Error", e?.message); setSaving(false); }
+    dispatchAction({
+      type: "WICKET",
+      dismissal: wicketType === "Stumped" ? "STUMPED" : "CAUGHT",
+      fielderName,
+    });
+  };
+
+  const handleRetirementSelect = (type: RetirementType) => {
+    setShowRetirement(false);
+    dispatchAction({
+      type: "RETIREMENT",
+      playerId: inn?.strikerId ?? 0,
+      retirementType: type,
+    });
+  };
+
+  const handleReturnToBat = (playerId: number) => {
+    setShowReturnToBat(false);
+    dispatchAction({
+      type: "RETURN_TO_BAT",
+      playerId,
+      slot: inn?.awaitingBatsmanSlot ?? "striker",
+    });
   };
 
   const handlePTY = () => {
-    const r = parseInt(ptyInput);
-    if (!r || r < 1) { Alert.alert("Error", "Enter valid runs"); return; }
-    setShowPTY(false); applyBall("PEN" + r);
+    const r = parseInt(ptyInput, 10);
+    if (!Number.isFinite(r) || r < 1) {
+      Alert.alert("Invalid", "Enter penalty runs (1 or more)");
+      return;
+    }
+    setShowPTY(false);
+    dispatchAction({
+      type: "PENALTY",
+      runs: r,
+      awardedTo: ptyAwardedTo,
+      reason: ptyReason,
+    });
   };
 
   const handleUndo = async () => {
-    if (!match || saving) return;
+    if (saving || !matchId) return;
     setSaving(true);
-    openerSelectionDoneRef.current = false;
     try {
-  const key = match.currentInnings === 1 ? "innings1" : "innings2";
-    const rebuiltInn = undoLastBall(match[key]);
-
-    // undoLastBall fully rebuilds batsmanStats/bowlerStats from ballHistory
-    // via createEmptyBatsmanStats/createEmptyBowlerStats, which never carry
-    // globalPlayerId — re-stamp immediately so the linkage isn't lost for
-    // however long it takes until the next ball is scored.
-    const battingRoster = match.currentInnings === 1 ? match.team1Players : match.team2Players;
-    const bowlingRoster = match.currentInnings === 1 ? match.team2Players : match.team1Players;
-    const undoneInn = stampGlobalPlayerIds(rebuiltInn, battingRoster, bowlingRoster);
-
-    await updateMatch(matchId, { [key]: undoneInn });
-
-    const atOverBoundary =
-      (undoneInn.balls ?? 0) === 0 &&
-      (undoneInn.overs ?? 0) > 0 &&
-      (undoneInn.overs ?? 0) < match.totalOvers &&
-      (undoneInn.wickets ?? 0) < 10;
-
-    if (atOverBoundary) {
+      await undoLastAction(matchId);
+      // Any pending prompt is stale once the event log changes. The engine's
+      // awaitingBatsmanSlot / awaitingBowler now drive these.
       setPendingWicket(false);
       setPendingBowlerAfterWicket(false);
       pendingBowlerAfterWicketRef.current = false;
-      setShowNewBowler(true);
+      setShowNewBowler(false);
+      openerSelectionDoneRef.current = false;
+    } catch (e: any) {
+      Alert.alert(e?.code ? "Cannot undo" : "Error", e?.message ?? "Could not undo");
+    } finally {
+      setSaving(false);
     }
-      } catch (e: any) { Alert.alert("Error", e?.message); }
-    setSaving(false);
   };
 
   const handleShare = async () => {
@@ -642,10 +585,9 @@ useEffect(() => {
   nonStrikerId: s2,
   currentBowlerId: id,
 
-  // Stamp globalPlayerId at creation time — don't rely solely on the next
-  // ball's stampGlobalPlayerIds call, since a batter/bowler whose entry is
-  // created but who never faces/bowls another delivery before the innings
-  // or match ends would otherwise be invisible in My Matches/History.
+  // Stamp globalPlayerId at creation time so a batter or bowler who never
+  // faces another delivery before the innings ends is still visible in
+  // My Matches and Match History. The engine also stamps it on every fold.
   batsmanStats: {
     [statKey(s1)]: { ...createEmptyBatsmanStats(s1), globalPlayerId: strikerGid },
     [statKey(s2)]: { ...createEmptyBatsmanStats(s2), globalPlayerId: nonStrikerGid },
@@ -723,7 +665,7 @@ useEffect(() => {
   const matchCompleted = !!(match?.status === "completed");
   const ss = inn?.batsmanStats?.[statKey(inn?.strikerId)];
   const bws = inn?.bowlerStats?.[statKey(inn?.currentBowlerId)];
-  const ext = inn?.extras ?? { wides: 0, noBalls: 0, byes: 0, legByes: 0 };
+  const ext = inn?.extras ?? { wides: 0, noBalls: 0, byes: 0, legByes: 0, penalty: 0 };
 
   return (
     <View style={s.container}>
@@ -826,7 +768,7 @@ useEffect(() => {
           <Text style={s.bowler}>{getName(bolP, inn?.currentBowlerId)}</Text>
           {bws && <Text style={s.bStats}>{bws.overs}.{bws.balls}-{bws.runs}-{bws.wickets}</Text>}
         </View>
-        <Text style={s.extLine}>Extras {(ext.wides ?? 0) + (ext.noBalls ?? 0) + (ext.byes ?? 0) + (ext.legByes ?? 0)} (W:{ext.wides ?? 0} NB:{ext.noBalls ?? 0} B:{ext.byes ?? 0} LB:{ext.legByes ?? 0})</Text>
+        <Text style={s.extLine}>Extras {(ext.wides ?? 0) + (ext.noBalls ?? 0) + (ext.byes ?? 0) + (ext.legByes ?? 0) + (ext.penalty ?? 0)} (W:{ext.wides ?? 0} NB:{ext.noBalls ?? 0} B:{ext.byes ?? 0} LB:{ext.legByes ?? 0} PTY:{ext.penalty ?? 0})</Text>
       </View>
 
       {!!matchCompleted && (
@@ -838,6 +780,16 @@ useEffect(() => {
         </View>
       )}
 
+      {/* Retired hurt batters can be brought back in. */}
+      {(inn?.retired ?? []).some((r: any) => r.type === "RETIRED_HURT" && !r.returned) && (
+        <View style={s.modeBanner}>
+          <Text style={s.modeTxt}>A retired hurt batter can return</Text>
+          <TouchableOpacity onPress={() => setShowReturnToBat(true)}>
+            <Text style={s.modeCancel}>Bring back</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {byeMode && (
         <View style={s.modeBanner}>
           <Text style={s.modeTxt}>{byeMode} — tap a run button</Text>
@@ -845,7 +797,9 @@ useEffect(() => {
         </View>
       )}
 
-      {!!freeHit && (
+      {/* Free hit comes from the engine's persisted innings state, so it
+          survives a reload and is restored correctly by undo. */}
+      {!!inn?.freeHit && (
         <View style={s.freeHitBanner}>
           <Text style={s.freeHitTxt}>FREE HIT</Text>
           <Text style={s.freeHitSub}>Batsman cannot be dismissed (except run out)</Text>
@@ -853,11 +807,15 @@ useEffect(() => {
       )}
 
       <View style={s.runsArea}>
-        {["0","1","2","3","4","6"].map(r => (
-          <Pressable key={r} style={[s.runBtn, r==="4"&&s.rb4, r==="6"&&s.rb6, !!byeMode&&s.rbBye]} onPress={() => handleRunTap(r)} disabled={!!(saving || matchCompleted)}>
-            <Text style={[s.runBtnTxt, (r==="4"||r==="6")&&{color:"#000"}]}>{r}</Text>
+        {QUICK_RUNS.map(r => (
+          <Pressable key={r} style={[s.runBtn, r===4&&s.rb4, r===6&&s.rb6, !!byeMode&&s.rbBye]} onPress={() => handleRunTap(r)} disabled={!!(saving || matchCompleted)}>
+            <Text style={[s.runBtnTxt, (r===4||r===6)&&{color:"#000"}]}>{r}</Text>
           </Pressable>
         ))}
+        {/* 7+, runs that were RUN rather than hit, overthrows and short runs. */}
+        <Pressable style={[s.runBtn, !!byeMode&&s.rbBye]} onPress={() => setShowMoreRuns(true)} disabled={!!(saving || matchCompleted)}>
+          <Text style={[s.runBtnTxt, {fontSize: 13}]}>More</Text>
+        </Pressable>
       </View>
 
       <View style={s.extrasArea}>
@@ -949,6 +907,39 @@ useEffect(() => {
             ))}
           </View>
           <TextInput style={s.penInput} value={ptyInput} onChangeText={setPtyInput} keyboardType="numeric" placeholderTextColor={COLORS.textMuted} />
+
+          <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: "bold", marginTop: 14, marginBottom: 6 }}>Awarded To</Text>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {([
+              { key: "BATTING" as const, label: "Batting side" },
+              { key: "FIELDING" as const, label: "Fielding side" },
+            ]).map(opt => (
+              <TouchableOpacity key={opt.key}
+                style={{ flex: 1, padding: 10, borderRadius: RADIUS.sm, alignItems: "center", borderWidth: 1,
+                         borderColor: ptyAwardedTo === opt.key ? COLORS.primary : COLORS.border,
+                         backgroundColor: ptyAwardedTo === opt.key ? COLORS.primary + "22" : COLORS.card2 }}
+                onPress={() => setPtyAwardedTo(opt.key)}>
+                <Text style={{ color: ptyAwardedTo === opt.key ? COLORS.primary : COLORS.textSecondary, fontSize: 12, fontWeight: "bold" }}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 6 }}>
+            Penalty runs are never charged to the bowler.
+          </Text>
+
+          <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: "bold", marginTop: 14, marginBottom: 6 }}>Reason</Text>
+          <ScrollView style={{ maxHeight: 132 }}>
+            {PENALTY_REASONS.map(reason => (
+              <TouchableOpacity key={reason}
+                style={{ padding: 9, borderRadius: RADIUS.sm, marginBottom: 5, borderWidth: 1,
+                         borderColor: ptyReason === reason ? COLORS.primary : COLORS.border,
+                         backgroundColor: ptyReason === reason ? COLORS.primary + "22" : "transparent" }}
+                onPress={() => setPtyReason(reason)}>
+                <Text style={{ color: ptyReason === reason ? COLORS.primary : COLORS.textSecondary, fontSize: 12 }}>{reason}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
           <View style={s.mBtns}>
             <TouchableOpacity style={s.cancelBtn} onPress={() => setShowPTY(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
             <TouchableOpacity style={s.confirmBtn} onPress={handlePTY}><Text style={s.confirmTxt}>Add</Text></TouchableOpacity>
@@ -1126,8 +1117,8 @@ useEffect(() => {
           </View>
           <ScrollView style={{flex:1, backgroundColor: COLORS.background}} showsVerticalScrollIndicator={false}>
             <View style={{flexDirection:"row", margin:12, gap:6}}>
-              {["0","1","2","3","4","6"].map(r => (
-                <TouchableOpacity key={r} style={{flex:1,height:56,backgroundColor:r==="4"?"#1a6fa8":r==="6"?"#c9a000":COLORS.card,borderRadius:RADIUS.md,justifyContent:"center",alignItems:"center",borderWidth:1,borderColor:COLORS.border}}
+              {QUICK_RUNS.map(r => (
+                <TouchableOpacity key={r} style={{flex:1,height:56,backgroundColor:r===4?"#1a6fa8":r===6?"#c9a000":COLORS.card,borderRadius:RADIUS.md,justifyContent:"center",alignItems:"center",borderWidth:1,borderColor:COLORS.border}}
                   onPress={() => handleRunTap(r)} disabled={!!(saving || matchCompleted)}>
                   <Text style={{color:"#fff",fontSize:22,fontWeight:"bold"}}>{r}</Text>
                 </TouchableOpacity>
@@ -1239,35 +1230,45 @@ useEffect(() => {
 
       <Modal visible={showWDRuns} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>
-          <Text style={s.mTitle}>Wide — Select Runs</Text>
-          <Text style={{ color: COLORS.textSecondary, fontSize: 12, textAlign: "center", marginBottom: 14 }}>1 wide run always added. Select extra runs scored.</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center", marginBottom: 14 }}>
-            {["0","1","2","3","4","5"].map(r => (
-              <TouchableOpacity key={r} style={{ width: 64, height: 64, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.orange }}
-                onPress={() => { setShowWDRuns(false); applyBall(r === "0" ? "WD" : "WD" + r); }}>
-                <Text style={{ color: COLORS.text, fontSize: 22, fontWeight: "bold" }}>{r}</Text>
-                <Text style={{ color: COLORS.textMuted, fontSize: 10 }}>= {parseInt(r)+1}</Text>
+          <Text style={s.mTitle}>Wide</Text>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 6 }}>Enter the TOTAL runs from this wide</Text>
+          <Text style={{ color: COLORS.textMuted, fontSize: 11, textAlign: "center", marginBottom: 14 }}>The one wide run is already included — do not add it yourself</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center", marginBottom: 12 }}>
+            {[1,2,3,4,5].map(n => (
+              <TouchableOpacity key={n}
+                style={{ width: 56, height: 56, backgroundColor: wideTotalInput === String(n) ? COLORS.orange : COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.orange }}
+                onPress={() => setWideTotalInput(String(n))}>
+                <Text style={{ color: wideTotalInput === String(n) ? "#fff" : COLORS.text, fontSize: 20, fontWeight: "bold" }}>{n}</Text>
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity style={s.cancelBtn} onPress={() => setShowWDRuns(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
+          <TextInput style={s.penInput} value={wideTotalInput} onChangeText={setWideTotalInput} keyboardType="numeric" placeholder="Total runs" placeholderTextColor={COLORS.textMuted} />
+          <View style={s.mBtns}>
+            <TouchableOpacity style={s.cancelBtn} onPress={() => setShowWDRuns(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={s.confirmBtn} onPress={submitWide}><Text style={s.confirmTxt}>Add</Text></TouchableOpacity>
+          </View>
         </View></View>
       </Modal>
 
       <Modal visible={showNBRuns} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>
-          <Text style={s.mTitle}>No Ball — Select Runs</Text>
-          <Text style={{ color: COLORS.textSecondary, fontSize: 12, textAlign: "center", marginBottom: 14 }}>1 no ball run always added. Select bat/extra runs scored.</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center", marginBottom: 14 }}>
-            {["0","1","2","3","4","5","6"].map(r => (
-              <TouchableOpacity key={r} style={{ width: 60, height: 64, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.purple }}
-                onPress={() => { setShowNBRuns(false); applyBall(r === "0" ? "NB" : "NB" + r); }}>
-                <Text style={{ color: COLORS.text, fontSize: 22, fontWeight: "bold" }}>{r}</Text>
-                <Text style={{ color: COLORS.textMuted, fontSize: 10 }}>= {parseInt(r)+1}</Text>
+          <Text style={s.mTitle}>No Ball</Text>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 6 }}>Enter the TOTAL runs from this no ball</Text>
+          <Text style={{ color: COLORS.textMuted, fontSize: 11, textAlign: "center", marginBottom: 14 }}>The one no-ball run is already included — do not add it yourself</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center", marginBottom: 12 }}>
+            {[1,2,3,4,5,7].map(n => (
+              <TouchableOpacity key={n}
+                style={{ width: 52, height: 52, backgroundColor: nbTotalInput === String(n) ? COLORS.purple : COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.purple }}
+                onPress={() => setNbTotalInput(String(n))}>
+                <Text style={{ color: nbTotalInput === String(n) ? "#fff" : COLORS.text, fontSize: 19, fontWeight: "bold" }}>{n}</Text>
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity style={s.cancelBtn} onPress={() => setShowNBRuns(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
+          <TextInput style={s.penInput} value={nbTotalInput} onChangeText={setNbTotalInput} keyboardType="numeric" placeholder="Total runs" placeholderTextColor={COLORS.textMuted} />
+          <View style={s.mBtns}>
+            <TouchableOpacity style={s.cancelBtn} onPress={() => setShowNBRuns(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={s.confirmBtn} onPress={submitNoBall}><Text style={s.confirmTxt}>Next</Text></TouchableOpacity>
+          </View>
         </View></View>
       </Modal>
       <Modal visible={showScorecardModal} animationType="slide" onRequestClose={() => setShowScorecardModal(false)}>
@@ -1292,6 +1293,151 @@ useEffect(() => {
     />
   </View>
 </Modal>
+
+      {/* ── No-ball run attribution ──────────────────────────────
+          The engine will not guess whether extra no-ball runs came off the
+          bat or were byes: crediting the batter wrongly corrupts their
+          strike rate, and crediting the bowler wrongly corrupts economy. */}
+      <Modal visible={showNBAttribution} transparent animationType="slide">
+        <View style={s.mOverlay}><View style={s.modal}>
+          <Text style={s.mTitle}>No Ball — Who Got The Runs?</Text>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 4 }}>
+            {nbPendingTotal} total = 1 no ball + {nbPendingTotal - 1} run{nbPendingTotal - 1 === 1 ? "" : "s"}
+          </Text>
+          <Text style={{ color: COLORS.textMuted, fontSize: 11, textAlign: "center", marginBottom: 16 }}>
+            Who the {nbPendingTotal - 1} run{nbPendingTotal - 1 === 1 ? "" : "s"} belong{nbPendingTotal - 1 === 1 ? "s" : ""} to
+          </Text>
+          {([
+            { key: "BATTER" as RunAttribution, label: "Off the bat", sub: "Counts to the batter's runs and the bowler's figures" },
+            { key: "BYE" as RunAttribution, label: "Byes", sub: "Team runs only — not charged to the bowler" },
+            { key: "LEG_BYE" as RunAttribution, label: "Leg byes", sub: "Team runs only — not charged to the bowler" },
+          ]).map(opt => (
+            <TouchableOpacity key={opt.key} style={s.endBtn} onPress={() => submitNoBallAttribution(opt.key)}>
+              <Text style={s.endBtnTxt}>{opt.label}</Text>
+              <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 2 }}>{opt.sub}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={s.cancelBtn} onPress={() => setShowNBAttribution(false)}>
+            <Text style={s.cancelTxt}>Cancel</Text>
+          </TouchableOpacity>
+        </View></View>
+      </Modal>
+
+      {/* ── More runs: 7+, runs that were run, overthrows ──────── */}
+      <Modal visible={showMoreRuns} transparent animationType="slide">
+        <View style={s.mOverlay}><View style={s.modal}>
+          <Text style={s.mTitle}>Enter Runs</Text>
+          <Text style={{ color: COLORS.textMuted, fontSize: 11, textAlign: "center", marginBottom: 12 }}>
+            Any number of runs. There is no six-run limit.
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 12 }}>
+            {[5,7,8,9,10].map(n => (
+              <TouchableOpacity key={n}
+                style={{ width: 52, height: 52, backgroundColor: moreRunsInput === String(n) ? COLORS.primary : COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border }}
+                onPress={() => setMoreRunsInput(String(n))}>
+                <Text style={{ color: moreRunsInput === String(n) ? "#fff" : COLORS.text, fontSize: 19, fontWeight: "bold" }}>{n}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput style={s.penInput} value={moreRunsInput} onChangeText={setMoreRunsInput} keyboardType="numeric" placeholder="Runs" placeholderTextColor={COLORS.textMuted} />
+          <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 }} onPress={() => setMoreRunsIsBoundary(v => !v)}>
+            <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: COLORS.primary, backgroundColor: moreRunsIsBoundary ? COLORS.primary : "transparent" }} />
+            <Text style={{ color: COLORS.text, fontSize: 13, flex: 1 }}>Hit as a boundary (counts as a 4 or 6)</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, marginBottom: 12 }} onPress={() => setMoreRunsIsOverthrow(v => !v)}>
+            <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 1, borderColor: COLORS.orange, backgroundColor: moreRunsIsOverthrow ? COLORS.orange : "transparent" }} />
+            <Text style={{ color: COLORS.text, fontSize: 13, flex: 1 }}>Came from an overthrow</Text>
+          </TouchableOpacity>
+          <View style={s.mBtns}>
+            <TouchableOpacity style={s.cancelBtn} onPress={() => setShowMoreRuns(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={s.confirmBtn} onPress={submitMoreRuns}><Text style={s.confirmTxt}>Add</Text></TouchableOpacity>
+          </View>
+          <TouchableOpacity style={[s.cancelBtn, { marginTop: 8 }]} onPress={() => { setShowMoreRuns(false); setShowShortRun(true); }}>
+            <Text style={[s.cancelTxt, { color: COLORS.orange }]}>A run was called short</Text>
+          </TouchableOpacity>
+        </View></View>
+      </Modal>
+
+      {/* ── Short run ──────────────────────────────────────────── */}
+      <Modal visible={showShortRun} transparent animationType="slide">
+        <View style={s.mOverlay}><View style={s.modal}>
+          <Text style={s.mTitle}>Short Run</Text>
+          <Text style={{ color: COLORS.textMuted, fontSize: 11, textAlign: "center", marginBottom: 14 }}>
+            Only the completed runs are credited. No wicket and no extra ball is recorded.
+          </Text>
+          <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: "bold", marginBottom: 4 }}>Runs attempted</Text>
+          <TextInput style={s.penInput} value={shortAttempted} onChangeText={setShortAttempted} keyboardType="numeric" placeholderTextColor={COLORS.textMuted} />
+          <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: "bold", marginTop: 10, marginBottom: 4 }}>Runs called short</Text>
+          <TextInput style={s.penInput} value={shortRunsInput} onChangeText={setShortRunsInput} keyboardType="numeric" placeholderTextColor={COLORS.textMuted} />
+          <Text style={{ color: COLORS.textSecondary, fontSize: 12, textAlign: "center", marginTop: 10, marginBottom: 12 }}>
+            Credited: {Math.max(0, (parseInt(shortAttempted, 10) || 0) - (parseInt(shortRunsInput, 10) || 0))}
+          </Text>
+          <View style={s.mBtns}>
+            <TouchableOpacity style={s.cancelBtn} onPress={() => setShowShortRun(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={s.confirmBtn} onPress={submitShortRun}><Text style={s.confirmTxt}>Add</Text></TouchableOpacity>
+          </View>
+        </View></View>
+      </Modal>
+
+      {/* ── Retirement ─────────────────────────────────────────────
+          Two different outcomes in law, no longer one "Retired". */}
+      <Modal visible={showRetirement} transparent animationType="slide">
+        <View style={s.mOverlay}><View style={s.modal}>
+          <Text style={s.mTitle}>Retirement</Text>
+          <TouchableOpacity style={s.endBtn} onPress={() => handleRetirementSelect("RETIRED_HURT")}>
+            <Text style={s.endBtnTxt}>Retired Hurt</Text>
+            <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 2 }}>Not a wicket. Keeps their score and may return later.</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.endBtn, { borderColor: COLORS.red }]} onPress={() => handleRetirementSelect("RETIRED_OUT")}>
+            <Text style={[s.endBtnTxt, { color: COLORS.red }]}>Retired Out</Text>
+            <Text style={{ color: COLORS.textMuted, fontSize: 10, marginTop: 2 }}>Counts as a wicket. No bowler is credited. Cannot return.</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.cancelBtn} onPress={() => setShowRetirement(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
+        </View></View>
+      </Modal>
+
+      {/* ── Return to bat (retired hurt) ──────────────────────── */}
+      <Modal visible={showReturnToBat} transparent animationType="slide">
+        <View style={s.mOverlay}><View style={s.modal}>
+          <Text style={s.mTitle}>Return to Bat</Text>
+          <ScrollView style={{ maxHeight: 300 }}>
+            {(inn?.retired ?? [])
+              .filter((r: any) => r.type === "RETIRED_HURT" && !r.returned)
+              .map((r: any) => (
+                <TouchableOpacity key={r.playerId} style={s.pickerRow} onPress={() => handleReturnToBat(r.playerId)}>
+                  <Text style={s.pickerName}>{getName(batP, r.playerId)}</Text>
+                </TouchableOpacity>
+              ))}
+            {(inn?.retired ?? []).filter((r: any) => r.type === "RETIRED_HURT" && !r.returned).length === 0 && (
+              <Text style={{ color: COLORS.textMuted, textAlign: "center", padding: 16 }}>No retired hurt batters to bring back.</Text>
+            )}
+          </ScrollView>
+          <TouchableOpacity style={s.cancelBtn} onPress={() => setShowReturnToBat(false)}><Text style={s.cancelTxt}>Cancel</Text></TouchableOpacity>
+        </View></View>
+      </Modal>
+
+      {/* ── Super Over prompt ──────────────────────────────────── */}
+      <Modal visible={showSuperOverPrompt} transparent animationType="fade">
+        <View style={s.mOverlay}><View style={s.modal}>
+          <Text style={s.mTitle}>Match Tied</Text>
+          <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 16 }}>
+            This competition settles a tie with a Super Over.
+          </Text>
+          <TouchableOpacity style={s.confirmBtn} onPress={async () => {
+            setShowSuperOverPrompt(false);
+            try {
+              if (matchId) await startSuperOver(matchId, {});
+            } catch (e: any) {
+              Alert.alert("Cannot start Super Over", e?.message ?? "Unknown error");
+            }
+          }}>
+            <Text style={s.confirmTxt}>Start Super Over</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.cancelBtn} onPress={() => { setShowSuperOverPrompt(false); navigation.replace("Scorecard", { matchId }); }}>
+            <Text style={s.cancelTxt}>Leave as a tied match</Text>
+          </TouchableOpacity>
+        </View></View>
+      </Modal>
     </View>
   );
 }

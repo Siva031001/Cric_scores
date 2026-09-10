@@ -1,9 +1,8 @@
 export type BallResult =
   '0' | '1' | '2' | '3' | '4' | '6' | 'W' |
-  'WD' | 'WD2' | 'WD3' | 'WD4' |
-  'NB' | 'NB2' | 'NB3' | 'NB4' | 'NB6' |
-  'B1' | 'B2' | 'B3' | 'B4' |
-  'LB1' | 'LB2' | 'LB3' | 'LB4';
+  'WD' | `WD${number}` |
+  'NB' | `NB${number}` |
+  `B${number}` | `LB${number}` | `PEN${number}`;
 
 export type WicketType =
   'Bowled' | 'Caught' | 'LBW' | 'Run Out' |
@@ -44,7 +43,14 @@ export interface Ball {
   bowlerId?: number;
   wicketType?: WicketType;
   fielderId?: number;
+  fielderName?: string;
   newBatsmanId?: number;
+  /** The non-striker at the moment the ball was bowled. Load-bearing: undo
+   *  replay and partnership reconstruction both depend on it. */
+  nonStrikerIdBefore?: number;
+  /** Marker entries that are not deliveries — they record an incoming
+   *  batter so a single undo can reverse both the batter and the wicket. */
+  type?: 'NEW_BATSMAN';
 }
 
 export interface BatsmanStats {
@@ -58,6 +64,16 @@ export interface BatsmanStats {
   bowlerId?: number;
   fielderId?: number;
   dots?: number;
+  /** How the batter was dismissed. This — not `wicketType` — is what the
+   *  code actually writes and what the scorecard reads. */
+  dismissalType?: string;
+  /** Fielder credited, stored by display name. 'Skip' means unknown. */
+  fielderName?: string;
+  /** Links this innings entry to the player's cross-match identity. */
+  globalPlayerId?: string | null;
+  /** Set when the batter retired; null once they return. */
+  retired?: 'RETIRED_HURT' | 'RETIRED_OUT' | null;
+  canReturn?: boolean;
 }
 
 export interface BowlerStats {
@@ -70,6 +86,16 @@ export interface BowlerStats {
   noBalls: number;
   maidens: number;
   dots: number;
+  globalPlayerId?: string | null;
+}
+
+/** Fielding credit, keyed by sanitised display name. */
+export interface FieldingStats {
+  catches: number;
+  stumpings: number;
+  runOuts: number;
+  displayName: string;
+  globalPlayerId?: string | null;
 }
 
 export interface Innings {
@@ -81,14 +107,23 @@ export interface Innings {
   strikerId: number;
   nonStrikerId: number;
   currentBowlerId: number;
-  batsmanStats: { [key: number]: BatsmanStats };
-  bowlerStats: { [key: number]: BowlerStats };
+  // Keyed `p<playerId>` (see statKey), never the bare number: Firebase turns
+  // integer-keyed objects into sparse arrays with null holes.
+  batsmanStats: { [key: string]: BatsmanStats };
+  bowlerStats: { [key: string]: BowlerStats };
+  fieldingStats?: { [key: string]: FieldingStats };
   extras: {
     wides: number;
     noBalls: number;
     byes: number;
     legByes: number;
+    /** Penalty runs awarded to this side. */
+    penalty: number;
   };
+  /** Persisted so a free hit survives a reload and undo replay. */
+  freeHit?: boolean;
+  latestCommentaryText?: string;
+  latestCommentaryTs?: number;
 }
 
 export interface Match {
@@ -138,6 +173,7 @@ export interface TournamentMatch {
   status: 'scheduled' | 'live' | 'completed';
   matchId?: string;
   result?: string;
+  assignedScorerPhone?: string | null;
 }
 
 export type TournamentFormatType = 'League' | 'Knockout' | 'Pool + Knockout';
@@ -193,7 +229,10 @@ export interface Tournament {
   createdBy: string;
   createdAt: number;
   status: 'upcoming' | 'live' | 'completed';
-  captainInvites?: CaptainInvite[]; // NEW
+  captainInvites?: CaptainInvite[];
+  scorers?: { [phone: string]: { uid: string; name: string; assignedAt: number } };
+  teamLockMode?: 'manual' | 'onStart' | 'afterLeague' | 'beforeKnockout';
+  teamsLocked?: boolean;
 }
 
 export interface UserProfile {
@@ -248,14 +287,22 @@ export interface CareerFieldingStats {
   runOuts: number;
 }
 
-export interface Tournament {
-  // ...existing fields...
-  scorers?: { [phone: string]: { uid: string; name: string; assignedAt: number } };
-  teamLockMode?: 'manual' | 'onStart' | 'afterLeague' | 'beforeKnockout';
-  teamsLocked?: boolean;
+export interface PlayerMaster {
+  playerId: string;
+  name: string;
+  phoneNumber: string | null;
+  accountId: string | null;
+  playerType: 'REGISTERED' | 'GUEST';
+  createdBy: string;
+  createdAt: number;
+  linkedAt?: number;
 }
 
-export interface TournamentMatch {
-  // ...existing fields...
-  assignedScorerPhone?: string | null;
+export interface MOMCandidate {
+  name: string;
+  teamName: string;
+  score: number;
+  battingLine: string;
+  bowlingLine: string;
+  fieldingLine: string;
 }

@@ -344,8 +344,23 @@ const goBackSafe = () => {
               const ballsUsed = overs2 * 6 + balls2;
               const ballsLeft = totalBalls - ballsUsed;
               const wicketsLeft = ((match.team2Players?.length ?? 11) - 1) - wkts2;
+              // Prefer the engine's STRUCTURED result. Reading the fields
+              // directly avoids re-deriving meaning from the sentence, which
+              // mis-fired whenever one team name was a suffix of the other.
+              const r = match.result;
               let resultLine = w;
-              if (w.includes(match.team2 + " won") && match.innings2) {
+              if (r?.resultType === "WIN_BY_WICKETS" && r.winnerTeam) {
+                const left = r.ballsRemaining ?? ballsLeft;
+                resultLine = r.winnerTeam + " won by " + r.margin + " wicket" + (r.margin !== 1 ? "s" : "") +
+                  (left > 0 ? " (with " + left + " ball" + (left !== 1 ? "s" : "") + " remaining)" : "");
+              } else if (r?.resultType === "WIN_BY_RUNS" && r.winnerTeam) {
+                resultLine = r.winnerTeam + " won by " + r.margin + " run" + (r.margin !== 1 ? "s" : "");
+              } else if (r?.resultType === "TIE_BROKEN_BY_SUPER_OVER" && r.winnerTeam) {
+                resultLine = "Match tied — " + r.winnerTeam + " won the Super Over";
+              } else if (r?.text) {
+                resultLine = r.text;
+              } else if (w.includes(match.team2 + " won") && match.innings2) {
+                // Legacy match with no structured result stored.
                 resultLine = match.team2 + " won by " + wicketsLeft + " wicket" + (wicketsLeft !== 1 ? "s" : "") +
                   (ballsLeft > 0 ? " (with " + ballsLeft + " ball" + (ballsLeft !== 1 ? "s" : "") + " remaining)" : "");
               } else if (w.includes(match.team1 + " won") && match.innings2) {
