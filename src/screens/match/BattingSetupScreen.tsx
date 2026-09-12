@@ -83,6 +83,8 @@ export default function BattingSetupScreen({ route, navigation }: any) {
         team2: finalTeam2,
         team1Players: finalTeam1Players,
         team2Players: finalTeam2Players,
+        team1Logo: team1Logo ?? null,
+        team2Logo: team2Logo ?? null,
         totalOvers: parseInt(overs, 10),
         venue: venue ?? '',
         ballType: ballType ?? 'Tennis Ball',

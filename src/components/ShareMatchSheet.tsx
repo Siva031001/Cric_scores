@@ -2,6 +2,13 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Share, Alert, Linking } from 'react-native';
 import { COLORS, RADIUS, SPACING } from '../constants/theme';
 
+// Base URL for the OBS/broadcast overlay web app (web/ in this repo, a
+// small Vite app deployed the same way admin/ already is). Replace once
+// that app has an actual deployed domain — left as an obvious placeholder
+// rather than a real, possibly-wrong URL.
+const OVERLAY_BASE_URL = 'https://your-overlay-domain.example.com';
+const overlayUrl = (matchId: string) => `${OVERLAY_BASE_URL}/?m=${encodeURIComponent(matchId)}`;
+
 export default function ShareMatchSheet({ visible, onClose, match, matchId }: any) {
   const buildMessage = () =>
     `🏏 ${match.team1} vs ${match.team2}\nMatch ID: ${matchId}\nWatch live: Open CricketScorer app → Live Match → Enter ID: ${matchId}`;
@@ -33,6 +40,7 @@ export default function ShareMatchSheet({ visible, onClose, match, matchId }: an
     { key: 'telegram', label: 'Telegram', icon: '✈️' },
     { key: 'generic', label: 'More Apps', icon: '📤' },
     { key: 'copy', label: 'Copy Link', icon: '🔗' },
+    { key: 'obsLink', label: 'OBS Overlay Link', icon: '🎥' },
     { key: 'qr', label: 'QR Code', icon: '📱' },
   ];
 
@@ -48,6 +56,14 @@ export default function ShareMatchSheet({ visible, onClose, match, matchId }: an
                 style={s.item}
                 onPress={() => {
                   if (o.key === 'copy') { Alert.alert('Match ID', matchId); onClose(); return; }
+                  if (o.key === 'obsLink') {
+                    Alert.alert(
+                      'OBS Overlay Link',
+                      `${overlayUrl(matchId)}\n\nPaste this into OBS as a Browser Source (with a transparent background) to show live score graphics over your camera feed.`
+                    );
+                    onClose();
+                    return;
+                  }
                   if (o.key === 'qr') { Alert.alert('QR Code', 'QR code sharing coming soon — for now, share the Match ID directly.'); onClose(); return; }
                   shareVia(o.key === 'generic' ? 'generic' : o.key);
                 }}

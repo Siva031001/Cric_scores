@@ -1,0 +1,141 @@
+/* All colors come from CSS variables set per-theme in Overlay.jsx
+   (--ov-primary/--ov-secondary/--ov-text/--ov-accent), ported 1:1 from
+   src/utils/streamThemes.ts. */
+
+.ov {
+  position: fixed;
+  inset: 0;
+  pointer-events: none; /* never intercept a click — this is a broadcast graphic, not a UI */
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ov-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.ov__connLost {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(220, 38, 38, 0.85);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.05em;
+}
+
+/* ── Branding strip ── */
+.ov__brand {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--ov-secondary);
+  padding: 6px 14px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.ov__brandTournament { font-size: 11px; font-weight: 700; opacity: 0.75; letter-spacing: 0.04em; text-transform: uppercase; }
+.ov__brandMatch { font-size: 13px; font-weight: 600; }
+
+/* ── Score bar ── */
+.ov--full .ov__scoreBar {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background: var(--ov-secondary);
+  border-radius: 10px;
+  padding: 10px 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  min-width: 300px;
+}
+.ov--bar .ov__scoreBar {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  background: var(--ov-secondary);
+  border-radius: 8px;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.ov__teamScore { display: flex; align-items: center; gap: 8px; }
+.ov__teamLogo { width: 22px; height: 22px; border-radius: 4px; object-fit: cover; }
+.ov__teamName { font-size: 12px; font-weight: 700; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.03em; }
+.ov__score { font-size: 26px; font-weight: 800; }
+.ov__overs { font-size: 13px; font-weight: 700; color: var(--ov-primary); }
+.ov__meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; font-weight: 600; margin-top: 4px; opacity: 0.9; }
+.ov--bar .ov__meta { margin-top: 0; }
+.ov__accent { color: var(--ov-accent); }
+
+/* ── Secondary panels (batsmen / bowler / partnership / FOW / sponsor) ── */
+.ov__batsmen,
+.ov__bowler,
+.ov__partnership,
+.ov__fow,
+.ov__sponsor {
+  position: absolute;
+  background: var(--ov-secondary);
+  border-radius: 8px;
+  padding: 8px 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+}
+
+.ov__batsmen { bottom: 108px; left: 16px; min-width: 220px; }
+.ov__batterRow { display: flex; align-items: baseline; gap: 6px; font-weight: 700; }
+.ov__batterRow--sub { font-weight: 500; opacity: 0.8; margin-top: 2px; }
+.ov__strikeDot { width: 12px; color: var(--ov-accent); font-size: 10px; }
+.ov__batterName { flex: 1; text-transform: uppercase; letter-spacing: 0.02em; }
+.ov__batterFigs { font-variant-numeric: tabular-nums; }
+
+.ov__bowler { bottom: 16px; right: 16px; display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.ov__bowlerFigs { font-variant-numeric: tabular-nums; color: var(--ov-primary); }
+.ov__bowlerEco { font-weight: 500; opacity: 0.8; }
+
+.ov__partnership { bottom: 168px; left: 16px; font-weight: 600; opacity: 0.9; }
+
+.ov__fow { top: 16px; right: 16px; display: flex; align-items: center; gap: 8px; }
+.ov__fowLabel { font-weight: 800; letter-spacing: 0.06em; opacity: 0.6; font-size: 10px; }
+.ov__fowItem { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.ov__sponsor { top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; opacity: 0.85; font-size: 11px; }
+.ov__sponsorLogo { height: 20px; }
+
+/* ── Temporary event graphics ── */
+.ov__event {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  background: var(--ov-secondary);
+  border: 3px solid var(--ov-accent);
+  border-radius: 16px;
+  padding: 24px 48px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: ov-event-pop 0.35s ease-out, ov-event-fade 0.4s ease-in 4.1s forwards;
+}
+.ov__event--persistent { animation: ov-event-pop 0.35s ease-out; }
+/* Matches each event type's own TTL in useMatchEvents.js, so the fade-out
+   finishes right as React unmounts it instead of being cut off mid-fade. */
+.ov__event--over { animation: ov-event-pop 0.35s ease-out, ov-event-fade 0.4s ease-in 2.1s forwards; }
+.ov__event--milestone { animation: ov-event-pop 0.35s ease-out, ov-event-fade 0.4s ease-in 4.6s forwards; }
+.ov__eventTitle { font-size: 36px; font-weight: 900; letter-spacing: 0.04em; color: var(--ov-accent); }
+.ov__event--wicket .ov__eventTitle { color: #ef4444; }
+.ov__eventName { font-size: 20px; font-weight: 700; margin-top: 6px; text-transform: uppercase; }
+.ov__eventSub { font-size: 14px; opacity: 0.85; margin-top: 2px; }
+
+@keyframes ov-event-pop {
+  from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+@keyframes ov-event-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}

@@ -133,6 +133,8 @@ export interface Match {
   team2: string;
   team1Players: Player[];
   team2Players: Player[];
+  team1Logo?: string | null;
+  team2Logo?: string | null;
   totalOvers: number;
   format?: MatchFormat;
   ballType?: BallType;

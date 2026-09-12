@@ -3,5 +3,5 @@
   "compilerOptions": {
     "skipLibCheck": true
   },
-  "exclude": ["admin"]
+  "exclude": ["admin", "web", "functions"]
 }
