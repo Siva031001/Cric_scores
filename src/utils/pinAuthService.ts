@@ -21,11 +21,16 @@ import { generateSalt, generateSessionId, hashPin, verifyPin, normalizePhone } f
 const LOCAL_SESSION_KEY = 'cricketscorer_session_id';
 const LOCAL_PHONE_KEY = 'cricketscorer_phone';
 
-// Checks if a phone number already has a PIN account set up.
+// Checks if a phone number already has a PIN account set up. Goes through
+// the checkPhoneExistsSafe Cloud Function (returns only a boolean) rather
+// than reading pinAuth/{phone} directly — that record also carries salt
+// and pinHash, which an unauthenticated caller has no reason to receive
+// just to answer "does this phone have an account yet".
 export const checkPhoneExists = async (phone: string): Promise<boolean> => {
   const key = normalizePhone(phone);
-  const snap = await database().ref(`pinAuth/${key}`).once('value');
-  return snap.exists();
+  const functionsMod = require('@react-native-firebase/functions').default;
+  const { data } = await functionsMod().httpsCallable('checkPhoneExistsSafe')({ phone: key });
+  return !!data?.exists;
 };
 
 // Creates a new PIN account for a phone number. Call only after
@@ -287,9 +292,26 @@ export const verifyForgotPasswordOtp = async (confirmation: any, code: string) =
 
 export const resetPinWithPhoneAuth = async (phone: string, newPin: string): Promise<{ success: boolean; error?: string }> => {
   const key = normalizePhone(phone);
-  const snap = await database().ref(`pinAuth/${key}`).once('value');
-  const record = snap.val();
-  if (!record) return { success: false, error: 'Account not found.' };
+  const exists = await checkPhoneExists(key);
+  if (!exists) return { success: false, error: 'Account not found.' };
+
+  // Mint FIRST, write the new PIN only after that succeeds — the opposite
+  // order (write, then mint) used to mean a failed mint left the PIN
+  // already changed with no way to sign in, since nothing here rolled it
+  // back. Do NOT sign out before minting — the phone-verified Firebase
+  // Auth session from the OTP step above (verifyForgotPasswordOtp's
+  // confirmation.confirm) is the proof mintPhoneSessionToken checks via
+  // context.auth; signInWithCustomToken below swaps to the stable uid
+  // on its own, no prior signOut needed.
+  const functionsMod = require('@react-native-firebase/functions').default;
+  let tokenData;
+  try {
+    const result = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
+    tokenData = result.data;
+  } catch (e: any) {
+    return { success: false, error: e?.message ?? 'Could not verify your session. Please try again.' };
+  }
+  await auth().signInWithCustomToken(tokenData.token);
 
   const newSalt = generateSalt();
   const newHash = hashPin(newPin, newSalt);
@@ -301,17 +323,6 @@ export const resetPinWithPhoneAuth = async (phone: string, newPin: string): Prom
     activeSessionId: newSessionId,
     lastLoginAt: Date.now(),
   });
-
-  // Sign in with the same stable, phone-derived uid used everywhere else —
-  // NOT anonymous auth, or this account gets disconnected from its own
-  // teams/matches/profile the moment PIN reset is used. Do NOT sign out
-  // first — the phone-verified Firebase Auth session from the OTP step
-  // above (verifyForgotPasswordOtp's confirmation.confirm) is the proof
-  // mintPhoneSessionToken checks via context.auth; signInWithCustomToken
-  // below swaps to the stable uid on its own.
-  const functionsMod = require('@react-native-firebase/functions').default;
-  const { data: tokenData } = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
-  await auth().signInWithCustomToken(tokenData.token);
 
   await AsyncStorage.setItem(LOCAL_SESSION_KEY, newSessionId);
   await AsyncStorage.setItem(LOCAL_PHONE_KEY, key);

@@ -194,8 +194,8 @@ const confirmNamePrompt = useCallback(() => {
   if (namePromptFor === null) return;
   const name = namePromptValue.trim();
   if (!name) { Alert.alert('Error', 'Please enter a display name'); return; }
-  if (!/^[a-zA-Z0-9\s]+$/.test(name)) {
-    Alert.alert('Invalid Name', 'Only letters and numbers are allowed. Special characters are not permitted.');
+  if (!/^[a-zA-Z]+(?:[\s'-]+[a-zA-Z]+)*$/.test(name)) {
+    Alert.alert('Invalid Name', 'Please enter a valid name using letters, spaces, apostrophes or hyphens.');
     return;
   }
   setPlayers((prev: any[]) => {
@@ -225,15 +225,30 @@ const confirmNamePrompt = useCallback(() => {
     if (wicketKeeperId === null) { Alert.alert('Error', 'Please select a Wicket Keeper (tap WK button)'); return; }
     const filled = players.filter((p: any) => p.phoneNumber?.trim() && p.name?.trim());
       if (filled.length < 11) { Alert.alert('Error', `Enter phone number + name for at least 11 players (${filled.length} entered)`); return; }
+    const seenNames = new Set<string>();
+    const dupeName = filled.find((p: any) => {
+      const key = p.name.trim().toLowerCase();
+      if (seenNames.has(key)) return true;
+      seenNames.add(key);
+      return false;
+    });
+    if (dupeName) { Alert.alert('Error', 'Duplicate player names found. Each player must have a unique name.'); return; }
     if (!filled.map((p: any) => p.id).includes(captainId)) { Alert.alert('Error', 'Captain must have a name'); return; }
     if (!filled.map((p: any) => p.id).includes(wicketKeeperId)) { Alert.alert('Error', 'Wicket Keeper must have a name'); return; }
     setSaving(true);
     try {
       // Upload a freshly picked local logo (file://... URI) to Storage so the
       // DB stores a stable https:// URL instead of a device-local file path.
+      // Editing an existing team reuses that team's own path so a re-upload
+      // OVERWRITES the old file instead of leaking a new orphaned blob every
+      // time the logo changes (a brand-new team has no id yet to key off of,
+      // so its first upload still gets a fresh generated name).
       let uploadedLogo = logo;
       if (logo && !/^https?:\/\//.test(logo)) {
-        uploadedLogo = await uploadLocalImageToStorage(logo, `team_logos/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`);
+        const uploadPath = existingTeam?.id
+          ? `team_logos/${existingTeam.id}.jpg`
+          : `team_logos/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+        uploadedLogo = await uploadLocalImageToStorage(logo, uploadPath);
       }
       // Resolve a globalPlayerId for every filled player slot.
       // 'registered' slot = the current logged-in account, linked via ensureMyPlayerLinked.
@@ -276,8 +291,8 @@ const confirmNamePrompt = useCallback(() => {
         return;
       }
       if (existingTeam?.id) {
-        await updateTeam(existingTeam.id, { name, logo: uploadedLogo ?? undefined, players: finalPlayers });
-        Alert.alert('Updated!', `"${name}" updated.`, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+        await updateTeam(existingTeam.id, { name: formattedTeamName, logo: uploadedLogo ?? undefined, players: finalPlayers });
+        Alert.alert('Updated!', `"${formattedTeamName}" updated.`, [{ text: 'OK', onPress: () => navigation.goBack() }]);
       } else {
         const teamId = await saveTeam({
           name: formattedTeamName,
@@ -320,7 +335,7 @@ Alert.alert(
     finally { setSaving(false); }
   };
 
-  const filledCount = players.filter((p: any) => p.name?.trim()).length;
+  const filledCount = players.filter((p: any) => p.phoneNumber?.trim() && p.name?.trim()).length;
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

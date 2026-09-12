@@ -97,6 +97,8 @@ export interface FieldingStats {
   runOuts: number;
   displayName: string;
   globalPlayerId?: string | null;
+  /** The fielder's local Player.id, when known — absent on older records. */
+  fielderId?: number | null;
 }
 
 export interface Innings {
@@ -219,6 +221,14 @@ export interface KnockoutFixture {
   awayTeamName?: string;
   homeSourceFixtureId?: string; // if this slot is fed by a previous knockout match's winner
   awaySourceFixtureId?: string;
+  // If this slot is instead seeded directly from a pool's standings (the
+  // first knockout round), which pool + finishing rank fed it — written by
+  // autoGenerateKnockoutBracket, read by TournamentDetailScreen to show
+  // e.g. "Pool A #1" before that team's actual name is known.
+  homeSourcePool?: string;
+  homeSourcePoolRank?: number;
+  awaySourcePool?: string;
+  awaySourcePoolRank?: number;
   status: 'scheduled' | 'live' | 'completed';
   matchId?: string;
   winner?: string;

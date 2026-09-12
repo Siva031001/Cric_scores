@@ -37,42 +37,62 @@ exports.mintPhoneSessionToken = functions.https.onCall(async (data, context) => 
   const phone = String(rawPhone).replace(/\D/g, '');
   const pin = data?.pin ?? data?.data?.pin;
 
-  console.log('mintPhoneSessionToken - rawPhone:', rawPhone, 'parsedPhone:', phone);
-
   if (!/^\d{10}$/.test(phone)) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number: received "' + rawPhone + '"');
   }
 
   if (pin !== undefined && pin !== null) {
     const ref = admin.database().ref('pinAuth/' + phone);
-    const snap = await ref.once('value');
-    const record = snap.val();
-    if (!record) {
+    const initialSnap = await ref.once('value');
+    const initialRecord = initialSnap.val();
+    if (!initialRecord) {
       throw new functions.https.HttpsError('not-found', 'No account found for this number. Please set up a PIN first.');
     }
 
     const now = Date.now();
-    if (record.pinLockedUntil && now < record.pinLockedUntil) {
-      throw new functions.https.HttpsError('resource-exhausted', 'Too many incorrect attempts. Please try again later.');
-    }
-
     // Same algorithm as hashPin in src/utils/pinAuth.ts (SHA256 of pin+salt
     // as a hex string) — Node's crypto module produces an identical digest
-    // to CryptoJS's SHA256(...).toString() here.
-    const computedHash = crypto.createHash('sha256').update(String(pin) + record.salt).digest('hex');
-    if (computedHash !== record.pinHash) {
-      const newCount = (record.pinFailedAttempts ?? 0) + 1;
-      const update = { pinFailedAttempts: newCount };
-      if (newCount >= MAX_PIN_ATTEMPTS) {
-        update.pinFailedAttempts = 0;
-        update.pinLockedUntil = now + PIN_LOCKOUT_MS;
-      }
-      await ref.update(update);
-      throw new functions.https.HttpsError('permission-denied', 'Incorrect PIN. Please try again.');
-    }
+    // to CryptoJS's SHA256(...).toString() here. salt/pinHash themselves
+    // aren't part of the race below (only the attempt counter is), so
+    // computing this against the initial read is fine.
+    const computedHash = crypto.createHash('sha256').update(String(pin) + initialRecord.salt).digest('hex');
+    const isCorrect = computedHash === initialRecord.pinHash;
 
-    if (record.pinFailedAttempts || record.pinLockedUntil) {
-      await ref.update({ pinFailedAttempts: 0, pinLockedUntil: null });
+    // Atomically check-and-update the lockout counters. A plain
+    // read-then-write here is exactly the race a concurrent brute-force
+    // attack exploits: every parallel guess reads the same stale count
+    // before any of them writes back, so the counter never actually
+    // accumulates past what a single request would produce.
+    // ref.transaction() re-runs this callback against the latest value
+    // whenever another write raced it, closing that gap — and checking
+    // pinLockedUntil INSIDE it (not from the stale initial read) means a
+    // lockout applied by a concurrent request is never missed either.
+    let lockedOut = false;
+    await ref.transaction((current) => {
+      if (!current) return current; // record vanished mid-flight — nothing to do
+      if (current.pinLockedUntil && now < current.pinLockedUntil) {
+        lockedOut = true;
+        return current;
+      }
+      lockedOut = false;
+      if (isCorrect) {
+        if (current.pinFailedAttempts || current.pinLockedUntil) {
+          return { ...current, pinFailedAttempts: 0, pinLockedUntil: null };
+        }
+        return current;
+      }
+      const newCount = (current.pinFailedAttempts ?? 0) + 1;
+      if (newCount >= MAX_PIN_ATTEMPTS) {
+        return { ...current, pinFailedAttempts: 0, pinLockedUntil: now + PIN_LOCKOUT_MS };
+      }
+      return { ...current, pinFailedAttempts: newCount };
+    });
+
+    if (lockedOut) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Too many incorrect attempts. Please try again later.');
+    }
+    if (!isCorrect) {
+      throw new functions.https.HttpsError('permission-denied', 'Incorrect PIN. Please try again.');
     }
   } else {
     const expectedPhoneNumber = '+91' + phone;
@@ -101,6 +121,22 @@ exports.verifyPhoneNotClaimed = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('already-exists', 'This phone number is already registered to another account.');
   }
   return { available: true };
+});
+
+// Same "does this phone have an account" check the login screen needs
+// pre-auth, but returning only a boolean instead of the full pinAuth/{phone}
+// record. checkPhoneExists in pinAuthService.ts used to read salt+pinHash
+// directly (an unauthenticated client can still read that record today for
+// other reasons, but callers that only need existence should not have to
+// fetch the hash at all) — this gives them a path that never does.
+exports.checkPhoneExistsSafe = functions.https.onCall(async (data, context) => {
+  const rawPhone = data?.phone ?? data?.data?.phone ?? '';
+  const phone = String(rawPhone).replace(/\D/g, '');
+  if (!/^\d{10}$/.test(phone)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number');
+  }
+  const snap = await admin.database().ref('pinAuth/' + phone).once('value');
+  return { exists: snap.exists() };
 });
 
 // NOTE: Paid live-streaming (createStreamOrder / verifyStreamPayment via

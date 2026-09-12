@@ -396,3 +396,85 @@ describe('retirement', () => {
     ).toThrow(/not enabled/);
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+describe('non-striker dismissals beyond run out', () => {
+  it('obstructing the field can dismiss the non-striker (regression: used to only allow run out)', () => {
+    const { state } = play([
+      { type: 'WICKET', dismissal: 'OBSTRUCTING_FIELD', playerOutId: 1 },
+    ]);
+    expect(state.wickets).toBe(1);
+    expect(state.batsmanStats[statKey(1)].isOut).toBe(true);
+    expect(state.batsmanStats[statKey(0)].isOut).toBe(false);
+  });
+
+  it('still rejects a non-striker bowled (only run out / obstructing the field are lawful)', () => {
+    const s = reduceInnings([], setup, rules);
+    expect(() =>
+      deriveEvent({ type: 'WICKET', dismissal: 'BOWLED', playerOutId: 1 }, s, rules, {
+        inningsKey: 'innings1',
+        seq: 0,
+        timestamp: 0,
+      })
+    ).toThrow(/Only a run out or obstructing the field/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+describe('wicket on an illegal delivery (wide / no-ball)', () => {
+  it('run out on a wide: bare penalty, no extra runs run', () => {
+    const { state, events } = play([
+      { type: 'WICKET', dismissal: 'RUN_OUT', fielderName: 'Fielder', illegalDelivery: { type: 'WIDE', totalRuns: 1 } },
+    ]);
+    expect(state.wickets).toBe(1);
+    expect(state.runs).toBe(1); // just the wide penalty
+    const ev = events[0] as any;
+    expect(ev.deliveryType).toBe('WIDE');
+    expect(ev.legalDelivery).toBe(false);
+    expect(ev.extras.wide).toBe(1);
+  });
+
+  it('run out on a wide with extra runs run: those runs count, and decide strike rotation like a real wide would', () => {
+    const { state } = play([
+      { type: 'WICKET', dismissal: 'RUN_OUT', fielderName: 'Fielder', illegalDelivery: { type: 'WIDE', totalRuns: 3 } },
+    ]);
+    expect(state.runs).toBe(3);
+    // 2 runs beyond the 1-run penalty is even -> no end swap (still on strike 0).
+    expect(state.strikerId).toBe(0);
+  });
+
+  it('stumped is lawful on a wide', () => {
+    const { state } = play([
+      { type: 'WICKET', dismissal: 'STUMPED', fielderName: 'Keeper', illegalDelivery: { type: 'WIDE', totalRuns: 1 } },
+    ]);
+    expect(state.wickets).toBe(1);
+  });
+
+  it('bowled is NOT lawful on a wide', () => {
+    const s = reduceInnings([], setup, rules);
+    expect(() =>
+      deriveEvent(
+        { type: 'WICKET', dismissal: 'BOWLED', illegalDelivery: { type: 'WIDE', totalRuns: 1 } },
+        s, rules, { inningsKey: 'innings1', seq: 0, timestamp: 0 }
+      )
+    ).toThrow(/cannot be recorded on a wide/);
+  });
+
+  it('run out is lawful on a no-ball, and it still grants the next-ball free hit', () => {
+    const { state } = play([
+      { type: 'WICKET', dismissal: 'RUN_OUT', fielderName: 'Fielder', illegalDelivery: { type: 'NO_BALL', totalRuns: 1 } },
+    ]);
+    expect(state.wickets).toBe(1);
+    expect(state.freeHit).toBe(rules.freeHitAfterNoBall);
+  });
+
+  it('stumped is NOT lawful on a no-ball (the no-ball itself is already an invalid delivery)', () => {
+    const s = reduceInnings([], setup, rules);
+    expect(() =>
+      deriveEvent(
+        { type: 'WICKET', dismissal: 'STUMPED', fielderName: 'Keeper', illegalDelivery: { type: 'NO_BALL', totalRuns: 1 } },
+        s, rules, { inningsKey: 'innings1', seq: 0, timestamp: 0 }
+      )
+    ).toThrow(/cannot be recorded on a no-ball/);
+  });
+});

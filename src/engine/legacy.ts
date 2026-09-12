@@ -343,7 +343,7 @@ export const fromLegacyHistory = (
  * equivalent (a 5 becomes "5", which the old engine could store but not
  * score). The structured event remains the source of truth either way.
  */
-export const toLegacyResult = (e: BallEvent): string => {
+export const toLegacyResult = (e: BallEvent, widePenaltyRuns = 1): string => {
   if (e.wicket) {
     if (e.wicket.type === 'RUN_OUT') {
       const r = e.batterRuns + e.extras.bye + e.extras.legBye;
@@ -354,7 +354,11 @@ export const toLegacyResult = (e: BallEvent): string => {
 
   if (e.deliveryType === 'WIDE') {
     const total = e.extras.wide + e.extras.bye + e.extras.legBye;
-    const extra = Math.max(0, total - 1);
+    // Subtract the ACTUAL penalty this competition's rules used for a wide
+    // (rules.widePenaltyRuns), not a hardcoded 1 — a profile that sets a
+    // different penalty would otherwise misreport every extra-run wide by
+    // the difference.
+    const extra = Math.max(0, total - widePenaltyRuns);
     return extra > 0 ? `WD${extra}` : 'WD';
   }
 
@@ -370,8 +374,8 @@ export const toLegacyResult = (e: BallEvent): string => {
 };
 
 /** Rebuilds one legacy history entry from a BallEvent. */
-export const toLegacyBall = (e: BallEvent): LegacyBall => ({
-  result: toLegacyResult(e),
+export const toLegacyBall = (e: BallEvent, widePenaltyRuns = 1): LegacyBall => ({
+  result: toLegacyResult(e, widePenaltyRuns),
   over: e.over,
   ball: e.ball,
   // Legacy inverted this for run-outs, storing the dismissed batter.

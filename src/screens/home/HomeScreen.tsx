@@ -29,7 +29,7 @@ export default function HomeScreen({ navigation }: any) {
       const [t, m, p] = await Promise.all([getMyTeams(), getMatchHistory(), getUserProfile()]);
       setTeams(t ?? []);
       setMatches(m ?? []);
-      setLiveMatches((m ?? []).filter((x: any) => x.status === 'live'));
+      setLiveMatches((m ?? []).filter((x: any) => x.status === 'live' || x.status === 'paused'));
       if (p) setProfile(p);
     } catch (e) { console.error(e); }
   }, []);

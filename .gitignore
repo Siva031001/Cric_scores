@@ -79,3 +79,7 @@ CricketScorer/
 server/serviceAccountKey.json
 admin/dist/
 web/dist/
+# Deploy logs can capture short-lived signed URLs / infra identifiers.
+deploylog.txt
+# Stale local `tree` snapshot from a dev machine (leaks a personal path/username).
+src_structure.txt

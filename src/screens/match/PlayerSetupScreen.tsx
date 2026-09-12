@@ -92,7 +92,7 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
         {[{t:team1,s:selected1,n:1},{t:team2,s:selected2,n:2}].map(item => (
           <TouchableOpacity key={item.n} style={[st.tab, activeTeam === item.n && st.tabActive]} onPress={() => setActiveTeam(item.n as 1|2)}>
             <Text style={[st.tabText, activeTeam === item.n && st.tabTextActive]}>{item.t}</Text>
-            <Text style={[st.tabCount, activeTeam === item.n && st.tabTextActive]}>{item.s.length}/11</Text>
+            <Text style={[st.tabCount, activeTeam === item.n && st.tabTextActive]}>{item.s.length}/{requiredCount}</Text>
           </TouchableOpacity>
         ))}
       </View>

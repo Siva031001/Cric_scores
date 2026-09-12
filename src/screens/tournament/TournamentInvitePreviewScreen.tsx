@@ -5,6 +5,7 @@ import Header from '../../components/Header';
 
 export default function TournamentInvitePreviewScreen({ route, navigation }: any) {
   const { preview, inviteResult } = route.params ?? {};
+  const otherTeams = (preview?.teams ?? []).filter((team: any) => team.teamName !== inviteResult?.teamName);
 
   if (!preview) {
     return (
@@ -31,11 +32,11 @@ export default function TournamentInvitePreviewScreen({ route, navigation }: any
           <Text style={s.teamName}>{inviteResult.teamName}</Text>
         </View>
 
-        <Text style={s.sectionTitle}>Teams already in this tournament ({preview.teams.length})</Text>
-        {preview.teams.length === 0 ? (
+        <Text style={s.sectionTitle}>Teams already in this tournament ({otherTeams.length})</Text>
+        {otherTeams.length === 0 ? (
           <Text style={{ color: COLORS.textMuted, fontSize: 13 }}>No other teams added yet.</Text>
         ) : (
-          preview.teams.map((team: any, i: number) => (
+          otherTeams.map((team: any, i: number) => (
             <View key={i} style={s.card}>
               <Text style={s.teamName}>{team.teamName}</Text>
               <Text style={s.meta}>{team.players.length} players</Text>

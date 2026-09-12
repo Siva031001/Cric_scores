@@ -91,8 +91,18 @@ export interface WicketAction {
   playerOutId?: number;
   fielderId?: number | null;
   fielderName?: string | null;
-  /** Runs completed before the dismissal (run-outs). */
+  /** Runs completed before the dismissal (run-outs). Ignored if illegalDelivery is set — see below. */
   runsCompleted?: number;
+  /**
+   * Set when the wicket happened on a wide or no-ball — a stumping or run
+   * out (or obstructing the field / hit the ball twice) remains lawful on
+   * either; other dismissals are not, since the delivery itself was
+   * invalid. totalRuns is the SAME "total runs on this ball" value a
+   * standalone WIDE/NO_BALL action takes (the automatic penalty plus
+   * anything the batters ran) — the wicket does not additionally consume
+   * runsCompleted on top of it.
+   */
+  illegalDelivery?: { type: 'WIDE' | 'NO_BALL'; totalRuns: number };
 }
 
 export interface PenaltyAction {
@@ -191,6 +201,26 @@ const DISMISSALS_NEEDING_FIELDER: ReadonlySet<DismissalType> = new Set<Dismissal
   'CAUGHT',
   'STUMPED',
   'RUN_OUT',
+]);
+
+/** Dismissals still lawful when the delivery itself was a wide — a batter
+ *  who's stumped, run out, obstructs the field or handles the ball is out
+ *  regardless of the ball being fair; bowled/caught/lbw/hit-wicket require
+ *  a legal delivery and are not. */
+const WICKETS_ALLOWED_ON_WIDE: ReadonlySet<DismissalType> = new Set<DismissalType>([
+  'RUN_OUT',
+  'STUMPED',
+  'OBSTRUCTING_FIELD',
+  'HIT_BALL_TWICE',
+]);
+
+/** Same idea for a no-ball — stumped is NOT included here (a no-ball means
+ *  the bowler overstepped, which makes a stumping off it unlawful; a run
+ *  out does not depend on the delivery being fair at all). */
+const WICKETS_ALLOWED_ON_NO_BALL: ReadonlySet<DismissalType> = new Set<DismissalType>([
+  'RUN_OUT',
+  'OBSTRUCTING_FIELD',
+  'HIT_BALL_TWICE',
 ]);
 
 const inferRunType = (runs: number, boundary: 0 | 4 | 6, overthrow: number): RunType => {
@@ -537,10 +567,24 @@ export const deriveEvent = (
         );
       }
 
-      const runsCompleted = assertRunRange(
-        assertInt(action.runsCompleted ?? 0, 'Runs completed'),
-        'Runs completed'
-      );
+      const illegal = action.illegalDelivery;
+      if (illegal) {
+        const allowed = illegal.type === 'WIDE' ? WICKETS_ALLOWED_ON_WIDE : WICKETS_ALLOWED_ON_NO_BALL;
+        if (!allowed.has(dismissal)) {
+          throw new EngineError(
+            'INVALID_DISMISSAL',
+            `${dismissal.toLowerCase().replace(/_/g, ' ')} cannot be recorded on a ${illegal.type === 'WIDE' ? 'wide' : 'no-ball'}`
+          );
+        }
+      }
+
+      // On an illegal delivery, the scorer enters the TOTAL for the ball
+      // (same as a standalone WIDE/NO_BALL action would) — runsCompleted is
+      // not separately layered on top, avoiding double-counting the same
+      // runs two different ways.
+      const runsCompleted = illegal
+        ? 0
+        : assertRunRange(assertInt(action.runsCompleted ?? 0, 'Runs completed'), 'Runs completed');
       if (runsCompleted > 0 && dismissal !== 'RUN_OUT') {
         throw new EngineError(
           'INVALID_RUNS',
@@ -552,25 +596,50 @@ export const deriveEvent = (
       if (playerOutId !== state.strikerId && playerOutId !== state.nonStrikerId) {
         throw new EngineError('INVALID_PLAYER', 'The dismissed batter must be at the crease');
       }
-      if (playerOutId === state.nonStrikerId && dismissal !== 'RUN_OUT') {
+      if (playerOutId === state.nonStrikerId && dismissal !== 'RUN_OUT' && dismissal !== 'OBSTRUCTING_FIELD') {
         throw new EngineError(
           'INVALID_PLAYER',
-          'Only a run out can dismiss the non-striker'
+          'Only a run out or obstructing the field can dismiss the non-striker'
         );
       }
 
+      let illegalTotal = 0;
+      let wideExtra = 0;
+      let noBallExtra = 0;
+      if (illegal) {
+        const penalty = illegal.type === 'WIDE' ? rules.widePenaltyRuns : rules.noBallPenaltyRuns;
+        illegalTotal = assertRunRange(assertInt(illegal.totalRuns, 'Total runs'), 'Total runs', penalty);
+        if (illegal.type === 'WIDE') wideExtra = illegalTotal;
+        else noBallExtra = illegalTotal;
+      }
+      const beyondPenalty = illegal
+        ? illegalTotal - (illegal.type === 'WIDE' ? rules.widePenaltyRuns : rules.noBallPenaltyRuns)
+        : 0;
+
       const event: BallEvent = {
         ...ballShell,
-        deliveryType: 'LEGAL',
-        legalDelivery: true,
-        batterFacedBall: true,
-        // Runs completed before a run out belong to the batter who faced it.
+        deliveryType: illegal ? illegal.type : 'LEGAL',
+        legalDelivery: !illegal,
+        // Neither a wide nor a no-ball's automatic penalty is "faced" by
+        // the batter in the sense that matters for balls-faced stats —
+        // matches the standalone WIDE/NO_BALL actions' own convention.
+        batterFacedBall: !illegal,
+        // Runs completed before a run out belong to the batter who faced it
+        // — only meaningful on a legal delivery; an illegal delivery's runs
+        // are extras (wide/no-ball), never the batter's own.
         batterRuns: runsCompleted,
-        totalRuns: runsCompleted,
-        crossingRuns: runsCompleted,
-        runType: runsCompleted > 0 ? 'RUNNING' : 'NONE',
+        totalRuns: illegal ? illegalTotal : runsCompleted,
+        // Same "runs run beyond the automatic penalty decide strike
+        // rotation" rule the standalone WIDE/NO_BALL actions use.
+        crossingRuns: illegal ? beyondPenalty : runsCompleted,
+        runType: (illegal ? beyondPenalty : runsCompleted) > 0 ? 'RUNNING' : 'NONE',
         boundary: 0,
-        freeHitAfter: false,
+        extras: { wide: wideExtra, noBall: noBallExtra, bye: 0, legBye: 0, penalty: 0 },
+        freeHitAfter: illegal
+          ? illegal.type === 'NO_BALL'
+            ? rules.freeHitAfterNoBall
+            : state.freeHit
+          : false,
         wicket: {
           type: dismissal,
           playerOutId,

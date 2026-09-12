@@ -32,7 +32,7 @@ import type {
   RunAttribution,
   ScoringAction,
 } from '../../engine';
-import { DEFAULT_PENALTY_REASONS } from '../../engine';
+import { DEFAULT_PENALTY_REASONS, resolveSuperOverChain, isSuperOverInningsComplete } from '../../engine';
 import { loadMatch } from '../../engine/persistence';
 import {
   applyScoringAction,
@@ -40,6 +40,7 @@ import {
   concludeMatchWithoutResult,
   suspendMatchForStoppage,
   startSuperOver,
+  startSuperOverInnings,
 } from '../../utils/matchEngine';
 
 
@@ -159,6 +160,18 @@ export default function ScoringScreen({ route, navigation }: any) {
   const [showEditBall, setShowEditBall] = useState(false);
   const [editTargetSeq, setEditTargetSeq] = useState<number | null>(null);
   const [showSuperOverPrompt, setShowSuperOverPrompt] = useState(false);
+  // Super Over opener selection — mirrors showOpenerSelect/openerStep above,
+  // kept separate because the Super Over's batting/bowling team assignment
+  // (battingFirstTeam) is independent of the regular match's team1/team2
+  // batting order and can differ innings to innings.
+  const [showSOOpenerSelect, setShowSOOpenerSelect] = useState(false);
+  const [soIndex, setSoIndex] = useState<number | null>(null);
+  const [soWhich, setSoWhich] = useState<1 | 2>(1);
+  const [soBattingFirstTeam, setSoBattingFirstTeam] = useState<string>('');
+  const [soStep, setSoStep] = useState<"striker" | "nonStriker" | "bowler">("striker");
+  const [soOpener1Id, setSoOpener1Id] = useState<number | null>(null);
+  const [soOpener2Id, setSoOpener2Id] = useState<number | null>(null);
+  const soOpenerSelectionDoneRef = useRef(false);
 
  useEffect(() => {
   if (!matchId) { setLoading(false); return; }
@@ -268,6 +281,41 @@ useEffect(() => {
     if (showNewBowler) setShowNewBowler(false);
   }
 }, [match, showOpenerSelect, showInningsEnd]);
+
+// Drives the Super Over opener picker. There was previously NO way to
+// select openers for a Super Over at all — after "Start Super Over" the
+// screen just kept showing the frozen, tied 2nd innings, and any runs
+// tapped were silently scored against a hardcoded placeholder pair. This
+// reuses loadMatch (the same pure function the engine itself uses) so
+// "which half is active, and does it already have real openers" is
+// decided by the exact same logic as everywhere else — not a second,
+// hand-rolled copy of that logic living in the screen.
+useEffect(() => {
+  if (!match) return;
+  if (!match.superOvers || match.superOvers.length === 0) return;
+  if (showSOOpenerSelect || soOpenerSelectionDoneRef.current) return;
+  let em;
+  try {
+    em = loadMatch(match);
+  } catch {
+    return;
+  }
+  const chain = resolveSuperOverChain(em.superOvers, match.team1 ?? '', match.team2 ?? '', em.rules);
+  if (chain.activeIndex == null) return;
+  const so = em.superOvers.find((s: any) => s.index === chain.activeIndex);
+  if (!so) return;
+  const which: 1 | 2 = so.innings1 && isSuperOverInningsComplete(so.innings1, em.rules) ? 2 : 1;
+  const half = which === 1 ? so.innings1 : so.innings2;
+  if (half) return; // openers already selected for this half
+  soOpenerSelectionDoneRef.current = true;
+  setSoIndex(chain.activeIndex);
+  setSoWhich(which);
+  setSoBattingFirstTeam(so.battingFirstTeam);
+  setSoOpener1Id(null);
+  setSoOpener2Id(null);
+  setSoStep("striker");
+  setShowSOOpenerSelect(true);
+}, [match, showSOOpenerSelect]);
 
   const getName = (players: any[], id: number) =>
     players?.find((p: any) => p.id === id)?.name ?? ("P" + (id + 1));
@@ -576,7 +624,17 @@ useEffect(() => {
       Alert.alert("Match Paused", "Match has been paused. You can resume from Home screen.");
       return;
     }
-    await updateMatch(matchId, { status: "completed", winner: reason });
+    // Routed through the engine (not a raw status write) so an abandoned
+    // match's outcome is resolved the same way every other terminal path
+    // is, and — critically — so syncTournament actually runs and marks the
+    // tournament's own fixture complete instead of leaving it stuck "live"
+    // forever.
+    try {
+      await concludeMatchWithoutResult(matchId, "ABANDONED", reason);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not end the match");
+      return;
+    }
     navigation.replace("Home");
   };
 
@@ -651,6 +709,41 @@ useEffect(() => {
         setShowOpenerSelect(true);
         Alert.alert("Error", "Could not start 2nd innings: " + (e?.message ?? "unknown error") + ". Please try again.");
       }
+    }
+  };
+
+  const handleSOOpenerSelect = async (id: number) => {
+    if (soStep === "striker") {
+      setSoOpener1Id(id);
+      setSoStep("nonStriker");
+      return;
+    }
+    if (soStep === "nonStriker") {
+      if (id === soOpener1Id) { Alert.alert("Error", "Must be different from Striker"); return; }
+      setSoOpener2Id(id);
+      setSoStep("bowler");
+      return;
+    }
+    // Bowler picked — openers for this Super Over half are complete.
+    const strikerId = soOpener1Id;
+    const nonStrikerId = soOpener2Id;
+    setShowSOOpenerSelect(false);
+    try {
+      if (soIndex == null || strikerId == null || nonStrikerId == null) {
+        throw new Error("Missing opener selection");
+      }
+      await startSuperOverInnings(matchId, soIndex, soWhich, {
+        strikerId,
+        nonStrikerId,
+        bowlerId: id,
+      });
+      // Let the detection effect re-evaluate for the next half (innings2)
+      // once this half's openers are visible in the next match update.
+      soOpenerSelectionDoneRef.current = false;
+    } catch (e: any) {
+      soOpenerSelectionDoneRef.current = false;
+      setShowSOOpenerSelect(true);
+      Alert.alert("Error", "Could not start the Super Over: " + (e?.message ?? "unknown error") + ". Please try again.");
     }
   };
 
@@ -1202,6 +1295,47 @@ useEffect(() => {
           </ScrollView>
         </View></View>
       </Modal>
+
+      {/* ── Super Over opener selection ─────────────────────────── */}
+      {showSOOpenerSelect && (() => {
+        const soBattingFirstIsTeam1 = soBattingFirstTeam === match.team1;
+        const soBattingIsTeam1 = soWhich === 1 ? soBattingFirstIsTeam1 : !soBattingFirstIsTeam1;
+        const soBatP = soBattingIsTeam1 ? (match.team1Players ?? []) : (match.team2Players ?? []);
+        const soBolP = soBattingIsTeam1 ? (match.team2Players ?? []) : (match.team1Players ?? []);
+        const soBattingTeamName = soBattingIsTeam1 ? match.team1 : match.team2;
+        const soBowlingTeamName = soBattingIsTeam1 ? match.team2 : match.team1;
+        return (
+          <Modal visible transparent animationType="slide">
+            <View style={s.mOverlay}><View style={s.modal}>
+              <Text style={s.mTitle}>
+                Super Over{soWhich === 2 ? " — 2nd Innings" : ""}
+                {"\n"}
+                {soStep === "striker" ? "Select Opening Batter 1 (Striker)" :
+                 soStep === "nonStriker" ? "Select Opening Batter 2 (Non-Striker)" :
+                 "Select Opening Bowler"}
+              </Text>
+              <Text style={{color: COLORS.textSecondary, fontSize: 12, textAlign: "center", marginBottom: 14}}>
+                {soStep === "bowler" ? soBowlingTeamName + " bowling" : soBattingTeamName + " batting"}
+              </Text>
+              <ScrollView style={{maxHeight: 320}}>
+                {(soStep === "bowler" ? soBolP : soBatP).map((p: any) => {
+                  const disabled = soStep === "nonStriker" && p.id === soOpener1Id;
+                  return (
+                    <TouchableOpacity key={p.id}
+                      style={[s.pickerRow, disabled && {opacity: 0.4}]}
+                      onPress={() => !disabled && handleSOOpenerSelect(p.id)}
+                      disabled={!!disabled}>
+                      <Text style={s.pickerName}>
+                        {p.name}{p.isCaptain ? " (C)" : ""}{p.isWicketKeeper ? " (WK)" : ""}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View></View>
+          </Modal>
+        );
+      })()}
 
       <Modal visible={showRunOutRuns} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>

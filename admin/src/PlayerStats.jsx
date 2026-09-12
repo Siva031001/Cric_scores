@@ -6,7 +6,7 @@ export default function PlayerStats({ player }) {
       <h2>?? {player.name}</h2>
       <p>Runs: {player.runs}</p>
       <p>Balls: {player.balls}</p>
-      <p>Strike Rate: {(player.runs/player.balls*100).toFixed(2)}</p>
+      <p>Strike Rate: {player.balls ? (player.runs/player.balls*100).toFixed(2) : "0.0"}</p>
     </div>
   );
 }

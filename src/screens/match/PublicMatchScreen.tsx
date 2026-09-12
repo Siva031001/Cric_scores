@@ -3,10 +3,12 @@ import { View, Text, StyleSheet } from "react-native";
 import database from "@react-native-firebase/database";
 
 export default function PublicMatchScreen({ route }: any) {
-  const { matchId } = route.params;
+  const { matchId } = route.params ?? {};
   const [match, setMatch] = useState<any>(null);
 
   useEffect(() => {
+    if (!matchId) return;
+
     const ref = database().ref(`matches/${matchId}`);
 
     const sub = ref.on("value", snap => {
@@ -14,7 +16,9 @@ export default function PublicMatchScreen({ route }: any) {
     });
 
     return () => ref.off("value", sub);
-  }, []);
+  }, [matchId]);
+
+  if (!matchId) return <View style={styles.center}><Text style={styles.error}>Match not found</Text></View>;
 
   if (!match) return <Text>Loading...</Text>;
 
@@ -33,4 +37,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
   title: { fontSize: 20 },
   score: { fontSize: 24, marginTop: 10 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  error: { fontSize: 16 },
 });

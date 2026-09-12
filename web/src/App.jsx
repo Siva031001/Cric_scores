@@ -26,6 +26,24 @@ export default function App() {
   // replays the last value on reconnect, but if it genuinely errors out we
   // keep showing the last good snapshot rather than blanking to zeros.
   const lastGoodMatch = useRef(null);
+  // A per-path onValue's error callback only fires for an unrecoverable
+  // listener error (e.g. permission denied) — NOT for ordinary network
+  // loss, which the SDK handles silently with automatic reconnect and no
+  // callback at all. Realtime Database's special .info/connected path is
+  // the documented way to actually observe the client-server connection
+  // state, so that's what drives the "Reconnecting…" banner.
+  const [connected, setConnected] = useState(true);
+  const everConnectedRef = useRef(false);
+
+  useEffect(() => {
+    const connectedRef = ref(db, '.info/connected');
+    const unsub = onValue(connectedRef, (snap) => {
+      const isConnected = snap.val() === true;
+      if (isConnected) everConnectedRef.current = true;
+      setConnected(isConnected);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (!matchId) return;
@@ -44,9 +62,9 @@ export default function App() {
       },
       () => setStatus('disconnected')
     );
-    // Properly unsubscribed on unmount — this is the ONLY Firebase listener
-    // this whole app opens, scoped to exactly one match, never the full
-    // matches collection.
+    // Properly unsubscribed on unmount — this is the ONLY per-match
+    // Firebase listener this whole app opens, scoped to exactly one match,
+    // never the full matches collection.
     return () => unsub();
   }, [matchId]);
 
@@ -92,7 +110,7 @@ export default function App() {
       sponsorText={sponsorText}
       sponsorLogo={sponsorLogo}
       tournamentName={tournamentName}
-      connectionLost={status === 'disconnected'}
+      connectionLost={status === 'disconnected' || (everConnectedRef.current && !connected)}
     />
   );
 }

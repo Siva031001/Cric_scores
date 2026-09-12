@@ -49,8 +49,9 @@ export default function Overlay({
   const ss = inn.batsmanStats?.[statKey(inn.strikerId)];
   const ns = inn.batsmanStats?.[statKey(inn.nonStrikerId)];
   const bws = inn.bowlerStats?.[statKey(inn.currentBowlerId)];
-  const partnership = currentPartnership(inn.ballHistory);
-  const fow = fallOfWickets(inn.ballHistory);
+  const hasActiveRetirement = (inn.retired ?? []).some((r) => !r.returned);
+  const partnership = currentPartnership(inn.ballHistory, hasActiveRetirement);
+  const fow = fallOfWickets(inn.ballHistory, inn.wickets);
 
   const vars = {
     '--ov-primary': theme.primary,
@@ -119,6 +120,7 @@ export default function Overlay({
 
           {show('partnership') && partnership.balls > 0 && (
             <div className="ov__partnership">
+              {partnership.approximate ? '~' : ''}
               {nameOf(batP, inn.strikerId)} &amp; {nameOf(batP, inn.nonStrikerId)}: {partnership.runs} ({partnership.balls})
             </div>
           )}
@@ -127,7 +129,9 @@ export default function Overlay({
             <div className="ov__fow">
               <span className="ov__fowLabel">FOW</span>
               {fow.map((w) => (
-                <span key={w.wicketNumber} className="ov__fowItem">{w.wicketNumber}-{w.score}</span>
+                <span key={w.wicketNumber} className="ov__fowItem">
+                  {w.wicketNumber}-{w.retired ? 'ret' : w.score}
+                </span>
               ))}
             </div>
           )}

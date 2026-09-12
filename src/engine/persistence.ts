@@ -77,6 +77,8 @@ export interface StoredMatch {
   rulesOverrides?: Partial<CompetitionRules> | null;
   tieBreaker?: 'MATCH_TIE' | 'SUPER_OVER';
   superOvers?: StoredSuperOver[];
+  /** Keyed `so{index}_innings{which}` — see superOverInningsKey(). */
+  superOverInnings?: Record<string, StoredInnings>;
   replacements?: Replacement[];
   interruptions?: Interruption[];
   result?: MatchOutcome | null;
@@ -299,21 +301,37 @@ export const loadMatch = (raw: StoredMatch): EngineMatch => {
       const battingIsTeam1 = which === 1 ? battingFirstIsTeam1 : !battingFirstIsTeam1;
       const bat = battingIsTeam1 ? raw.team1Players : raw.team2Players;
       const bowl = battingIsTeam1 ? raw.team2Players : raw.team1Players;
-      const evs = grouped[which === 1 ? k1 : k2] ?? [];
+      const storedKey = which === 1 ? k1 : k2;
+      const evs = grouped[storedKey] ?? [];
       const firstBall = evs.find(e => e.kind === 'BALL') as
         | { strikerId: number; nonStrikerId: number; bowlerId: number }
         | undefined;
-      return {
+      // Prefer the openers explicitly selected via startSuperOverInnings
+      // (written to raw.superOverInnings[storedKey]) over scanning ball
+      // events for the first delivery's recorded ids — this is what lets
+      // ball 1 itself use the real openers instead of a placeholder,
+      // mirroring setupFor's openingStrikerId pattern for the 2nd innings.
+      const opening = deriveInningsSetup(raw.superOverInnings?.[storedKey], {
         strikerId: firstBall?.strikerId ?? 0,
         nonStrikerId: firstBall?.nonStrikerId ?? 1,
         bowlerId: firstBall?.bowlerId ?? 0,
+      });
+      return {
+        ...opening,
         isSuperOver: true,
         battingPlayers: (bat ?? []).map(p => ({ id: p.id, name: p.name, globalPlayerId: p.globalPlayerId ?? null })),
         bowlingPlayers: (bowl ?? []).map(p => ({ id: p.id, name: p.name, globalPlayerId: p.globalPlayerId ?? null })),
       };
     };
-    const s1 = (grouped[k1] ?? []).length > 0 ? reduceInnings(grouped[k1], mkSetup(1), soRules) : null;
-    const s2 = (grouped[k2] ?? []).length > 0 ? reduceInnings(grouped[k2], mkSetup(2), soRules) : null;
+    // An innings becomes real the moment its openers are selected (even
+    // before ball 1), same as the regular 2nd innings becoming non-null the
+    // instant startSecondInnings writes it — not gated purely on events
+    // existing, or the opener-selection screen's own "no events yet" state
+    // would still show a placeholder.
+    const hasStarted = (which: 1 | 2) =>
+      (grouped[which === 1 ? k1 : k2] ?? []).length > 0 || raw.superOverInnings?.[which === 1 ? k1 : k2] != null;
+    const s1 = hasStarted(1) ? reduceInnings(grouped[k1] ?? [], mkSetup(1), soRules) : null;
+    const s2 = hasStarted(2) ? reduceInnings(grouped[k2] ?? [], mkSetup(2), soRules) : null;
     return {
       index: meta.index,
       battingFirstTeam: meta.battingFirstTeam,
@@ -591,6 +609,37 @@ export const activeInningsKey = (m: EngineMatch): string => {
     return `so${chain.activeIndex}_innings${which}`;
   }
   return (m.raw.currentInnings ?? 1) === 2 ? 'innings2' : 'innings1';
+};
+
+/**
+ * The InningsState currently being scored — the counterpart to
+ * activeInningsKey() that returns the actual state object instead of its
+ * key. Lives here (not in matchEngine.ts) specifically so both functions
+ * share the exact same "is this Super Over half complete" check and cannot
+ * drift apart the way they once did (a non-null-but-incomplete innings1
+ * was wrongly treated as "move on to innings2").
+ */
+export const activeInningsState = (m: EngineMatch): InningsState => {
+  const key = activeInningsKey(m);
+  if (key === 'innings2' && m.innings2) return m.innings2;
+  if (key.startsWith('so')) {
+    const chain = resolveSuperOverChain(m.superOvers, m.raw.team1 ?? '', m.raw.team2 ?? '', m.rules);
+    const so = m.superOvers.find(s => s.index === chain.activeIndex);
+    const which = so && isSuperOverInningsComplete(so.innings1, m.rules) ? 2 : 1;
+    const s = which === 1 ? so?.innings1 : so?.innings2;
+    if (s) return s;
+    // First ball of this Super Over half — no events yet. Use whatever
+    // openers were already selected via startSuperOverInnings (mirrors
+    // setupFor's openingStrikerId pattern for the regular 2nd innings),
+    // so scoring never silently falls back to placeholder player ids 0/1/0.
+    const opening = deriveInningsSetup(m.raw.superOverInnings?.[key], {
+      strikerId: 0,
+      nonStrikerId: 1,
+      bowlerId: 0,
+    });
+    return reduceInnings([], { ...opening, isSuperOver: true }, rulesForSuperOver(m.rules));
+  }
+  return m.innings1;
 };
 
 export { isSuperOverKey, parseSuperOverKey, statKey };

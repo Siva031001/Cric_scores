@@ -63,6 +63,7 @@ import {
   EngineMatch,
   StoredMatch,
   activeInningsKey,
+  activeInningsState,
   buildInningsWrite,
   buildMatchWrite,
   buildTournamentResult,
@@ -102,21 +103,11 @@ const refoldAll = (m: EngineMatch, events: MatchEvent[]): FoldedInnings => {
   };
 };
 
-/** The innings state currently being scored. */
-const activeState = (m: EngineMatch): InningsState => {
-  const key = activeInningsKey(m);
-  if (key === 'innings2' && m.innings2) return m.innings2;
-  if (key.startsWith('so')) {
-    const chain = resolveSuperOverChain(m.superOvers, m.raw.team1 ?? '', m.raw.team2 ?? '', m.rules);
-    const so = m.superOvers.find(s => s.index === chain.activeIndex);
-    const which = so && so.innings1 && !so.innings2 ? 2 : 1;
-    const s = which === 1 ? so?.innings1 : so?.innings2;
-    if (s) return s;
-    // First ball of a Super Over innings that has no events yet.
-    return reduceInnings([], { strikerId: 0, nonStrikerId: 1, bowlerId: 0, isSuperOver: true }, rulesForSuperOver(m.rules));
-  }
-  return m.innings1;
-};
+// activeState() used to live here, but it needs the exact same "is this
+// Super Over half complete" logic as activeInningsKey() and repeatedly
+// drifted out of sync with it — it now lives in persistence.ts as
+// activeInningsState(), right next to activeInningsKey(), so both share one
+// implementation.
 
 /** Recomputes the outcome and status after a change. */
 const resolveAfter = (
@@ -293,7 +284,7 @@ export const applyScoringAction = async (
   }
 
   const key = activeInningsKey(m);
-  const state = activeState(m);
+  const state = activeInningsState(m);
   const inningsEvents = eventsForInnings(m.events, key);
 
   // Eligibility checks that depend on replacements.

@@ -286,6 +286,10 @@ export interface DerivedFieldingStats {
   stumpings: number;
   runOuts: number;
   globalPlayerId?: string | null;
+  /** The fielder's local Player.id, when known. Lets consumers match on a
+   *  stable id instead of displayName (which is free text and can collide
+   *  or drift from the roster's actual name). */
+  fielderId?: number | null;
   displayName: string;
 }
 

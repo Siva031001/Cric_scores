@@ -7,9 +7,9 @@ import Header from "../../components/Header";
 
 type Step = "phone" | "otp" | "newPin";
 
-export default function ForgotPasswordScreen({ navigation }: any) {
+export default function ForgotPasswordScreen({ navigation, route }: any) {
   const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(route?.params?.phone ?? "");
   const [otp, setOtp] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");

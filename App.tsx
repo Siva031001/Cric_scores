@@ -44,10 +44,11 @@ import TournamentInvitePreviewScreen from "./src/screens/tournament/TournamentIn
 
 
 
-// NOTE: The old src/screens/LeaderboardScreen.tsx has been intentionally removed.
-// It imported from a non-existent '../utils/leaderboard' utility and was dead code
-// (nothing in the app navigated to 'Leaderboard'). Tournament points table is now
-// handled by TournamentLeaderboardScreen (src/screens/tournament/LeaderboardScreen.tsx).
+// NOTE: src/screens/LeaderboardScreen.tsx still exists and imports a real
+// '../utils/leaderboard' utility, but it is not registered as a route here and
+// nothing else in the app imports or navigates to it, so it is currently unused.
+// Tournament points table is handled by TournamentLeaderboardScreen
+// (src/screens/tournament/LeaderboardScreen.tsx).
 
 const navigationRef = createNavigationContainerRef();
 const Stack = createNativeStackNavigator();

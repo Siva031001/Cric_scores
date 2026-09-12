@@ -165,6 +165,12 @@ export const processBall = (innings: Innings, result: BallResult): Innings => {
   return inn;
 };
 
+// NOTE: unused by the current scoring path — the real undo mechanism is
+// undoLastAction in src/utils/matchEngine.ts (engine-based, via
+// src/engine/reduce.ts), which this function is not called by anything in
+// src/. This replay also only rotates strike on odd runs and does NOT apply
+// the end-of-over strike swap, so do not resurrect or copy this logic
+// elsewhere without fixing that first.
 export const undoLastBall = (innings: Innings): Innings => {
   const history = [...(innings.ballHistory ?? [])];
   if (history.length === 0) return innings;

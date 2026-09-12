@@ -81,6 +81,7 @@ const emptyFielding = (displayName: string): DerivedFieldingStats => ({
   stumpings: 0,
   runOuts: 0,
   globalPlayerId: null,
+  fielderId: null,
   displayName,
 });
 
@@ -444,6 +445,9 @@ export const reduceInningsVerbose = (
         if (w.fielderId != null && gidBowl.has(w.fielderId)) {
           fs.globalPlayerId = gidBowl.get(w.fielderId) ?? null;
         }
+        if (w.fielderId != null) {
+          fs.fielderId = w.fielderId;
+        }
         if (w.type === 'STUMPED') fs.stumpings += 1;
         else if (w.type === 'RUN_OUT') fs.runOuts += 1;
         else if (w.type === 'CAUGHT' || w.type === 'CAUGHT_AND_BOWLED') fs.catches += 1;
@@ -501,7 +505,7 @@ export const reduceInningsVerbose = (
     }
 
     // ── Legacy view ──
-    state.ballHistory.push(toLegacyBall(e));
+    state.ballHistory.push(toLegacyBall(e, rules.widePenaltyRuns));
   }
 };
 

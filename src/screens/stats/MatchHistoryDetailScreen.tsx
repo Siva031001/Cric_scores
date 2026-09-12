@@ -395,8 +395,23 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
         {tab === 'overview' && (
           <View>
-            
-
+            {formResults.length > 0 && (
+              <View style={s.formCard}>
+                <Text style={s.formLabel}>RECENT FORM</Text>
+                <View style={s.formRow}>
+                  {formResults.map((r: any, i: number) => (
+                    <View key={i} style={[
+                      s.formPill,
+                      r === 'W' && { backgroundColor: COLORS.primary },
+                      r === 'L' && { backgroundColor: COLORS.red },
+                      r === 'T' && { backgroundColor: COLORS.yellow },
+                    ]}>
+                      <Text style={[s.formPillTxt, r === 'T' && { color: '#000' }]}>{r}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {topPartnerships.length > 0 && (
               <View style={s.partnershipsBox}>

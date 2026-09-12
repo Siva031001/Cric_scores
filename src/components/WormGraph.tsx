@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { COLORS, RADIUS } from '../constants/theme';
 
 interface Props {
@@ -17,6 +17,8 @@ export default function WormGraph({ innings1Points, innings2Points, totalOvers, 
     1
   );
   const graphHeight = 140;
+  const [graphWidth, setGraphWidth] = useState(300);
+  const onGraphLayout = (e: LayoutChangeEvent) => setGraphWidth(e.nativeEvent.layout.width);
 
   const renderLine = (points: { over: number; runs: number }[], color: string) => {
     if (points.length < 2) return null;
@@ -27,7 +29,7 @@ export default function WormGraph({ innings1Points, innings2Points, totalOvers, 
       const y1 = graphHeight - (prev.runs / maxRuns) * graphHeight;
       const y2 = graphHeight - (p.runs / maxRuns) * graphHeight;
       const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow((y2 - y1) / graphHeight * 100, 2));
-      const angle = Math.atan2(y2 - y1, ((x2 - x1) / 100) * 300) * (180 / Math.PI);
+      const angle = Math.atan2(y2 - y1, ((x2 - x1) / 100) * graphWidth) * (180 / Math.PI);
       return (
         <View
           key={i}
@@ -52,7 +54,7 @@ export default function WormGraph({ innings1Points, innings2Points, totalOvers, 
         <View style={s.legendItem}><View style={[s.dot, { backgroundColor: COLORS.blue }]} /><Text style={s.legendTxt}>{team1Name}</Text></View>
         <View style={s.legendItem}><View style={[s.dot, { backgroundColor: COLORS.primary }]} /><Text style={s.legendTxt}>{team2Name}</Text></View>
       </View>
-      <View style={[s.graphArea, { height: graphHeight }]}>
+      <View style={[s.graphArea, { height: graphHeight }]} onLayout={onGraphLayout}>
         {renderLine(innings1Points, COLORS.blue)}
         {renderLine(innings2Points, COLORS.primary)}
       </View>

@@ -33,8 +33,9 @@ export default function TeamDetailScreen({ route, navigation }: any) {
     </View>
   );
 
-  const captain = team.players.find(p => p.isCaptain);
-  const wk = team.players.find(p => p.isWicketKeeper);
+  const players = team.players ?? [];
+  const captain = players.find(p => p.isCaptain);
+  const wk = players.find(p => p.isWicketKeeper);
 
   return (
     <ScrollView style={styles.container}>
@@ -55,7 +56,7 @@ export default function TeamDetailScreen({ route, navigation }: any) {
           )}
         </View>
         <Text style={styles.teamName}>{team.name}</Text>
-        <Text style={styles.teamSub}>{team.players.length} Players</Text>
+        <Text style={styles.teamSub}>{players.length} Players</Text>
       </View>
 
       {/* Key Players */}
@@ -74,8 +75,8 @@ export default function TeamDetailScreen({ route, navigation }: any) {
 
       {/* Player List */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Squad ({team.players.length})</Text>
-        {team.players.map((player: Player, index: number) => (
+        <Text style={styles.sectionTitle}>Squad ({players.length})</Text>
+        {players.map((player: Player, index: number) => (
           <View key={player.id} style={styles.playerRow}>
             <View style={styles.playerNum}>
               <Text style={styles.playerNumText}>{index + 1}</Text>

@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity,
   StyleSheet, ScrollView, Alert,
 } from 'react-native';
-import { createMatch } from '../../utils/firebase';
+import { createMatch, attachMatchIdToFixture } from '../../utils/firebase';
 import { createEmptyInnings } from '../../utils/cricketLogic';
 import { Player } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
@@ -100,6 +100,18 @@ export default function BattingSetupScreen({ route, navigation }: any) {
         tournamentMatchId: tournamentMatchId ?? null,
         playersPerSide: playersPerSide ?? 11,
       });
+      // Link the fixture back to this real match, so leaving the setup
+      // wizard partway and coming back can actually resume it — without
+      // this, tournament.matches/pools/knockoutFixtures never learn the
+      // real matchId until the match COMPLETES, and Continue either shows
+      // "Match not found" or starts a duplicate match for the same fixture.
+      if (tournamentId && tournamentMatchId) {
+        try {
+          await attachMatchIdToFixture(tournamentId, tournamentMatchId, matchId);
+        } catch (e) {
+          console.warn('Could not link match to tournament fixture:', e);
+        }
+      }
       navigation.replace('Scoring', { matchId });
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed');

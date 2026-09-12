@@ -91,8 +91,9 @@ export default function NewMatchScreen({ route, navigation }: any) {
       Alert.alert('Error', 'Team 1 and Team 2 cannot be the same team');
       return;
     }
-    if (!overs || parseInt(overs) < 1) {
-      Alert.alert('Error', 'Please enter valid overs');
+    const oversNum = parseInt(overs, 10);
+    if (!overs || isNaN(oversNum) || oversNum < 1 || oversNum > 50) {
+      Alert.alert('Error', 'Please enter a valid number of overs (1-50)');
       return;
     }
     navigation.navigate('PlayerSetup', {

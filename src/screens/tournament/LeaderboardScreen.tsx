@@ -64,6 +64,7 @@ export default function LeaderboardScreen({ route, navigation }: any) {
             <Text style={s.hCell}>W</Text>
             <Text style={s.hCell}>L</Text>
             <Text style={s.hCell}>T</Text>
+            <Text style={s.hCell}>NR</Text>
             <Text style={s.hCell}>NRR</Text>
             <Text style={[s.hCell, s.ptsCell]}>Pts</Text>
           </View>
@@ -97,6 +98,7 @@ export default function LeaderboardScreen({ route, navigation }: any) {
                 <Text style={[s.cell, { color: COLORS.primary }]}>{team.won ?? 0}</Text>
                 <Text style={[s.cell, { color: COLORS.red }]}>{team.lost ?? 0}</Text>
                 <Text style={[s.cell, { color: COLORS.orange }]}>{team.tied ?? 0}</Text>
+                <Text style={[s.cell, { color: COLORS.textMuted }]}>{team.noResult ?? 0}</Text>
                 <Text style={[s.cell, { color: nrrVal >= 0 ? COLORS.primary : COLORS.red }]}>
                   {nrrStr}
                 </Text>
@@ -107,7 +109,7 @@ export default function LeaderboardScreen({ route, navigation }: any) {
 
           {/* Legend */}
           <View style={s.legend}>
-            <Text style={s.legendTxt}>P = Played  W = Won  L = Lost  T = Tied</Text>
+            <Text style={s.legendTxt}>P = Played  W = Won  L = Lost  T = Tied  NR = No Result</Text>
             <Text style={s.legendTxt}>NRR = Net Run Rate  Pts = Points</Text>
             <Text style={s.legendTxt}>Sorted by Points, then NRR</Text>
           </View>

@@ -9,7 +9,7 @@ const app = initializeApp({
 });
 
 const shareMatch = (m) => {
-  const link = `https://cric-scores.vercel.app/?match=${m.team1}`;
+  const link = `https://cric-scores.vercel.app/?match=${encodeURIComponent(m.team1)}`;
   const inn = m.currentInnings === 2 ? m.innings2 : m.innings1;
 
   const text = `${m.team1} vs ${m.team2}

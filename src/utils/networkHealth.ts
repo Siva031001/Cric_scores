@@ -6,6 +6,16 @@ export const subscribeToNetworkHealth = (callback: (status: 'Excellent'|'Good'|'
       callback('Disconnected');
       return;
     }
+    // isConnected only means "associated with a wifi/cellular radio" — a
+    // captive portal or a wifi with no working upstream link can still be
+    // isConnected:true. isInternetReachable is NetInfo's actual "can this
+    // device reach the internet" signal; only trust an explicit false (it
+    // can be null while still being determined, which should not count
+    // against the connection).
+    if (state.isInternetReachable === false) {
+      callback('Disconnected');
+      return;
+    }
     const type = state.type;
     if (type === 'wifi' || type === 'ethernet') callback('Excellent');
     else if (type === 'cellular') {

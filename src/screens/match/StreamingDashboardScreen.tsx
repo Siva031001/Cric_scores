@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView, Share, Modal } from 'react-native';import { subscribeToMatch, updateMatch, getCurrentUser } from '../../utils/firebase';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView, Share, Modal } from 'react-native';import { subscribeToMatch, updateMatch, isMatchOrganizer } from '../../utils/firebase';
 import { validateStreamSource } from '../../utils/liveStreamValidation';
 import { subscribeToNetworkHealth } from '../../utils/networkHealth';
 import { getOversString } from '../../utils/cricketLogic';
@@ -57,7 +57,7 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
     return <View style={s.center}><Text style={s.loadingTxt}>Loading match…</Text></View>;
   }
   
-  const isOrganizer = match.scorerId === getCurrentUser()?.uid;
+  const isOrganizer = isMatchOrganizer(match);
   
 
   const formatDuration = (sec: number) => {
@@ -193,7 +193,7 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
             <>
               <TextInput
                 style={s.input}
-                placeholder="YouTube URL or RTMP stream key"
+                placeholder="YouTube URL or rtmp://your-stream-url"
                 placeholderTextColor={COLORS.textMuted}
                 value={streamInput}
                 onChangeText={setStreamInput}

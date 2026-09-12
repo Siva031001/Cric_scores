@@ -10,6 +10,12 @@ export default function ThemeSelectorScreen({ route, navigation }: any) {
   const { matchId, match, currentThemeId } = route.params ?? {};
 
   const handleSelect = async (themeId: string, isPremium: boolean) => {
+    // NOTE: this is a client-side-only gate — it just blocks the UI action.
+    // Nothing server-side stops a modified/patched client from writing
+    // streamThemeId directly. Real enforcement would need a matching
+    // server-side check (e.g. a Firebase security rule restricting writes
+    // to matches/{matchId}/streamThemeId, or a Cloud Function) once there's
+    // an actual entitlement/payment system to check against.
     if (isPremium) {
       Alert.alert(
         'Premium Theme',

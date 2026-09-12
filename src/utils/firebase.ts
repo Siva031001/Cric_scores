@@ -231,7 +231,16 @@ export const getLiveMatches = async () => {
 export const createTournament = async (data) => {
   const user = getCurrentUser();
   if (!user) throw new Error('Not authenticated');
-  const id = Math.random().toString(36).substring(2, 8).toUpperCase();
+  // Collision-check the generated id before using it — the id space
+  // (36^6 ≈ 2.2 billion) makes a collision rare but not impossible, and an
+  // unchecked collision would silently overwrite someone else's tournament.
+  let id;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const exists = (await database().ref(`tournaments/${candidate}`).once('value')).exists();
+    if (!exists) { id = candidate; break; }
+  }
+  if (!id) throw new Error('Could not generate a unique tournament id, please try again');
   await database().ref(`tournaments/${id}`).set({
     ...data, id, createdBy: user.uid, createdAt: Date.now(),
   });
@@ -829,7 +838,12 @@ const _buildMOMScores = (match: any) => {
     Object.entries(inn.fieldingStats ?? {}).forEach(([, fs]: any) => {
       if (!fs) return;
       const displayName = fs.displayName ?? 'Unknown';
-      const player = bowlingPlayers?.find((p: any) => p.name === displayName);
+      // Prefer the stable id (fs.fielderId, set for any record produced
+      // since it was added to the engine); fall back to name matching for
+      // older records that predate it — mirrors the batting/bowling blocks
+      // above, which always had a stable playerId to match on.
+      const player = (fs.fielderId != null ? bowlingPlayers?.find((p: any) => p.id === fs.fielderId) : undefined)
+        ?? bowlingPlayers?.find((p: any) => p.name === displayName);
       if (!player) return;
       const key = fs.globalPlayerId ?? ('local:' + player.id + ':' + bowlingTeamName);
       const catches = fs.catches ?? 0;
@@ -922,17 +936,28 @@ const buildSeededPairs = (allQualifiers) => {
   const rank3PlusFlat = Object.keys(byRank).filter((r) => Number(r) >= 3).flatMap((r) => byRank[r]);
 
   const pairs = [];
-  // Standard seeding: Rank1[i] vs Rank2[opposite pool], rotating so a pool's
-  // #1 never faces its own #2.
-  const n = Math.max(rank1s.length, rank2s.length);
-  for (let i = 0; i < n; i++) {
-    const home = rank1s[i];
-    // Pair with a rank-2 team from a DIFFERENT pool where possible.
-    const awayCandidateIdx = rank2s.findIndex((r2, idx) => !pairs.some((p) => p.away === r2) && r2.poolName !== home?.poolName);
-    const away = awayCandidateIdx !== -1 ? rank2s[awayCandidateIdx] : rank2s.find((r2) => !pairs.some((p) => p.away === r2));
-    if (home && away) pairs.push({ home, away });
+  // Cross-pool seeding: rank1s[i] and rank2s[i] come from the SAME i-th
+  // pool (both lists are built by filtering allQualifiers, which preserves
+  // pool order) — a fixed rotation by 1 always lands rank1s[i] on a
+  // DIFFERENT pool's rank2, for any pool count >= 2. The previous approach
+  // greedily picked the first available different-pool candidate one seed
+  // at a time with no backtracking, which could — and did, with an odd
+  // number of pools — paint itself into a corner where the LAST seed had
+  // no cross-pool candidate left, even though a valid overall assignment
+  // existed (a rotation always exists as one).
+  const n = Math.min(rank1s.length, rank2s.length);
+  if (n >= 2) {
+    for (let i = 0; i < n; i++) {
+      pairs.push({ home: rank1s[i], away: rank2s[(i + 1) % n] });
+    }
+  } else if (n === 1) {
+    // Only one pool has both a rank1 and rank2 qualifier — there is no
+    // cross-pool option at all, so this pairing is unavoidable.
+    pairs.push({ home: rank1s[0], away: rank2s[0] });
   }
-  // Any leftover rank1/rank2 (uneven counts) plus all rank3+ get paired sequentially.
+
+  // Any leftover rank1/rank2 (uneven counts beyond what the rotation above
+  // covered) plus all rank3+ get paired sequentially.
   const usedIds = new Set(pairs.flatMap((p) => [p.home?.teamId, p.away?.teamId]));
   const leftovers = [...rank1s, ...rank2s, ...rank3PlusFlat].filter((q) => !usedIds.has(q.teamId));
   for (let i = 0; i < leftovers.length; i += 2) {
@@ -1064,6 +1089,51 @@ export const startKnockoutMatch = async (tournamentId, fixtureId) => {
     f.id === fixtureId ? { ...f, status: 'live' } : f
   );
   await database().ref(`tournaments/${tournamentId}`).update({ knockoutFixtures: updated });
+};
+
+// Links a fixture (in tournament.matches, a pool's matches, or
+// knockoutFixtures — wherever it actually lives) back to the real
+// matches/{matchId} record once BattingSetupScreen finishes creating it.
+// Without this, a fixture is "live" with no matchId at all until the
+// match completes, so leaving the setup wizard partway and coming back
+// has nothing to resume — Continue either shows "Match not found"
+// (knockout) or silently starts a second match for the same fixture
+// (league/pool), since match.matchId is undefined either way.
+export const attachMatchIdToFixture = async (tournamentId, tournamentMatchId, matchId) => {
+  const snap = await database().ref(`tournaments/${tournamentId}`).once('value');
+  const tournament = snap.val();
+  if (!tournament) return;
+
+  if ((tournament.matches ?? []).some((m) => m.id === tournamentMatchId)) {
+    await database().ref(`tournaments/${tournamentId}`).update({
+      matches: (tournament.matches ?? []).map((m) =>
+        m.id === tournamentMatchId ? { ...m, status: 'live', matchId } : m
+      ),
+    });
+    return;
+  }
+
+  const poolWithMatch = (tournament.pools ?? []).find((p) =>
+    (p.matches ?? []).some((m) => m.id === tournamentMatchId)
+  );
+  if (poolWithMatch) {
+    await database().ref(`tournaments/${tournamentId}`).update({
+      pools: (tournament.pools ?? []).map((p) =>
+        p.poolId === poolWithMatch.poolId
+          ? { ...p, matches: (p.matches ?? []).map((m) => m.id === tournamentMatchId ? { ...m, status: 'live', matchId } : m) }
+          : p
+      ),
+    });
+    return;
+  }
+
+  if ((tournament.knockoutFixtures ?? []).some((f) => f.id === tournamentMatchId)) {
+    await database().ref(`tournaments/${tournamentId}`).update({
+      knockoutFixtures: (tournament.knockoutFixtures ?? []).map((f) =>
+        f.id === tournamentMatchId ? { ...f, status: 'live', matchId } : f
+      ),
+    });
+  }
 };
 
 // ───────────────────────────────────────────────────────────
