@@ -178,7 +178,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 });
 
   const fieldMap: any = {};
-  typeFilteredMatches.forEach((m: any) => {
+  ballFilteredMatches.forEach((m: any) => {
     [m.innings1, m.innings2].forEach((inn: any) => {
       if (!inn?.fieldingStats) return;
       Object.values(inn.fieldingStats).forEach((fs: any) => {
@@ -204,7 +204,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   );
 
   const allPartnerships: any[] = [];
-  typeFilteredMatches.forEach((m: any) => {
+  ballFilteredMatches.forEach((m: any) => {
     // Process BOTH innings — team1/team1Players always corresponds to
     // whoever batted in innings1, team2/team2Players to whoever batted in
     // innings2 (same convention used throughout ScoringScreen). Previously
@@ -256,13 +256,13 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   ];
 
   const COUNTERS = [
-    { n: typeFilteredMatches.length, l: 'Total', f: 'all' },
-    { n: typeFilteredMatches.filter((m: any) => m.status === 'completed').length, l: 'Done', f: 'completed' },
+    { n: ballFilteredMatches.length, l: 'Total', f: 'all' },
+    { n: ballFilteredMatches.filter((m: any) => m.status === 'completed').length, l: 'Done', f: 'completed' },
    ];
 
   const filteredMatches = filter === 'all'
-    ? typeFilteredMatches
-    : typeFilteredMatches.filter((m: any) => m.status === filter);
+    ? ballFilteredMatches
+    : ballFilteredMatches.filter((m: any) => m.status === filter);
 
   const battingEntries = Object.entries(batMap).map(([id, bs]: any) => {
     const avg = bs.outs > 0 ? bs.runs / bs.outs : bs.runs;
@@ -601,7 +601,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                 { icon: '🧤', label: 'Catches',   value: fieldTotals.catches,   color: COLORS.blue },
                 { icon: '🏃', label: 'Run Outs',  value: fieldTotals.runOuts,   color: COLORS.orange },
                 { icon: '🥅', label: 'Stumpings', value: fieldTotals.stumpings, color: COLORS.purple },
-                { icon: '📋', label: 'Matches',   value: typeFilteredMatches.length, color: COLORS.primary },
+                { icon: '📋', label: 'Matches',   value: ballFilteredMatches.length, color: COLORS.primary },
               ].map((f, i) => (
                 <View key={i} style={[s.fieldingBox, { borderColor: f.color + '55' }]}>
                   <View style={[s.fieldingIcon, { backgroundColor: f.color + '22' }]}>

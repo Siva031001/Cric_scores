@@ -14,24 +14,31 @@ export default function MyTeamsScreen({ navigation, route }: any) {
 
   const handleSelectForTournament = async (team: any) => {
   try {
-    const { updateTournament, subscribeToTournament } = require('../../utils/firebase');
-    // Read current tournament once to append without clobbering concurrent edits.
+    // Use an atomic transaction on the teams array so two concurrent adds
+    // (e.g. from two devices) cannot clobber each other.
     const database = require('@react-native-firebase/database').default;
-    const snap = await database().ref('tournaments/' + tournamentId).once('value');
-    const tournament = snap.val();
-    if (!tournament) { Alert.alert('Error', 'Tournament not found'); return; }
-    if (tournament.teams?.some((t: any) => t.teamName === team.name)) {
+    const tournamentRef = database().ref('tournaments/' + tournamentId);
+    const existsSnap = await tournamentRef.once('value');
+    if (!existsSnap.exists()) { Alert.alert('Error', 'Tournament not found'); return; }
+    let alreadyAdded = false;
+    const result = await tournamentRef.child('teams').transaction((currentTeams: any) => {
+      if (currentTeams?.some((t: any) => t.teamName === team.name)) {
+        alreadyAdded = true;
+        return undefined;
+      }
+      const newTeam = {
+        teamId: team.id,
+        teamName: team.name,
+        logo: team.logo ?? undefined,
+        players: team.players ?? [],
+        played: 0, won: 0, lost: 0, tied: 0, nrr: 0, points: 0,
+      };
+      return [...(currentTeams ?? []), newTeam];
+    });
+    if (alreadyAdded || !result.committed) {
       Alert.alert('Already Added', team.name + ' is already in this tournament');
       return;
     }
-    const newTeam = {
-      teamId: team.id,
-      teamName: team.name,
-      logo: team.logo ?? undefined,
-      players: team.players ?? [],
-      played: 0, won: 0, lost: 0, tied: 0, nrr: 0, points: 0,
-    };
-    await updateTournament(tournamentId, { teams: [...(tournament.teams ?? []), newTeam] });
     Alert.alert('Added!', team.name + ' added with ' + (team.players?.length ?? 0) + ' players', [
       { text: 'OK', onPress: () => navigation.goBack() },
     ]);

@@ -98,17 +98,44 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-  const unsub = subscribeToSessionValidity(async () => {
-    await logoutLocalSession();
-    Alert.alert(
-      "Logged Out",
-      "This account was signed in on another device, so you've been logged out here."
-    );
-    if (navigationRef.isReady()) {
-      navigationRef.reset({ index: 0, routes: [{ name: "Login" }] });
+  const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+  let unsub: (() => void) | null = null;
+  let pollTimer: any = null;
+  let cancelled = false;
+
+  const attach = () => {
+    unsub = subscribeToSessionValidity(async () => {
+      await logoutLocalSession();
+      Alert.alert(
+        "Logged Out",
+        "This account was signed in on another device, so you've been logged out here."
+      );
+      if (navigationRef.isReady()) {
+        navigationRef.reset({ index: 0, routes: [{ name: "Login" }] });
+      }
+    });
+  };
+
+  // subscribeToSessionValidity reads the stored phone once; if it isn't
+  // there yet (fresh install, or before this run's first login), it
+  // attaches no listener. Keep checking until a phone shows up (e.g. a
+  // login completes later in this app session), then attach for real.
+  const waitForPhoneThenAttach = async () => {
+    const phone = await AsyncStorage.getItem("cricketscorer_phone");
+    if (cancelled) return;
+    if (phone) {
+      attach();
+    } else {
+      pollTimer = setTimeout(waitForPhoneThenAttach, 3000);
     }
-  });
-  return unsub;
+  };
+  waitForPhoneThenAttach();
+
+  return () => {
+    cancelled = true;
+    if (pollTimer) clearTimeout(pollTimer);
+    if (unsub) unsub();
+  };
   }, []);
 
   if (loading) return <SplashScreen />;

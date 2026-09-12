@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   FlatList, ActivityIndicator,
 } from 'react-native';
-import { getMyTournaments, getCurrentUser } from '../../utils/firebase';
+import { getMyTournaments, getCurrentUser, getTournamentDisplayStatus } from '../../utils/firebase';
 import { Tournament } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
@@ -61,23 +61,25 @@ export default function MyTournamentScreen({ navigation }: any) {
           data={tournaments}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
+          renderItem={({ item }) => {
+            const displayStatus = getTournamentDisplayStatus(item);
+            return (
             <TouchableOpacity
               style={styles.card}
               onPress={() => navigation.navigate('TournamentDetail', { tournamentId: item.id })}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardName}>{item.name}</Text>
                 <View style={[styles.badge,
-                  item.status === 'live' && styles.liveBadge,
-                  item.status === 'completed' && styles.doneBadge]}>
+                  displayStatus === 'live' && styles.liveBadge,
+                  displayStatus === 'completed' && styles.doneBadge]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <AppIcon
-                    emoji={item.status === 'live' ? '🔴' : item.status === 'completed' ? '✅' : '📅'}
+                    emoji={displayStatus === 'live' ? '🔴' : displayStatus === 'completed' ? '✅' : '📅'}
                     size={11}
-                    color={item.status === 'live' ? COLORS.red : item.status === 'completed' ? COLORS.primary : COLORS.textSecondary}
+                    color={displayStatus === 'live' ? COLORS.red : displayStatus === 'completed' ? COLORS.primary : COLORS.textSecondary}
                     />
                     <Text style={styles.badgeText}>
-                    {item.status === 'live' ? 'LIVE' : item.status === 'completed' ? 'Done' : 'Upcoming'}
+                    {displayStatus === 'live' ? 'LIVE' : displayStatus === 'completed' ? 'Done' : 'Upcoming'}
                     </Text>
                     </View>
                 </View>
@@ -99,7 +101,8 @@ export default function MyTournamentScreen({ navigation }: any) {
                 <Text style={styles.cardFormat}>{item.format ?? '20 Overs'}</Text>
               </View>
             </TouchableOpacity>
-          )}
+            );
+          }}
         />
       )}
     </View>

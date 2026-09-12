@@ -37,6 +37,7 @@ import { fromLegacyHistory } from './legacy';
 import { eventsForInnings, groupByInnings } from './history';
 import { resolveMatchOutcome, targetFor, buildNRRInputs } from './outcome';
 import {
+  isSuperOverInningsComplete,
   isSuperOverKey,
   parseSuperOverKey,
   resolveSuperOverChain,
@@ -219,11 +220,27 @@ export interface EngineMatch {
   warnings: Array<{ seq: number; message: string }>;
 }
 
+/**
+ * The legacy "End / Abandon Match" picker (ScoringScreen) writes
+ * `{ status: "completed", winner: reason }` for every one of these reasons,
+ * reusing the same "completed" string a genuine result also uses. A real
+ * win/tie always leaves `winner` as a result sentence instead.
+ */
+const LEGACY_ABANDON_REASONS = [
+  'Match Abandoned',
+  'Network Issue',
+  'Bad Weather',
+  'Pitch Issue',
+  'Other Reason',
+];
+
 /** Maps the old free-text status onto the state machine. */
 export const normaliseStatus = (raw: StoredMatch): MatchStatus => {
   if (raw.matchStatus) return raw.matchStatus;
   const s = String(raw.status ?? '').toLowerCase();
-  if (s === 'completed') return 'COMPLETED';
+  if (s === 'completed') {
+    return LEGACY_ABANDON_REASONS.includes(raw.winner ?? '') ? 'ABANDONED' : 'COMPLETED';
+  }
   if (s === 'paused') return 'SUSPENDED';
   if (s === 'live') return 'IN_PROGRESS';
   return 'SCHEDULED';
@@ -558,7 +575,7 @@ export const activeInningsEvents = (m: EngineMatch): MatchEvent[] => {
   const chain = resolveSuperOverChain(m.superOvers, m.raw.team1 ?? '', m.raw.team2 ?? '', m.rules);
   if (chain.activeIndex != null) {
     const so = m.superOvers.find(s => s.index === chain.activeIndex);
-    const which = so && so.innings1 && !so.innings2 ? 2 : 1;
+    const which = so && isSuperOverInningsComplete(so.innings1, m.rules) ? 2 : 1;
     return eventsForInnings(m.events, `so${chain.activeIndex}_innings${which}`);
   }
   const key = (m.raw.currentInnings ?? 1) === 2 ? 'innings2' : 'innings1';
@@ -570,7 +587,7 @@ export const activeInningsKey = (m: EngineMatch): string => {
   const chain = resolveSuperOverChain(m.superOvers, m.raw.team1 ?? '', m.raw.team2 ?? '', m.rules);
   if (chain.activeIndex != null) {
     const so = m.superOvers.find(s => s.index === chain.activeIndex);
-    const which = so && so.innings1 && !so.innings2 ? 2 : 1;
+    const which = so && isSuperOverInningsComplete(so.innings1, m.rules) ? 2 : 1;
     return `so${chain.activeIndex}_innings${which}`;
   }
   return (m.raw.currentInnings ?? 1) === 2 ? 'innings2' : 'innings1';

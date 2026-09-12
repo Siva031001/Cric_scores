@@ -7,7 +7,7 @@ import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 
 const getTodayString = () => { const d = new Date(); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); };
-const BALL_TYPES: BallType[] = ['Leather Ball', 'Tennis Ball'];
+const BALL_TYPES: BallType[] = ['Leather Ball', 'Tennis Ball', 'Turf'];
 const FORMAT_OPTIONS = ['6 Overs', '8 Overs', '20 Overs', '50 Overs', 'Others'];
 
 export default function CreateTournamentScreen({ navigation }: any) {
@@ -60,7 +60,7 @@ export default function CreateTournamentScreen({ navigation }: any) {
     const finalFormat = format === 'Others' ? customFormat || 'Custom' : format;
     setSaving(true);
     try {
-      const id = await createTournament({ name: name.trim(), organisationName: orgName.trim(), venue: venue.trim(), startDate: startDate.trim(), endDate: endDate.trim(), ballType, format: finalFormat, teams, matches, status: 'upcoming' });
+      const id = await createTournament({ name: name.trim(), organisationName: orgName.trim(), venue: venue.trim(), startDate: startDate.trim(), endDate: endDate.trim(), ballType, format: finalFormat, tournamentFormat, teams, matches, status: 'upcoming' });
       Alert.alert('Created!', 'Tournament ID: ' + id, [{ text: 'View', onPress: () => navigation.replace('TournamentDetail', { tournamentId: id }) }]);
     } catch (e: any) { Alert.alert('Error', e?.message); }
     finally { setSaving(false); }
@@ -111,7 +111,7 @@ export default function CreateTournamentScreen({ navigation }: any) {
               {BALL_TYPES.map(b => (
                 <TouchableOpacity key={b} style={[styles.chip, ballType === b && styles.chipActive]} onPress={() => setBallType(b)}>
                   <Text style={[styles.chipText, ballType === b && styles.chipTextActive]}>
-                    {b === 'Leather Ball' ? 'Red Ball - ' : 'Tennis Ball - '}{b}
+                    {b === 'Leather Ball' ? 'Red Ball - ' : b === 'Turf' ? 'Turf - ' : 'Tennis Ball - '}{b}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -140,25 +140,11 @@ export default function CreateTournamentScreen({ navigation }: any) {
             {format === 'Others' && (
               <TextInput style={styles.input} placeholder="Enter overs e.g. 15" placeholderTextColor={COLORS.textMuted} value={customFormat} onChangeText={setCustomFormat} keyboardType="numeric" />
             )}
-            <TouchableOpacity style={styles.nextBtn} onPress={async () => {
+            <TouchableOpacity style={styles.nextBtn} onPress={() => {
   if (!name.trim() || !orgName.trim()) { Alert.alert('Error', 'Fill required fields'); return; }
-  const finalFormat = format === 'Others' ? customFormat || 'Custom' : format;
-  setSaving(true);
-  try {
-    const id = await createTournament({
-      name: name.trim(), organisationName: orgName.trim(), venue: venue.trim(),
-      startDate: startDate.trim(), endDate: endDate.trim(), ballType, format: finalFormat,
-      tournamentFormat,
-      teams: [], matches: [], status: 'upcoming',
-    });
-    navigation.replace('TournamentDetail', { tournamentId: id });
-  } catch (e: any) {
-    Alert.alert('Error', e?.message);
-  } finally {
-    setSaving(false);
-  }
-}} disabled={saving}>
-  <Text style={styles.nextBtnText}>{saving ? 'Creating...' : 'Create Tournament'}</Text>
+  setStep(2);
+}}>
+  <Text style={styles.nextBtnText}>Next: Teams</Text>
 </TouchableOpacity>
           </View>
         )}

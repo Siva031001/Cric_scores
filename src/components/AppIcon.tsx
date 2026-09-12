@@ -30,6 +30,7 @@ const EMOJI_TO_ICON: Record<string, string> = {
   "🏢": "office-building",
   "🏅": "medal",
   "🎾": "tennis-ball",
+  "🏟️": "stadium",
   "⏰": "alarm",
   "➕": "plus",
   "⚙️": "cog",
@@ -48,7 +49,10 @@ const EMOJI_TO_ICON: Record<string, string> = {
   "🔒": "lock",
   "📭": "inbox",
   "🥅": "gate",
-  "←": "arrow-left"
+  "←": "arrow-left",
+  "🎥": "video",
+  "🏊": "pool",
+  "✉️": "email"
 };
 
 export default function AppIcon({

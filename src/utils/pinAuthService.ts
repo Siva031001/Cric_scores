@@ -33,14 +33,13 @@ export const checkPhoneExists = async (phone: string): Promise<boolean> => {
 export const createPinAccount = async (phone: string, pin: string): Promise<string> => {
   const key = normalizePhone(phone);
 
-  // Always start a brand-new anonymous session for a new registration —
-  // reusing an existing session (e.g. left over from a previous test
-  // account on this device) would attach the new phone number to the OLD
-  // UID and inherit its teams/matches/profile, which is the exact bug
-  // this guards against.
-  if (auth().currentUser) {
-  await auth().signOut();
-}
+  // Do NOT sign out here — the client just completed an OTP verification
+  // (confirmation.confirm in LoginScreen), leaving a phone-verified Firebase
+  // Auth session in place. mintPhoneSessionToken below requires that exact
+  // context.auth session (matching this phone) as proof the OTP was really
+  // checked; signing out first would throw that proof away.
+  // signInWithCustomToken below swaps to the stable phone-derived uid on
+  // its own, no prior signOut needed.
 
 // Sign in with a custom token bound to a stable, phone-derived uid (via
 // Cloud Function) instead of a random anonymous uid. This is what makes
@@ -105,16 +104,29 @@ export const loginWithPin = async (phone: string, pin: string): Promise<{ succes
     return { success: false, error: 'No account found for this number. Please set up a PIN first.' };
   }
 
-  const isValid = verifyPin(pin, record.salt, record.pinHash);
-if (!isValid) {
-  return { success: false, error: 'Incorrect PIN. Please try again.' };
-}
-
-if (auth().currentUser) {
+  // The PIN check itself now happens server-side, in mintPhoneSessionToken —
+  // a client-side "trust me, I checked" claim proves nothing, since there is
+  // no OTP/Firebase-Auth session in this flow to prove it another way. The
+  // function also enforces the attempt lockout, since it's the real
+  // enforcement point.
+  if (auth().currentUser) {
   await auth().signOut();
 }
 const functionsMod = require('@react-native-firebase/functions').default;
-const { data: tokenData } = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
+let tokenData;
+try {
+  const result = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key, pin });
+  tokenData = result.data;
+} catch (e: any) {
+  const code = e?.code ?? '';
+  if (code.includes('not-found')) {
+    return { success: false, error: 'No account found for this number. Please set up a PIN first.' };
+  }
+  if (code.includes('resource-exhausted')) {
+    return { success: false, error: e?.message ?? 'Too many incorrect attempts. Please try again later.' };
+  }
+  return { success: false, error: 'Incorrect PIN. Please try again.' };
+}
 await auth().signInWithCustomToken(tokenData.token);
 
   const newSessionId = generateSessionId();
@@ -292,10 +304,11 @@ export const resetPinWithPhoneAuth = async (phone: string, newPin: string): Prom
 
   // Sign in with the same stable, phone-derived uid used everywhere else —
   // NOT anonymous auth, or this account gets disconnected from its own
-  // teams/matches/profile the moment PIN reset is used.
-  if (auth().currentUser) {
-    await auth().signOut();
-  }
+  // teams/matches/profile the moment PIN reset is used. Do NOT sign out
+  // first — the phone-verified Firebase Auth session from the OTP step
+  // above (verifyForgotPasswordOtp's confirmation.confirm) is the proof
+  // mintPhoneSessionToken checks via context.auth; signInWithCustomToken
+  // below swaps to the stable uid on its own.
   const functionsMod = require('@react-native-firebase/functions').default;
   const { data: tokenData } = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
   await auth().signInWithCustomToken(tokenData.token);

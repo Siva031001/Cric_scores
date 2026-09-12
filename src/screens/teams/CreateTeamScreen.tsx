@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, FlatList, KeyboardAvoidingView, Platform, Modal  } from 'react-native';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import { saveTeam, updateTeam, getMyTeams, formatPlayerName, formatTeamName, ensureMyPlayerLinked, createPlayerMaster, getMyLinkedPlayerId, findAccountByPhone, createGuestPlayerByPhone, getPlayerMasterByAccountPhone } from '../../utils/firebase';
+import { saveTeam, updateTeam, getMyTeams, formatPlayerName, formatTeamName, ensureMyPlayerLinked, createPlayerMaster, getMyLinkedPlayerId, findAccountByPhone, createGuestPlayerByPhone, getPlayerMasterByAccountPhone, uploadLocalImageToStorage } from '../../utils/firebase';
 import { Player } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
@@ -229,6 +229,12 @@ const confirmNamePrompt = useCallback(() => {
     if (!filled.map((p: any) => p.id).includes(wicketKeeperId)) { Alert.alert('Error', 'Wicket Keeper must have a name'); return; }
     setSaving(true);
     try {
+      // Upload a freshly picked local logo (file://... URI) to Storage so the
+      // DB stores a stable https:// URL instead of a device-local file path.
+      let uploadedLogo = logo;
+      if (logo && !/^https?:\/\//.test(logo)) {
+        uploadedLogo = await uploadLocalImageToStorage(logo, `team_logos/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`);
+      }
       // Resolve a globalPlayerId for every filled player slot.
       // 'registered' slot = the current logged-in account, linked via ensureMyPlayerLinked.
       // 'guest' slots only get a NEW player master record if they don't already have
@@ -270,12 +276,12 @@ const confirmNamePrompt = useCallback(() => {
         return;
       }
       if (existingTeam?.id) {
-        await updateTeam(existingTeam.id, { name, logo: logo ?? undefined, players: finalPlayers });
+        await updateTeam(existingTeam.id, { name, logo: uploadedLogo ?? undefined, players: finalPlayers });
         Alert.alert('Updated!', `"${name}" updated.`, [{ text: 'OK', onPress: () => navigation.goBack() }]);
       } else {
         const teamId = await saveTeam({
           name: formattedTeamName,
-          logo: logo ?? undefined,
+          logo: uploadedLogo ?? undefined,
           players: finalPlayers,
           teamType
           });
@@ -294,13 +300,13 @@ Alert.alert(
           const { updateTournament } = require('../../utils/firebase');
           const snap = await database().ref('tournaments/' + tournamentIdParam).once('value');
           const tournament = snap.val();
-          const newTeam = { teamId: teamId, teamName: formattedTeamName, logo, players: finalPlayers, played: 0, won: 0, lost: 0, tied: 0, nrr: 0, points: 0 };
+          const newTeam = { teamId: teamId, teamName: formattedTeamName, logo: uploadedLogo, players: finalPlayers, played: 0, won: 0, lost: 0, tied: 0, nrr: 0, points: 0 };
           await updateTournament(tournamentIdParam, { teams: [...(tournament?.teams ?? []), newTeam] });
         } catch (e) { console.warn('Could not auto-add team to tournament', e); }
         navigation.navigate('TournamentDetail', { tournamentId: tournamentIdParam });
       } else if (fromNewMatch) {
         navigation.navigate('NewMatch', {
-          savedTeam: { name: formattedTeamName, players: finalPlayers, logo },
+          savedTeam: { name: formattedTeamName, players: finalPlayers, logo: uploadedLogo },
           teamSlot
         });
       } else {

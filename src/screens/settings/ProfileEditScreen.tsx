@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Image, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import { getUserProfile, saveUserProfile } from '../../utils/firebase';
+import { getUserProfile, saveUserProfile, getCurrentUser, uploadLocalImageToStorage } from '../../utils/firebase';
 import { PlayerRole, BattingStyle } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
@@ -57,7 +57,12 @@ export default function ProfileEditScreen({ navigation }: any) {
     if (!name.trim()) { Alert.alert('Error', 'Please enter your name'); return; }
     setSaving(true);
     try {
-      await saveUserProfile({ name: name.trim(), mobile: mobile.trim(), email: email.trim(), role, battingStyle, bowlingStyle: bowlingStyle.trim(), country: country.trim(), photo: photo ?? undefined });
+      let photoUrl = photo ?? undefined;
+      if (photo && !photo.startsWith('http')) {
+        const user = getCurrentUser();
+        if (user) photoUrl = await uploadLocalImageToStorage(photo, `profile_photos/${user.uid}.jpg`);
+      }
+      await saveUserProfile({ name: name.trim(), mobile: mobile.trim(), email: email.trim(), role, battingStyle, bowlingStyle: bowlingStyle.trim(), country: country.trim(), photo: photoUrl });
       Alert.alert('Saved!', 'Profile updated successfully', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e: any) { Alert.alert('Error', e?.message); }
     finally { setSaving(false); }

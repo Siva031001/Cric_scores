@@ -176,8 +176,17 @@ export default function MyMatchesScreen({ navigation }: any) {
           .filter((m: any) => m.status === 'completed')
           .slice(0, 5)
           .map((m: any) => {
-            const w = m.winner ?? '';
             const isPlayerTeam1 = (m.team1Players ?? []).some((p: any) => p.globalPlayerId === myPlayerId);
+            // Structured result first; the sentence is only a legacy fallback.
+            const r = m.result;
+            if (r) {
+              if (r.resultType === 'NO_RESULT' || r.resultType === 'ABANDONED') return null;
+              if (r.resultType === 'TIE') return 'T';
+              // A Super Over decides who progressed, so it reads as a W or an L.
+              if (r.winnerTeam) return r.winnerTeam === (isPlayerTeam1 ? m.team1 : m.team2) ? 'W' : 'L';
+              return null;
+            }
+            const w = m.winner ?? '';
             const won = w.includes((isPlayerTeam1 ? m.team1 : m.team2) + ' won');
             const lost = w.includes((isPlayerTeam1 ? m.team2 : m.team1) + ' won');
             if (w.toLowerCase().includes('tied')) return 'T';

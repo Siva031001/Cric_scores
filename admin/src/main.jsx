@@ -10,12 +10,13 @@ const app = initializeApp({
 
 const shareMatch = (m) => {
   const link = `https://cric-scores.vercel.app/?match=${m.team1}`;
+  const inn = m.currentInnings === 2 ? m.innings2 : m.innings1;
 
   const text = `${m.team1} vs ${m.team2}
-Score: ${m.innings1?.runs}/${m.innings1?.wickets}
+Score: ${inn?.runs}/${inn?.wickets}
 Status: ${m.status}
-Overs: ${m.innings1?.overs || "10.0"}
-Run Rate: ${((m.innings1?.runs || 0)/(m.innings1?.overs || 10)).toFixed(2)}
+Overs: ${inn?.overs || "10.0"}
+Run Rate: ${((inn?.runs || 0)/((inn?.overs || 0) + (inn?.balls || 0)/6 || 10)).toFixed(2)}
 
 Open match:
 ${link}`;
@@ -28,7 +29,7 @@ function App() {
   const matchFromUrl = params.get("match");
 
   const [matches, setMatches] = useState([]);
-  const [filter, setFilter] = useState("Live");
+  const [filter, setFilter] = useState("live");
   const [selectedMatch, setSelectedMatch] = useState(null);
 
   useEffect(() => {
@@ -51,7 +52,9 @@ function App() {
         (matchFromUrl
           ? matches.filter(m => m.team1 === matchFromUrl)
           : matches.filter(m => m.status === filter)
-        ).map((m, i) => (
+        ).map((m, i) => {
+          const inn = m.currentInnings === 2 ? m.innings2 : m.innings1;
+          return (
           <div
             key={i}
             onClick={() => setSelectedMatch(m)}
@@ -65,16 +68,17 @@ function App() {
             }}
           >
             <b>{m.team1} vs {m.team2}</b><br/>
-            Score: {m.innings1?.runs}/{m.innings1?.wickets}<br/>
+            Score: {inn?.runs}/{inn?.wickets}<br/>
             Status: {m.status}<br/>
-            Overs: {m.innings1?.overs || "10.0"}<br/>
-            Run Rate: {((m.innings1?.runs || 0)/(m.innings1?.overs || 10)).toFixed(2)}<br/>
+            Overs: {inn?.overs || "10.0"}<br/>
+            Run Rate: {((inn?.runs || 0)/((inn?.overs || 0) + (inn?.balls || 0)/6 || 10)).toFixed(2)}<br/>
 
             <button onClick={(e) => { e.stopPropagation(); shareMatch(m); }}>
               ?? Share
             </button>
           </div>
-        ))
+          );
+        })
       )}
     </div>
   );

@@ -20,9 +20,9 @@ export default function HomeScreen({ navigation }: any) {
   const [publicTournaments, setPublicTournaments] = useState<any[]>([]);
   const [tournamentFilter, setTournamentFilter] = useState<'all'|'live'|'upcoming'|'completed'|'mine'>('all');
 
-  useEffect(() => {
-  getPublicTournaments().then(setPublicTournaments).catch(() => setPublicTournaments([]));
-  }, []);
+  useFocusEffect(useCallback(() => {
+    getPublicTournaments().then(setPublicTournaments).catch(() => setPublicTournaments([]));
+  }, []));
 
   const loadData = useCallback(async () => {
     try {
@@ -194,11 +194,12 @@ export default function HomeScreen({ navigation }: any) {
                 // regardless of the stored status field. The "Completed"
                 // filter chip is an explicit override for anyone who wants
                 // to look back at old tournaments on purpose.
-                let list = tournamentFilter === 'completed'
-                  ? publicTournaments.filter((t) => getTournamentDisplayStatus(t) === 'completed')
+                let list = tournamentFilter === 'completed' || tournamentFilter === 'mine'
+                  ? publicTournaments
                   : getHomePageTournaments(publicTournaments);
 
-                if (tournamentFilter === 'live') list = list.filter((t) => getTournamentDisplayStatus(t) === 'live');
+                if (tournamentFilter === 'completed') list = list.filter((t) => getTournamentDisplayStatus(t) === 'completed');
+                else if (tournamentFilter === 'live') list = list.filter((t) => getTournamentDisplayStatus(t) === 'live');
                 else if (tournamentFilter === 'upcoming') list = list.filter((t) => getTournamentDisplayStatus(t) === 'upcoming');
                 else if (tournamentFilter === 'mine') list = list.filter((t) => t.createdBy === getCurrentUser()?.uid);
 

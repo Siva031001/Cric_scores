@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
-import { subscribeToTournament } from "../../utils/firebase";
+import { subscribeToTournament, tieBreakersFor } from "../../utils/firebase";
+import { sortStandings } from "../../engine";
 import { COLORS, RADIUS, SPACING } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from "../../components/AppIcon";
@@ -21,12 +22,10 @@ export default function LeaderboardScreen({ route, navigation }: any) {
     const unsub = subscribeToTournament(tournamentId, (data: any) => {
       if (!data) { setLoading(false); return; }
       setTournamentName(data.name ?? "");
-      const sorted = [...(data.teams ?? [])].sort((a: any, b: any) => {
-        // Primary sort: points descending
-        if (b.points !== a.points) return b.points - a.points;
-        // Secondary sort: NRR descending
-        return (b.nrr ?? 0) - (a.nrr ?? 0);
-      });
+      // Mirrors the engine's own standings order (points, wins, NRR, head
+      // to head, seeding) via sortStandings, instead of a simplified
+      // points-then-NRR sort that could disagree with the real table.
+      const sorted = sortStandings(data.teams ?? [], tieBreakersFor(data));
       setTeams(sorted);
       setLoading(false);
     });

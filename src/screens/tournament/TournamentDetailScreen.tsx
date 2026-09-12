@@ -160,10 +160,41 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     setMatchStep(2);
   };
 
-  const handleStartMatch = (match: any) => {
+  // Flips a scheduled fixture's status to "live" wherever it actually lives
+  // (overall tournament.matches, a pool's matches, or knockoutFixtures) —
+  // called once from handleStartMatch so a second tap on "Start" can never
+  // spawn a duplicate live match (the Start button only renders while
+  // status === "scheduled").
+  const markScheduledFixtureLive = async (matchId: string) => {
+    if (!tournament) return;
+    if ((tournament.matches ?? []).some((m: any) => m.id === matchId)) {
+      await updateTournament(tournamentId, {
+        matches: (tournament.matches ?? []).map((m: any) => m.id === matchId ? { ...m, status: "live" } : m),
+      });
+      return;
+    }
+    const poolWithMatch = (tournament.pools ?? []).find((p: any) => (p.matches ?? []).some((m: any) => m.id === matchId));
+    if (poolWithMatch) {
+      await updateTournament(tournamentId, {
+        pools: (tournament.pools ?? []).map((p: any) =>
+          p.poolId === poolWithMatch.poolId
+            ? { ...p, matches: (p.matches ?? []).map((m: any) => m.id === matchId ? { ...m, status: "live" } : m) }
+            : p
+        ),
+      });
+      return;
+    }
+    if ((tournament.knockoutFixtures ?? []).some((f: any) => f.id === matchId)) {
+      await startKnockoutMatch(tournamentId, matchId);
+    }
+  };
+
+  const handleStartMatch = async (match: any) => {
     if (!tournament) return;
     if (match.status === "completed" && match.matchId) { navigation.navigate("Scorecard", { matchId: match.matchId }); return; }
     if (match.status === "live" && match.matchId) { navigation.navigate("Scoring", { matchId: match.matchId }); return; }
+
+    if (match.status !== "live") await markScheduledFixtureLive(match.id);
 
     // First check tournament teams (which have players saved)
     const tournTeam1 = (tournament.teams ?? []).find((t: any) => t.teamName === match.team1);
@@ -201,7 +232,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
 
   const startMatchFlow = (match: any, team1Players: any[], team2Players: any[]) => {
     const overs = tournament?.format?.replace(" Overs", "") ?? "20";
-    navigation.navigate("PlayerSetup", { team1: match.team1, team2: match.team2, overs, venue: match.venue !== "TBD" ? match.venue : tournament?.venue ?? "", team1Players, team2Players, tournamentId, tournamentMatchId: match.id });
+    navigation.navigate("PlayerSetup", { team1: match.team1, team2: match.team2, overs, venue: match.venue !== "TBD" ? match.venue : tournament?.venue ?? "", ballType: tournament?.ballType, team1Players, team2Players, tournamentId, tournamentMatchId: match.id });
   };
 
   if (!tournament) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
@@ -247,7 +278,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
       Object.values(inn.batsmanStats ?? {}).forEach((bs: any) => {
         if (!bs) return;
         const gid = bs.globalPlayerId;
-        const key = gid ?? ("local:" + bs.playerId + ":" + (battingRoster === m.team1Players ? "t1" : "t2") + ":" + battingTeamName);
+        const key = gid ?? ("local:" + bs.playerId + ":" + battingTeamName);
         const pName = gid
           ? [...battingRoster, ...bowlingRoster].find((p: any) => p.globalPlayerId === gid)?.name ?? "Player"
           : battingRoster.find((p: any) => p.id === bs.playerId)?.name ?? "Player";
@@ -264,7 +295,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
       Object.values(inn.bowlerStats ?? {}).forEach((bw: any) => {
         if (!bw) return;
         const gid = bw.globalPlayerId;
-        const key = gid ?? ("local:" + bw.playerId + ":" + (bowlingRoster === m.team1Players ? "t1" : "t2") + ":" + bowlingTeamName);
+        const key = gid ?? ("local:" + bw.playerId + ":" + bowlingTeamName);
         const pName = gid
           ? [...battingRoster, ...bowlingRoster].find((p: any) => p.globalPlayerId === gid)?.name ?? "Player"
           : bowlingRoster.find((p: any) => p.id === bw.playerId)?.name ?? "Player";
@@ -345,7 +376,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
     </View>
   ) : null}
   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-    <AppIcon emoji={tournament.ballType === "Leather Ball" ? "🔴" : "🎾"} size={12} color={COLORS.textSecondary} />
+    <AppIcon emoji={tournament.ballType === "Leather Ball" ? "🔴" : tournament.ballType === "Turf" ? "🏟️" : "🎾"} size={12} color={COLORS.textSecondary} />
     <Text style={styles.infoText}>{tournament.format}</Text>
   </View>
 </View>
@@ -597,6 +628,14 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 {pool.matches.map((m: any) => (
                   <View key={m.id} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6 }}>
                     <Text style={{ color: COLORS.text, fontSize: 13 }}>{m.team1} vs {m.team2}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                       {m.status === "scheduled" && canManage && (
+                      <TouchableOpacity onPress={() => { setAssignScorerPhone(m.assignedScorerPhone ?? ''); setAssignScorerMatchId(m.id); }}>
+                        <Text style={{ color: COLORS.blue, fontSize: 12, fontWeight: "bold" }}>
+                          {m.assignedScorerPhone ? `Scorer: ${m.assignedScorerPhone}` : 'Assign Scorer'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                        {m.status === "scheduled" && canScoreThisMatch(tournament, m) && (
                       <TouchableOpacity style={styles.startBtn} onPress={() => handleStartMatch(m)}>
                         <Text style={styles.startBtnText}>Start</Text>
@@ -610,6 +649,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     {m.status === "completed" && (
                       <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: "bold" }}>{m.winner}</Text>
                     )}
+                    </View>
                   </View>
                 ))}
               </View>
@@ -712,6 +752,13 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                   <Text style={styles.statusText}>{f.status === "completed" ? "Done" : f.status === "live" ? "Live" : "Scheduled"}</Text>
                 </View>
                 <View style={{ flexDirection: "row", gap: 8 }}>
+                  {f.status === "scheduled" && canManage && (
+                    <TouchableOpacity onPress={() => { setAssignScorerPhone(f.assignedScorerPhone ?? ''); setAssignScorerMatchId(f.id); }} style={{ justifyContent: "center" }}>
+                      <Text style={{ color: COLORS.blue, fontSize: 12, fontWeight: "bold" }}>
+                        {f.assignedScorerPhone ? `Scorer: ${f.assignedScorerPhone}` : 'Assign Scorer'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                   {f.status === "scheduled" && f.homeTeamName && f.awayTeamName && canScoreThisMatch(tournament, { assignedScorerPhone: f.assignedScorerPhone }) && (
                     <TouchableOpacity style={styles.startBtn} onPress={() => handleStartMatch({ id: f.id, team1: f.homeTeamName, team2: f.awayTeamName, date: "TBD", time: "TBD", venue: tournament.venue ?? "TBD", status: "scheduled" })}>
                       <Text style={styles.startBtnText}>Start</Text>
@@ -1025,273 +1072,273 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         </View>
       </Modal>
       <Modal visible={showInviteModal} transparent animationType="slide">
-  <View style={styles.modalOverlay}>
-    <View style={styles.modal}>
-      <Text style={styles.modalTitle}>Invite Team Captain</Text>
-      {!generatedInviteCode ? (
-        <>
-          <Text style={styles.modalLabel}>Team Name *</Text>
-          <TextInput style={styles.modalInput} placeholder="Enter team name" placeholderTextColor={COLORS.textMuted} value={inviteTeamName} onChangeText={setInviteTeamName} autoFocus />
-          <View style={styles.modalBtns}>
-            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowInviteModal(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
-              if (!inviteTeamName.trim()) { Alert.alert("Error", "Enter a team name"); return; }
-              try {
-                const code = await createCaptainInvite(tournamentId, inviteTeamName);
-                setGeneratedInviteCode(code);
-              } catch (e: any) { Alert.alert("Error", e?.message); }
-            }}>
-              <Text style={styles.modalAddText}>Generate Invite</Text>
-            </TouchableOpacity>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Invite Team Captain</Text>
+            {!generatedInviteCode ? (
+              <>
+                <Text style={styles.modalLabel}>Team Name *</Text>
+                <TextInput style={styles.modalInput} placeholder="Enter team name" placeholderTextColor={COLORS.textMuted} value={inviteTeamName} onChangeText={setInviteTeamName} autoFocus />
+                <View style={styles.modalBtns}>
+                  <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowInviteModal(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+                    if (!inviteTeamName.trim()) { Alert.alert("Error", "Enter a team name"); return; }
+                    try {
+                      const code = await createCaptainInvite(tournamentId, inviteTeamName);
+                      setGeneratedInviteCode(code);
+                    } catch (e: any) { Alert.alert("Error", e?.message); }
+                  }}>
+                    <Text style={styles.modalAddText}>Generate Invite</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 20 }}>
+                  Invite "{inviteTeamName}"'s captain via WhatsApp. They'll tap the link to join and add their players.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.modalAddBtn, { backgroundColor: '#25D366', marginBottom: 10 }]}
+                  onPress={async () => {
+                    const { Linking } = require('react-native');
+                    const msg = `You've been invited to join "${inviteTeamName}" for the tournament "${tournament.name}"!\n\nOpen CricketScorer app → Join as Captain → Enter code: ${generatedInviteCode}`;
+                    const url = `whatsapp://send?text=${encodeURIComponent(msg)}`;
+                    try {
+                      // Skip canOpenURL — on Android 11+ it unreliably returns
+                      // false for whatsapp:// even when WhatsApp IS installed,
+                      // unless AndroidManifest.xml declares a <queries> entry for
+                      // it. Attempting openURL directly and catching the failure
+                      // avoids needing a native manifest change.
+                      await Linking.openURL(url);
+                    } catch {
+                      Alert.alert('Could not open WhatsApp', 'Make sure WhatsApp is installed, or share the code manually.');
+                    }
+                  }}
+                >
+                  <Text style={styles.modalAddText}>📤 Share via WhatsApp</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowInviteModal(false)}>
+                  <Text style={styles.modalCancelText}>Close</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
-        </>
-      ) : (
-        <>
-          <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 20 }}>
-            Invite "{inviteTeamName}"'s captain via WhatsApp. They'll tap the link to join and add their players.
-          </Text>
-          <TouchableOpacity
-            style={[styles.modalAddBtn, { backgroundColor: '#25D366', marginBottom: 10 }]}
-            onPress={async () => {
-              const { Linking } = require('react-native');
-              const msg = `You've been invited to join "${inviteTeamName}" for the tournament "${tournament.name}"!\n\nOpen CricketScorer app → Join as Captain → Enter code: ${generatedInviteCode}`;
-              const url = `whatsapp://send?text=${encodeURIComponent(msg)}`;
-              try {
-                // Skip canOpenURL — on Android 11+ it unreliably returns
-                // false for whatsapp:// even when WhatsApp IS installed,
-                // unless AndroidManifest.xml declares a <queries> entry for
-                // it. Attempting openURL directly and catching the failure
-                // avoids needing a native manifest change.
-                await Linking.openURL(url);
-              } catch {
-                Alert.alert('Could not open WhatsApp', 'Make sure WhatsApp is installed, or share the code manually.');
-              }
-            }}
-          >
-            <Text style={styles.modalAddText}>📤 Share via WhatsApp</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowInviteModal(false)}>
-            <Text style={styles.modalCancelText}>Close</Text>
-          </TouchableOpacity>
-        </>
-      )}
+        </View>
+      </Modal>
 
       <Modal visible={!!renamingPool} transparent animationType="fade">
-  <View style={styles.modalOverlay}>
-    <View style={styles.modal}>
-      <Text style={styles.modalTitle}>Rename Pool</Text>
-      <TextInput style={styles.modalInput} value={renamePoolValue} onChangeText={setRenamePoolValue} autoFocus />
-      <View style={styles.modalBtns}>
-        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setRenamingPool(null)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
-          if (!renamePoolValue.trim()) { Alert.alert("Error", "Enter a pool name"); return; }
-          await renamePool(tournamentId, renamingPool!.poolId, renamePoolValue);
-          setRenamingPool(null);
-        }}>
-          <Text style={styles.modalAddText}>Save</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
-<Modal visible={showDeleteConfirm} transparent animationType="fade">
-  <View style={styles.modalOverlay}>
-    <View style={styles.modal}>
-      <Text style={styles.modalTitle}>Delete Tournament?</Text>
-      <Text style={{ color: COLORS.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: 16 }}>
-        This action cannot be undone. Deleting this tournament will permanently remove all associated data, including teams, fixtures, points tables, match history, and tournament statistics.
-      </Text>
-      <AdBanner />
-      <View style={[styles.modalBtns, { marginTop: 16 }]}>
-        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowDeleteConfirm(false)}>
-          <Text style={styles.modalCancelText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.modalAddBtn, { backgroundColor: COLORS.red }]} onPress={() => { setShowDeleteConfirm(false); setShowDeleteRewarded(true); }}>
-          <Text style={styles.modalAddText}>Watch Ad & Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Rename Pool</Text>
+            <TextInput style={styles.modalInput} value={renamePoolValue} onChangeText={setRenamePoolValue} autoFocus />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setRenamingPool(null)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+                if (!renamePoolValue.trim()) { Alert.alert("Error", "Enter a pool name"); return; }
+                await renamePool(tournamentId, renamingPool!.poolId, renamePoolValue);
+                setRenamingPool(null);
+              }}>
+                <Text style={styles.modalAddText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={showDeleteConfirm} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Delete Tournament?</Text>
+            <Text style={{ color: COLORS.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: 16 }}>
+              This action cannot be undone. Deleting this tournament will permanently remove all associated data, including teams, fixtures, points tables, match history, and tournament statistics.
+            </Text>
+            <AdBanner />
+            <View style={[styles.modalBtns, { marginTop: 16 }]}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowDeleteConfirm(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalAddBtn, { backgroundColor: COLORS.red }]} onPress={() => { setShowDeleteConfirm(false); setShowDeleteRewarded(true); }}>
+                <Text style={styles.modalAddText}>Watch Ad & Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
-<AdRewardedGate
-  visible={showDeleteRewarded}
-  onComplete={async () => {
-    setShowDeleteRewarded(false);
-    setDeletingTournament(true);
-    try {
-      await deleteTournament(tournamentId);
-      Alert.alert('Deleted', 'Tournament deleted successfully.');
-      navigation.reset({ index: 0, routes: [{ name: 'MyTournament' }] });
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Could not delete tournament');
-    } finally {
-      setDeletingTournament(false);
-    }
-  }}
-  onSkip={() => {
-    setShowDeleteRewarded(false);
-    Alert.alert('Ad Skipped', 'Please watch the complete advertisement to delete the tournament.');
-  }}
-/>
-
-<Modal visible={showBracketSetup} transparent animationType="slide">
-  <View style={styles.modalOverlay}>
-    <View style={styles.modal}>
-      <Text style={styles.modalTitle}>Generate Bracket</Text>
-      <Text style={styles.modalLabel}>Start Stage</Text>
-      <View style={styles.teamChipRow}>
-        {(['Quarter Final', 'Semi Final', 'Final'] as const).map((stage) => (
-          <TouchableOpacity key={stage} style={[styles.teamChip, bracketStartStage === stage && styles.teamChipActive]} onPress={() => setBracketStartStage(stage)}>
-            <Text style={[styles.teamChipText, bracketStartStage === stage && styles.teamChipTextActive]}>{stage}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, marginBottom: 10 }} onPress={() => setIncludeThirdPlace(!includeThirdPlace)}>
-        <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: COLORS.primary, backgroundColor: includeThirdPlace ? COLORS.primary : "transparent" }} />
-        <Text style={{ color: COLORS.text, fontSize: 13 }}>Include Third Place Match</Text>
-      </TouchableOpacity>
-      <View style={styles.modalBtns}>
-        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowBracketSetup(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+      <AdRewardedGate
+        visible={showDeleteRewarded}
+        onComplete={async () => {
+          setShowDeleteRewarded(false);
+          setDeletingTournament(true);
           try {
-            await autoGenerateKnockoutBracket(tournamentId, bracketStartStage, includeThirdPlace);
-            setShowBracketSetup(false);
-          } catch (e: any) { Alert.alert("Error", e?.message); }
-        }}>
-          <Text style={styles.modalAddText}>Generate</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
+            await deleteTournament(tournamentId);
+            Alert.alert('Deleted', 'Tournament deleted successfully.');
+            navigation.reset({ index: 0, routes: [{ name: 'MyTournament' }] });
+          } catch (e: any) {
+            Alert.alert('Error', e?.message ?? 'Could not delete tournament');
+          } finally {
+            setDeletingTournament(false);
+          }
+        }}
+        onSkip={() => {
+          setShowDeleteRewarded(false);
+          Alert.alert('Ad Skipped', 'Please watch the complete advertisement to delete the tournament.');
+        }}
+      />
 
-<Modal visible={showManualBracket} transparent animationType="slide">
-  <View style={styles.modalOverlay}>
-    <View style={styles.modal}>
-      <Text style={styles.modalTitle}>Add Match Manually</Text>
-      <Text style={styles.modalLabel}>Stage *</Text>
-      <View style={styles.teamChipRow}>
-        {(['Quarter Final', 'Semi Final', 'Final', 'Third Place Match'] as const).map((stage) => (
-          <TouchableOpacity key={stage} style={[styles.teamChip, manualStage === stage && styles.teamChipActive]} onPress={() => setManualStage(stage)}>
-            <Text style={[styles.teamChipText, manualStage === stage && styles.teamChipTextActive]}>{stage}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <Text style={styles.modalLabel}>Team 1</Text>
-      <View style={styles.teamChipRow}>
-        {(tournament.teams ?? []).map((t: any) => (
-          <TouchableOpacity key={t.teamId} style={[styles.teamChip, manualHomeTeam === t.teamName && styles.teamChipActive]} onPress={() => setManualHomeTeam(t.teamName)}>
-            <Text style={[styles.teamChipText, manualHomeTeam === t.teamName && styles.teamChipTextActive]}>{t.teamName}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <Text style={styles.modalLabel}>Team 2 (leave unselected for a "Winner of..." placeholder)</Text>
-      <View style={styles.teamChipRow}>
-        {(tournament.teams ?? []).map((t: any) => (
-          <TouchableOpacity key={t.teamId} style={[styles.teamChip, manualAwayTeam === t.teamName && styles.teamChipActive]} onPress={() => setManualAwayTeam(t.teamName)}>
-            <Text style={[styles.teamChipText, manualAwayTeam === t.teamName && styles.teamChipTextActive]}>{t.teamName}</Text>
-          </TouchableOpacity>
-                ))}
-      </View>
-      <Text style={styles.modalLabel}>Date (DD/MM/YYYY)</Text>
-      <TextInput style={styles.modalInput} placeholderTextColor={COLORS.textMuted} value={manualMatchDate} onChangeText={setManualMatchDate} />
-      <Text style={styles.modalLabel}>Time</Text>
-      <TextInput style={styles.modalInput} placeholder="e.g. 10:00 AM" placeholderTextColor={COLORS.textMuted} value={manualMatchTime} onChangeText={setManualMatchTime} />
-      <View style={styles.modalBtns}>
-        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowManualBracket(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
-          const existingSlots = (tournament.knockoutFixtures ?? []).filter((f: any) => f.stage === manualStage).length;
-          const fixture = {
-            id: 'ko_manual_' + Date.now(),
-            stage: manualStage,
-            slot: existingSlots + 1,
-            homeTeamName: manualHomeTeam || undefined,
-            awayTeamName: manualAwayTeam || undefined,
-            date: manualMatchDate || "TBD",
-            time: manualMatchTime || "TBD",
-            status: 'scheduled',
-          };
-          try {
-            await setManualKnockoutFixture(tournamentId, fixture);
-            setShowManualBracket(false);
-            setManualMatchDate(getTodayString());
-            setManualMatchTime("");
-          } catch (e: any) { Alert.alert("Error", e?.message); }
-        }}>
-          <Text style={styles.modalAddText}>Add</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
-<Modal visible={showEditTournament} transparent animationType="slide">
-  <View style={styles.modalOverlay}>
-    <View style={styles.modal}>
-      <Text style={styles.modalTitle}>Edit Tournament</Text>
-      <Text style={styles.modalLabel}>Tournament Name</Text>
-      <TextInput style={styles.modalInput} value={editName} onChangeText={setEditName} placeholderTextColor={COLORS.textMuted} />
-      <Text style={styles.modalLabel}>Organisation</Text>
-      <TextInput style={styles.modalInput} value={editOrg} onChangeText={setEditOrg} placeholderTextColor={COLORS.textMuted} />
-      <Text style={styles.modalLabel}>Venue</Text>
-      <TextInput style={styles.modalInput} value={editVenue} onChangeText={setEditVenue} placeholderTextColor={COLORS.textMuted} />
-      <Text style={styles.modalLabel}>Start Date</Text>
-      <TextInput style={styles.modalInput} value={editStartDate} onChangeText={setEditStartDate} placeholderTextColor={COLORS.textMuted} />
-      <Text style={styles.modalLabel}>End Date</Text>
-      <TextInput style={styles.modalInput} value={editEndDate} onChangeText={setEditEndDate} placeholderTextColor={COLORS.textMuted} />
-      <View style={styles.modalBtns}>
-        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowEditTournament(false)}>
-          <Text style={styles.modalCancelText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.modalAddBtn}
-          onPress={async () => {
-            if (!editName.trim()) { Alert.alert('Error', 'Tournament name cannot be empty'); return; }
-            await updateTournament(tournamentId, {
-              name: editName.trim(),
-              organisationName: editOrg.trim(),
-              venue: editVenue.trim(),
-              startDate: editStartDate.trim(),
-              endDate: editEndDate.trim(),
-            });
-            setShowEditTournament(false);
-          }}
-        >
-          <Text style={styles.modalAddText}>Save</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
-          <Modal visible={!!assignScorerMatchId} transparent animationType="fade">
-  <View style={styles.modalOverlay}>
-    <View style={styles.modal}>
-      <Text style={styles.modalTitle}>Assign Scorer</Text>
-      <Text style={styles.modalLabel}>Scorer's phone number (blank to unassign)</Text>
-      <TextInput style={styles.modalInput} value={assignScorerPhone} onChangeText={setAssignScorerPhone} keyboardType="phone-pad" placeholderTextColor={COLORS.textMuted} />
-      <View style={styles.modalBtns}>
-        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setAssignScorerMatchId(null)}>
-          <Text style={styles.modalCancelText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.modalAddBtn}
-          onPress={async () => {
-            await assignScorerToMatch(tournamentId, assignScorerMatchId!, assignScorerPhone.trim() || null);
-            setAssignScorerMatchId(null);
-          }}
-        >
-          <Text style={styles.modalAddText}>Save</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
-    </View>
-  </View>
-</Modal>
-    </View>
+      <Modal visible={showBracketSetup} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Generate Bracket</Text>
+            <Text style={styles.modalLabel}>Start Stage</Text>
+            <View style={styles.teamChipRow}>
+              {(['Quarter Final', 'Semi Final', 'Final'] as const).map((stage) => (
+                <TouchableOpacity key={stage} style={[styles.teamChip, bracketStartStage === stage && styles.teamChipActive]} onPress={() => setBracketStartStage(stage)}>
+                  <Text style={[styles.teamChipText, bracketStartStage === stage && styles.teamChipTextActive]}>{stage}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, marginBottom: 10 }} onPress={() => setIncludeThirdPlace(!includeThirdPlace)}>
+              <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: COLORS.primary, backgroundColor: includeThirdPlace ? COLORS.primary : "transparent" }} />
+              <Text style={{ color: COLORS.text, fontSize: 13 }}>Include Third Place Match</Text>
+            </TouchableOpacity>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowBracketSetup(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+                try {
+                  await autoGenerateKnockoutBracket(tournamentId, bracketStartStage, includeThirdPlace);
+                  setShowBracketSetup(false);
+                } catch (e: any) { Alert.alert("Error", e?.message); }
+              }}>
+                <Text style={styles.modalAddText}>Generate</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
-    
+      <Modal visible={showManualBracket} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Add Match Manually</Text>
+            <Text style={styles.modalLabel}>Stage *</Text>
+            <View style={styles.teamChipRow}>
+              {(['Quarter Final', 'Semi Final', 'Final', 'Third Place Match'] as const).map((stage) => (
+                <TouchableOpacity key={stage} style={[styles.teamChip, manualStage === stage && styles.teamChipActive]} onPress={() => setManualStage(stage)}>
+                  <Text style={[styles.teamChipText, manualStage === stage && styles.teamChipTextActive]}>{stage}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.modalLabel}>Team 1</Text>
+            <View style={styles.teamChipRow}>
+              {(tournament.teams ?? []).map((t: any) => (
+                <TouchableOpacity key={t.teamId} style={[styles.teamChip, manualHomeTeam === t.teamName && styles.teamChipActive]} onPress={() => setManualHomeTeam(t.teamName)}>
+                  <Text style={[styles.teamChipText, manualHomeTeam === t.teamName && styles.teamChipTextActive]}>{t.teamName}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.modalLabel}>Team 2 (leave unselected for a "Winner of..." placeholder)</Text>
+            <View style={styles.teamChipRow}>
+              {(tournament.teams ?? []).map((t: any) => (
+                <TouchableOpacity key={t.teamId} style={[styles.teamChip, manualAwayTeam === t.teamName && styles.teamChipActive]} onPress={() => setManualAwayTeam(t.teamName)}>
+                  <Text style={[styles.teamChipText, manualAwayTeam === t.teamName && styles.teamChipTextActive]}>{t.teamName}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.modalLabel}>Date (DD/MM/YYYY)</Text>
+            <TextInput style={styles.modalInput} placeholderTextColor={COLORS.textMuted} value={manualMatchDate} onChangeText={setManualMatchDate} />
+            <Text style={styles.modalLabel}>Time</Text>
+            <TextInput style={styles.modalInput} placeholder="e.g. 10:00 AM" placeholderTextColor={COLORS.textMuted} value={manualMatchTime} onChangeText={setManualMatchTime} />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowManualBracket(false)}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.modalAddBtn} onPress={async () => {
+                const existingSlots = (tournament.knockoutFixtures ?? []).filter((f: any) => f.stage === manualStage).length;
+                const fixture = {
+                  id: 'ko_manual_' + Date.now(),
+                  stage: manualStage,
+                  slot: existingSlots + 1,
+                  homeTeamName: manualHomeTeam || undefined,
+                  awayTeamName: manualAwayTeam || undefined,
+                  date: manualMatchDate || "TBD",
+                  time: manualMatchTime || "TBD",
+                  status: 'scheduled',
+                };
+                try {
+                  await setManualKnockoutFixture(tournamentId, fixture);
+                  setShowManualBracket(false);
+                  setManualMatchDate(getTodayString());
+                  setManualMatchTime("");
+                } catch (e: any) { Alert.alert("Error", e?.message); }
+              }}>
+                <Text style={styles.modalAddText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEditTournament} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Edit Tournament</Text>
+            <Text style={styles.modalLabel}>Tournament Name</Text>
+            <TextInput style={styles.modalInput} value={editName} onChangeText={setEditName} placeholderTextColor={COLORS.textMuted} />
+            <Text style={styles.modalLabel}>Organisation</Text>
+            <TextInput style={styles.modalInput} value={editOrg} onChangeText={setEditOrg} placeholderTextColor={COLORS.textMuted} />
+            <Text style={styles.modalLabel}>Venue</Text>
+            <TextInput style={styles.modalInput} value={editVenue} onChangeText={setEditVenue} placeholderTextColor={COLORS.textMuted} />
+            <Text style={styles.modalLabel}>Start Date</Text>
+            <TextInput style={styles.modalInput} value={editStartDate} onChangeText={setEditStartDate} placeholderTextColor={COLORS.textMuted} />
+            <Text style={styles.modalLabel}>End Date</Text>
+            <TextInput style={styles.modalInput} value={editEndDate} onChangeText={setEditEndDate} placeholderTextColor={COLORS.textMuted} />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowEditTournament(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalAddBtn}
+                onPress={async () => {
+                  if (!editName.trim()) { Alert.alert('Error', 'Tournament name cannot be empty'); return; }
+                  await updateTournament(tournamentId, {
+                    name: editName.trim(),
+                    organisationName: editOrg.trim(),
+                    venue: editVenue.trim(),
+                    startDate: editStartDate.trim(),
+                    endDate: editEndDate.trim(),
+                  });
+                  setShowEditTournament(false);
+                }}
+              >
+                <Text style={styles.modalAddText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!assignScorerMatchId} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Assign Scorer</Text>
+            <Text style={styles.modalLabel}>Scorer's phone number (blank to unassign)</Text>
+            <TextInput style={styles.modalInput} value={assignScorerPhone} onChangeText={setAssignScorerPhone} keyboardType="phone-pad" placeholderTextColor={COLORS.textMuted} />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setAssignScorerMatchId(null)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalAddBtn}
+                onPress={async () => {
+                  await assignScorerToMatch(tournamentId, assignScorerMatchId!, assignScorerPhone.trim() || null);
+                  setAssignScorerMatchId(null);
+                }}
+              >
+                <Text style={styles.modalAddText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
             

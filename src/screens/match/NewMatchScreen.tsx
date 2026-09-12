@@ -87,6 +87,10 @@ export default function NewMatchScreen({ route, navigation }: any) {
       Alert.alert('Error', `Search or create team "${team2Name}" first`);
       return;
     }
+    if (team1Data.id === team2Data.id) {
+      Alert.alert('Error', 'Team 1 and Team 2 cannot be the same team');
+      return;
+    }
     if (!overs || parseInt(overs) < 1) {
       Alert.alert('Error', 'Please enter valid overs');
       return;

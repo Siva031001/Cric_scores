@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, StatusBar } from "react-native";
 import { checkPhoneExists, createPinAccount, loginWithPin } from "../../utils/pinAuthService";
-import { startForgotPasswordOtp, verifyForgotPasswordOtp } from "../../utils/pinAuthService";
+import { startForgotPasswordOtp, verifyForgotPasswordOtp, checkOtpRateLimit, recordOtpSent } from "../../utils/pinAuthService";
 import AppIcon from "../../components/AppIcon";
 import { isValidPinFormat } from "../../utils/pinAuth";
 import { COLORS } from "../../constants/theme";
@@ -39,12 +39,22 @@ export default function LoginScreen({ navigation }: any) {
         setPin("");
       } else {
         // New number — verify ownership via OTP before allowing PIN setup.
-        const res = await startForgotPasswordOtp(digits);
+        const rateCheck = await checkOtpRateLimit(digits);
+        if (!rateCheck.allowed) {
+          if (rateCheck.secondsUntilResend) {
+            Alert.alert("Please Wait", `You can request another OTP in ${rateCheck.secondsUntilResend}s.`);
+          } else {
+            Alert.alert("Limit Reached", rateCheck.error ?? "You've reached today's OTP limit. Please try again after 24 hours.");
+          }
+          return;
+        }
         // startForgotPasswordOtp checks checkPhoneExists internally and
         // returns an error for unregistered numbers — bypass that check
-        // for registration by calling signInWithPhoneNumber directly instead.
+        // for registration by calling signInWithPhoneNumber directly instead,
+        // but still go through the same OTP rate limit gate above/below.
         const authMod = require('@react-native-firebase/auth').default;
         const conf = await authMod().signInWithPhoneNumber('+91' + digits);
+        await recordOtpSent(digits);
         setConfirmation(conf);
         setMode("verify-otp");
         setResendCooldown(30);
@@ -78,8 +88,19 @@ export default function LoginScreen({ navigation }: any) {
     try {
       setLoading(true);
       const digits = phone.replace(/\D/g, "");
+      const rateCheck = await checkOtpRateLimit(digits);
+      if (!rateCheck.allowed) {
+        if (rateCheck.secondsUntilResend) {
+          Alert.alert("Please Wait", `You can request another OTP in ${rateCheck.secondsUntilResend}s.`);
+          setResendCooldown(rateCheck.secondsUntilResend);
+        } else {
+          Alert.alert("Limit Reached", rateCheck.error ?? "You've reached today's OTP limit. Please try again after 24 hours.");
+        }
+        return;
+      }
       const authMod = require('@react-native-firebase/auth').default;
       const conf = await authMod().signInWithPhoneNumber('+91' + digits);
+      await recordOtpSent(digits);
       setConfirmation(conf);
       setResendCooldown(30);
     } catch (error: any) {

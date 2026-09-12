@@ -353,7 +353,7 @@ export const toLegacyResult = (e: BallEvent): string => {
   }
 
   if (e.deliveryType === 'WIDE') {
-    const total = e.extras.wide;
+    const total = e.extras.wide + e.extras.bye + e.extras.legBye;
     const extra = Math.max(0, total - 1);
     return extra > 0 ? `WD${extra}` : 'WD';
   }

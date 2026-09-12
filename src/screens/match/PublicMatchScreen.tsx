@@ -18,10 +18,12 @@ export default function PublicMatchScreen({ route }: any) {
 
   if (!match) return <Text>Loading...</Text>;
 
+  const curInn = match.currentInnings === 1 ? match.innings1 : match.innings2;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{match.team1} vs {match.team2}</Text>
-      <Text style={styles.score}>{match.innings1?.runs}/{match.innings1?.wickets}</Text>
+      <Text style={styles.score}>{curInn?.runs}/{curInn?.wickets}</Text>
       <Text>Status: {match.status}</Text>
     </View>
   );

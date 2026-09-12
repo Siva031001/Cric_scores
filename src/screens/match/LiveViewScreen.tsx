@@ -19,7 +19,8 @@ export default function LiveViewScreen({ navigation }: any) {
   const [viewTab, setViewTab] = useState<'live'|'analytics'>('live');
 
   const joinMatch = () => {
-    if (matchId.trim().length < 4) { Alert.alert('Error', 'Please enter a valid Match ID'); return; }
+    const trimmed = matchId.trim();
+    if (trimmed.length < 4 || !/^[A-Z0-9]+$/i.test(trimmed)) { Alert.alert('Error', 'Please enter a valid Match ID'); return; }
     setWatching(true);
   };
 
@@ -34,7 +35,7 @@ export default function LiveViewScreen({ navigation }: any) {
   }, [watching]);
 
   const getYTEmbed = (url: string) => {
-    const m = url?.match(/(?:v=|youtu\.be\/)([^&?/]+)/);
+    const m = url?.match(/(?:v=|youtu\.be\/|\/live\/)([^&?/]+)/);
     return m ? 'https://www.youtube.com/embed/' + m[1] + '?autoplay=1&playsinline=1' : url;
   };
 

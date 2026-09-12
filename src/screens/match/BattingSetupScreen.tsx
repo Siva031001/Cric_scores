@@ -49,6 +49,10 @@ export default function BattingSetupScreen({ route, navigation }: any) {
 
   const handleSelect = (id: number) => {
     if (activeTab === 'striker') {
+      if (id === nonStrikerId) {
+        Alert.alert('Error', 'Must be different from Non-Striker');
+        return;
+      }
       setStrikerId(id);
       setActiveTab('nonstriker');
     } else if (activeTab === 'nonstriker') {
@@ -173,7 +177,9 @@ export default function BattingSetupScreen({ route, navigation }: any) {
             (activeTab === 'striker' && strikerId === player.id) ||
             (activeTab === 'nonstriker' && nonStrikerId === player.id) ||
             (activeTab === 'bowler' && bowlerId === player.id);
-          const isDisabled = activeTab === 'nonstriker' && strikerId === player.id;
+          const isDisabled =
+            (activeTab === 'nonstriker' && strikerId === player.id) ||
+            (activeTab === 'striker' && nonStrikerId === player.id);
 
           return (
             <TouchableOpacity

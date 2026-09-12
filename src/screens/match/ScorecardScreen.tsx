@@ -151,13 +151,14 @@ const goBackSafe = () => {
     const bowlerName = bowlingPlayers?.find((p: any) => p.id === bs.bowlerId)?.name;
     const fielder = bs.fielderName && bs.fielderName !== "Skip" ? bs.fielderName : null;
     switch (bs.dismissalType) {
-      case "Caught": return (fielder ? "c " + fielder + " " : "c & ") + "b " + (bowlerName ?? "?");
-      case "Bowled": return "b " + (bowlerName ?? "?");
+      case "CAUGHT":
+      case "CAUGHT_AND_BOWLED": return (fielder ? "c " + fielder + " " : "c & ") + "b " + (bowlerName ?? "?");
+      case "BOWLED": return "b " + (bowlerName ?? "?");
       case "LBW": return "lbw b " + (bowlerName ?? "?");
-      case "Hit Wicket": return "hit wkt b " + (bowlerName ?? "?");
-      case "Run Out": return "Run Out" + (fielder ? " (" + fielder + ")" : "");
-      case "Stumped": return "st " + (fielder ?? "?") + " b " + (bowlerName ?? "?");
-      case "Retired": return "retired";
+      case "HIT_WICKET": return "hit wkt b " + (bowlerName ?? "?");
+      case "RUN_OUT": return "Run Out" + (fielder ? " (" + fielder + ")" : "");
+      case "STUMPED": return "st " + (fielder ?? "?") + " b " + (bowlerName ?? "?");
+      case "RETIRED_OUT": return "retired";
       default: return bs.dismissalType ?? "out";
     }
   };

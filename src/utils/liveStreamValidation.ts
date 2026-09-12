@@ -17,11 +17,5 @@ export const validateStreamSource = (input: string): { valid: boolean; type: 'yo
     return { valid: true, type: 'rtmp' };
   }
 
-  // Generic http(s) URL fallback — accept but flag as unverified type
-  const httpPattern = /^https?:\/\/.+\..+/i;
-  if (httpPattern.test(trimmed)) {
-    return { valid: true, type: 'youtube' }; // treat as embeddable URL
-  }
-
   return { valid: false, type: null, error: 'Enter a valid YouTube URL or RTMP stream key' };
 };

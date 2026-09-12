@@ -1,6 +1,7 @@
 ﻿import database from '@react-native-firebase/database';
 import auth from '@react-native-firebase/auth';
-import { Match, Tournament, Team, Player, PlayerMaster, MOMCandidate, BallResult, BatsmanStats, BowlerStats } from '../types/cricket';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Match, Tournament, Team, Player, PlayerMaster, MOMCandidate, BallResult } from '../types/cricket';
 // ── Rules engine ─────────────────────────────────────────────
 // Tournament points, NRR and tie-breaking are engine concerns. This module
 // only reads and writes; it never recomputes a cricket rule itself.
@@ -77,11 +78,28 @@ export const subscribeToProfile = (callback) => {
   return () => ref.off('value', listener);
 };
 
+// Keys mirrored from pinAuthService.ts's logoutLocalSession — must stay in
+// sync with LOCAL_SESSION_KEY / LOCAL_PHONE_KEY there.
+const LOCAL_SESSION_KEY = 'cricketscorer_session_id';
+const LOCAL_PHONE_KEY = 'cricketscorer_phone';
+
 export const deleteAccount = async () => {
   const user = getCurrentUser();
   if (!user) throw new Error('Not authenticated');
+  // Phone-based accounts use a stable uid of "phone_" + phoneKey (see
+  // assignScorer / isAssignedScorer) — without also removing the
+  // pinAuth/{phone} credential record, the old PIN can still log back into
+  // this "deleted" account since a new account creation reuses the same uid.
+  if (user.uid.startsWith('phone_')) {
+    const phoneKey = user.uid.slice('phone_'.length);
+    await database().ref(`pinAuth/${phoneKey}`).remove();
+  }
   await database().ref(`users/${user.uid}`).remove();
   await user.delete();
+  // Clear this device's local session pointer too, so it can't keep acting
+  // as if it's still logged in to the now-deleted account.
+  await AsyncStorage.removeItem(LOCAL_SESSION_KEY);
+  await AsyncStorage.removeItem(LOCAL_PHONE_KEY);
 };
 
 export const saveTeam = async (teamData: any): Promise<string> => {
@@ -650,7 +668,20 @@ export const completeTournamentMatch = async (
       f?.status === 'completed' &&
       (input.matchId == null || f?.matchId === input.matchId)
   );
-  if (alreadyRecorded) return;
+  if (alreadyRecorded) {
+    // The fixture was already marked completed by a previous call, but that
+    // call may have failed AFTER writing "completed" and BEFORE the bracket
+    // advance below ran (e.g. a dropped connection), stranding the bracket
+    // on a permanently-skipped winner. advanceWinnerInBracket only assigns
+    // the same winner name into the next slot, so it's safe to retry here.
+    const strandedFixture = (tournament.knockoutFixtures ?? []).find(
+      (f: any) => f?.id === tournamentMatchId
+    );
+    if (strandedFixture?.result?.winnerTeam) {
+      await advanceWinnerInBracket(tournamentId, tournamentMatchId, strandedFixture.result.winnerTeam);
+    }
+    return;
+  }
 
   const { outcome, nrrInputs, rules, team1, team2 } = input;
   const matchId = input.matchId ?? null;
@@ -733,64 +764,16 @@ export const completeTournamentMatch = async (
 };
 
 // ───────────────────────────────────────────────────────────
-// AI MATCH SUMMARY — Gemini REST call
+// AI MATCH SUMMARY — routed through the generateMatchSummary Cloud
+// Function so the Gemini API key stays server-side (never embedded in the
+// client bundle — see functions/index.js for the prompt + Gemini call).
 // ───────────────────────────────────────────────────────────
-
-const buildMatchSummaryPrompt = (match) => {
-  const i1 = match.innings1 ?? {};
-  const i2 = match.innings2 ?? {};
-
-  const topBatter = (inn: any, players: any[]) => {
-    const entries = Object.values(inn.batsmanStats ?? {}) as Array<BatsmanStats | null>;
-    const best = entries.filter(Boolean).sort((a, b) => (b?.runs ?? 0) - (a?.runs ?? 0))[0];
-    if (!best || (best.runs ?? 0) === 0) return null;
-    const name = players?.find((p: any) => p.id === best.playerId)?.name ?? 'A batter';
-    return name + ' (' + best.runs + ' off ' + best.balls + ')';
-  };
-  const topBowler = (inn: any, players: any[]) => {
-    const entries = Object.values(inn.bowlerStats ?? {}) as Array<BowlerStats | null>;
-    const best = entries.filter(Boolean).sort((a, b) => (b?.wickets ?? 0) - (a?.wickets ?? 0))[0];
-    if (!best || (best.wickets ?? 0) === 0) return null;
-    const name = players?.find((p: any) => p.id === best.playerId)?.name ?? 'A bowler';
-    return name + ' (' + best.wickets + '/' + best.runs + ')';
-  };
-
-  const i1Top = topBatter(i1, match.team1Players);
-  const i2Top = topBatter(i2, match.team2Players);
-  const i1BestBowl = topBowler(i1, match.team2Players);
-  const i2BestBowl = topBowler(i2, match.team1Players);
-
-  return [
-    'Write a short, exciting 3-4 sentence cricket match summary in the style of a sports journalist, based on this data. Do not invent any facts not given below.',
-    'Team 1: ' + match.team1 + ' scored ' + (i1.runs ?? 0) + '/' + (i1.wickets ?? 0) + ' in ' + (i1.overs ?? 0) + '.' + (i1.balls ?? 0) + ' overs.',
-    'Team 2: ' + match.team2 + ' scored ' + (i2.runs ?? 0) + '/' + (i2.wickets ?? 0) + ' in ' + (i2.overs ?? 0) + '.' + (i2.balls ?? 0) + ' overs.',
-    'Result: ' + (match.winner ?? 'No result'),
-    i1Top ? ('Top scorer for ' + match.team1 + ': ' + i1Top) : '',
-    i2Top ? ('Top scorer for ' + match.team2 + ': ' + i2Top) : '',
-    i1BestBowl ? ('Best bowler vs ' + match.team1 + ': ' + i1BestBowl) : '',
-    i2BestBowl ? ('Best bowler vs ' + match.team2 + ': ' + i2BestBowl) : '',
-  ].filter(Boolean).join('\n');
-};
 
 export const generateMatchSummary = async (matchId, match) => {
   try {
-    const aiMod = require('./aiConfig');
-    const GEMINI_API_KEY = aiMod.GEMINI_API_KEY ?? aiMod.default?.GEMINI_API_KEY ?? '';
-    const prompt = buildMatchSummaryPrompt(match);
-    const res = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
-        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }),
-      }
-    );
-    if (!res.ok) { const errText = await res.text(); throw new Error('Gemini API error ' + res.status + ': ' + errText); }
-    const data = await res.json();
-    const summaryText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!summaryText) throw new Error('No summary text in Gemini response');
-    await database().ref('matches/' + matchId).update({ summaryText, summaryGeneratedAt: Date.now() });
-    return summaryText;
+    const functionsMod = require('@react-native-firebase/functions').default;
+    const { data } = await functionsMod().httpsCallable('generateMatchSummary')({ matchId, match });
+    return data?.summaryText ?? null;
   } catch (e) {
     console.error('AI summary generation failed:', e);
     return null;
@@ -920,7 +903,7 @@ export const getPoolQualifiers = (pool, tournament?: any) => {
   );
   // Re-attach the original stored objects so callers keep any extra fields.
   return ranked.map((r, idx) => {
-    const original = (pool.standings ?? []).find((s: any) => s.teamName === r.teamName) ?? {};
+    const original = (pool.standings ?? []).find((s: any) => s.teamId === r.teamId) ?? {};
     return { ...original, ...r, poolRank: idx + 1, poolName: pool.poolName };
   });
 };
@@ -950,8 +933,8 @@ const buildSeededPairs = (allQualifiers) => {
     if (home && away) pairs.push({ home, away });
   }
   // Any leftover rank1/rank2 (uneven counts) plus all rank3+ get paired sequentially.
-  const usedNames = new Set(pairs.flatMap((p) => [p.home?.teamName, p.away?.teamName]));
-  const leftovers = [...rank1s, ...rank2s, ...rank3PlusFlat].filter((q) => !usedNames.has(q.teamName));
+  const usedIds = new Set(pairs.flatMap((p) => [p.home?.teamId, p.away?.teamId]));
+  const leftovers = [...rank1s, ...rank2s, ...rank3PlusFlat].filter((q) => !usedIds.has(q.teamId));
   for (let i = 0; i < leftovers.length; i += 2) {
     if (leftovers[i + 1]) pairs.push({ home: leftovers[i], away: leftovers[i + 1] });
   }
@@ -1334,26 +1317,51 @@ export const areTeamsLockedNow = (tournament) => {
 // MATCH ASSIGNMENT — only the assigned scorer can score a given match
 // ───────────────────────────────────────────────────────────
 
+// Works for a fixture from any of the three sources — the overall
+// tournament.matches list, a pool's matches, or knockoutFixtures — since
+// pool/knockout fixtures reuse this same assign-scorer flow too.
 export const assignScorerToMatch = async (tournamentId, matchId, phone) => {
   const key = phone ? phone.replace(/\D/g, '') : null;
   const snap = await database().ref(`tournaments/${tournamentId}`).once('value');
   const tournament = snap.val();
   if (!tournament) throw new Error('Tournament not found');
-  const updatedMatches = (tournament.matches ?? []).map((m) =>
-    m.id === matchId ? { ...m, assignedScorerPhone: key } : m
-  );
-  await database().ref(`tournaments/${tournamentId}`).update({ matches: updatedMatches });
+
+  if ((tournament.matches ?? []).some((m) => m.id === matchId)) {
+    const updatedMatches = (tournament.matches ?? []).map((m) =>
+      m.id === matchId ? { ...m, assignedScorerPhone: key } : m
+    );
+    await database().ref(`tournaments/${tournamentId}`).update({ matches: updatedMatches });
+    return;
+  }
+
+  const poolWithMatch = (tournament.pools ?? []).find((p) => (p.matches ?? []).some((m) => m.id === matchId));
+  if (poolWithMatch) {
+    const updatedPools = (tournament.pools ?? []).map((p) =>
+      p.poolId === poolWithMatch.poolId
+        ? { ...p, matches: (p.matches ?? []).map((m) => m.id === matchId ? { ...m, assignedScorerPhone: key } : m) }
+        : p
+    );
+    await database().ref(`tournaments/${tournamentId}`).update({ pools: updatedPools });
+    return;
+  }
+
+  if ((tournament.knockoutFixtures ?? []).some((f) => f.id === matchId)) {
+    const updatedFixtures = (tournament.knockoutFixtures ?? []).map((f) =>
+      f.id === matchId ? { ...f, assignedScorerPhone: key } : f
+    );
+    await database().ref(`tournaments/${tournamentId}`).update({ knockoutFixtures: updatedFixtures });
+  }
 };
 
 // True if the current signed-in user is allowed to score this specific
 // match: the organizer always can; a scorer only if THIS match is
-// specifically assigned to their phone (or if the match has no assignment
-// at all, i.e. assignment is optional per-match, not mandatory).
+// specifically assigned to their phone. A match with no scorer assigned
+// yet is organizer-only — it does NOT fall open to any signed-in user.
 export const canScoreThisMatch = (tournament, match) => {
   const user = getCurrentUser();
   if (!user) return false;
   if (tournament.createdBy === user.uid) return true;
-  if (!match.assignedScorerPhone) return true; // unassigned matches remain open to any assigned tournament scorer
+  if (!match.assignedScorerPhone) return false; // unassigned matches are organizer-only until a scorer is assigned
   const stableUidForAssigned = 'phone_' + match.assignedScorerPhone;
   return user.uid === stableUidForAssigned;
 };
@@ -1488,4 +1496,20 @@ export const getOrCreateTestTeam = async () => {
   };
   await database().ref(`teams/${TEST_TEAM_ID}`).set(testTeam);
   return testTeam;
+};
+
+// ───────────────────────────────────────────────────────────
+// STORAGE — shared upload helper for locally-picked images
+// ───────────────────────────────────────────────────────────
+
+// Uploads a local file (e.g. from react-native-image-picker) to Firebase
+// Storage and returns its public download URL. Used by screens that let a
+// user pick a profile photo or team logo, so the DB stores a stable
+// https:// URL instead of a device-local file:// URI that breaks on other
+// devices / after the picked file is cleaned up.
+export const uploadLocalImageToStorage = async (localUri: string, storagePath: string): Promise<string> => {
+  const storageMod = require('@react-native-firebase/storage').default;
+  const ref = storageMod().ref(storagePath);
+  await ref.putFile(localUri);
+  return await ref.getDownloadURL();
 };

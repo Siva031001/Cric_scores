@@ -364,6 +364,26 @@ describe('over and maiden accounting', () => {
     expect(state.awaitingBowler).toBe(true);
   });
 
+  it('rejects the same bowler for the next over', () => {
+    const { state } = play(Array.from({ length: 6 }, () => ({ type: 'RUNS', runs: 0 } as ScoringAction)));
+    expect(() =>
+      deriveEvent({ type: 'BOWLER_CHANGE', bowlerId: 20 }, state, rules, {
+        inningsKey: 'innings1',
+        seq: 6,
+        timestamp: 2000,
+      })
+    ).toThrow(/consecutive overs/);
+  });
+
+  it('accepts a different bowler for the next over and clears awaitingBowler', () => {
+    const { state } = play([
+      ...Array.from({ length: 6 }, () => ({ type: 'RUNS', runs: 0 } as ScoringAction)),
+      { type: 'BOWLER_CHANGE', bowlerId: 21 },
+    ]);
+    expect(state.currentBowlerId).toBe(21);
+    expect(state.awaitingBowler).toBe(false);
+  });
+
   it('does not let wides or no balls complete an over', () => {
     const actions: ScoringAction[] = [
       ...Array.from({ length: 5 }, () => ({ type: 'RUNS', runs: 0 } as ScoringAction)),
@@ -513,5 +533,30 @@ describe('legacy migration', () => {
     expect(state.ballHistory[0].result).toBe('1');
     expect(state.ballHistory[1].result).toBe('WD1');
     expect(state.ballHistory[0].bowlerId).toBe(20);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+describe('next batsman and next bowler prompts', () => {
+  it('a wicket flags the striker slot as awaiting, and NEW_BATSMAN without an explicit slot fills it', () => {
+    const { state } = play([{ type: 'WICKET', dismissal: 'BOWLED' }]);
+    expect(state.awaitingBatsmanSlot).toBe('striker');
+    const next = play([{ type: 'WICKET', dismissal: 'BOWLED' }, { type: 'NEW_BATSMAN', playerId: 2 }]);
+    expect(next.state.awaitingBatsmanSlot).toBeNull();
+    expect(next.state.strikerId).toBe(2);
+  });
+
+  it('a wicket on the last ball of an over flags both the batsman slot and the bowler at once', () => {
+    const { state } = play([
+      ...Array.from({ length: 5 }, () => ({ type: 'RUNS', runs: 0 } as ScoringAction)),
+      { type: 'WICKET', dismissal: 'BOWLED' },
+    ]);
+    expect(state.overs).toBe(1);
+    // The end-of-over swap runs before the vacant-crease check, so the label
+    // reflects where the dismissed batter's end landed AFTER that swap, not
+    // before it — this is the same mechanic that keeps a non-striker run-out
+    // correct, see reduce.ts's "Vacant crease" comment.
+    expect(state.awaitingBatsmanSlot).toBe('nonStriker');
+    expect(state.awaitingBowler).toBe(true);
   });
 });

@@ -33,6 +33,7 @@ export interface Team {
   players: Player[];
   createdAt: number;
   createdBy: string;
+  teamType?: 'my' | 'other';
 }
 
 export interface Ball {
@@ -138,16 +139,36 @@ export interface Match {
   currentInnings: 1 | 2;
   innings1: Innings;
   innings2: Innings;
-  status: 'live' | 'completed';
+  status: 'live' | 'paused' | 'completed';
   createdAt: number;
   scorerId: string;
   venue?: string;
   tournamentId?: string;
+  tournamentMatchId?: string | null;
   winner?: string;
   tossWinner?: string;
   tossChoice?: string;
   matchDate?: string;
   matchTime?: string;
+  playersPerSide?: number;
+  /** Live-streaming state, written from StreamingDashboardScreen / ScoringScreen. */
+  isLive?: boolean;
+  isStreaming?: boolean;
+  streamUrl?: string;
+  streamSourceType?: 'youtube' | 'rtmp' | null;
+  streamPaused?: boolean;
+  streamStartedAt?: number;
+  streamQuality?: '360p' | '480p' | '720p' | '1080p' | 'auto';
+  streamThemeId?: string;
+  streamTitle?: string;
+  streamDescription?: string;
+  commentsEnabled?: boolean;
+  /** Latest milestone toast, shown on LiveViewScreen. */
+  lastMilestone?: { text: string; playerName: string; ts: number };
+  /** AI-generated match summary, shown on ScorecardScreen. */
+  summaryText?: string;
+  summaryGeneratedAt?: number;
+  manOfMatch?: MOMCandidate;
 }
 
 export interface TournamentTeam {

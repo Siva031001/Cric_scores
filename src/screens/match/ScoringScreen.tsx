@@ -97,8 +97,6 @@ export default function ScoringScreen({ route, navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [showNewBowler, setShowNewBowler] = useState(false);
   const [pendingWicket, setPendingWicket] = useState(false);
-  const [pendingBowlerAfterWicket, setPendingBowlerAfterWicket] = useState(false);
-  const pendingBowlerAfterWicketRef = useRef(false);
   const postWicketInnRef = useRef<any>(null);
   const openerSelectionDoneRef = useRef(false);
   const [showWicket, setShowWicket] = useState(false);
@@ -108,10 +106,6 @@ export default function ScoringScreen({ route, navigation }: any) {
   const [runOutWhoSelected, setRunOutWhoSelected] = useState<"striker"|"nonStriker"|null>(null);
   const [showRunOutRuns, setShowRunOutRuns] = useState(false);
   const [runOutRuns, setRunOutRuns] = useState(0);
-  // Tracks which crease position (striker/non-striker) is actually vacant
-  // after a wicket, so selectNewBatsman fills the correct slot — critical
-  // for non-striker run-outs, where the striker never left the crease.
-  const vacantSlotRef = useRef<'striker'|'nonStriker'>('striker');
   const [showOpenerSelect, setShowOpenerSelect] = useState(false);
   const [openerStep, setOpenerStep] = useState<"striker"|"nonStriker"|"bowler">("striker");
   const [opener1Id, setOpener1Id] = useState<number|null>(null);
@@ -234,6 +228,46 @@ useEffect(() => {
     setShowInningsEnd(true);
   }
 }, [match]);
+
+// Drives the "who's the next batsman" and "who's the next bowler" prompts
+// straight off the engine's own awaitingBatsmanSlot / awaitingBowler fields
+// (set by the reducer after a wicket / over completion, cleared by a
+// NEW_BATSMAN / BOWLER_CHANGE event), instead of a one-off flag some handler
+// has to remember to set. A wicket on the last ball of an over sets both at
+// once; batsman takes priority so the two prompts chain automatically once
+// the batsman pick clears its half and this effect re-runs on the next
+// match update.
+useEffect(() => {
+  if (!match) return;
+  // Innings1 having ended and the 2nd innings not yet actually open (no
+  // innings2 node yet, or its openers/bowler are still the -1 placeholder
+  // "Start 2nd Innings" writes before the opener-select flow finishes) means
+  // any leftover awaitingBatsmanSlot/awaitingBowler still belongs to the
+  // innings that just ended — it must not surface here once the screen has
+  // moved on. Checked directly off the data (not a "have we ever finished
+  // opener-select once" ref) so it never gets stuck true for the rest of
+  // the 2nd innings once openers are actually picked.
+  const inningsNotYetOpen =
+    match.currentInnings === 2 && (!match.innings2 || match.innings2.strikerId === -1);
+  if (showOpenerSelect || showInningsEnd || inningsNotYetOpen) {
+    if (pendingWicket) setPendingWicket(false);
+    if (showNewBowler) setShowNewBowler(false);
+    return;
+  }
+  const curInn = match.currentInnings === 1 ? match.innings1 : match.innings2;
+  if (!curInn) return;
+
+  if (curInn.awaitingBatsmanSlot) {
+    if (!pendingWicket) setPendingWicket(true);
+    if (showNewBowler) setShowNewBowler(false);
+  } else if (curInn.awaitingBowler) {
+    if (pendingWicket) setPendingWicket(false);
+    if (!showNewBowler) setShowNewBowler(true);
+  } else {
+    if (pendingWicket) setPendingWicket(false);
+    if (showNewBowler) setShowNewBowler(false);
+  }
+}, [match, showOpenerSelect, showInningsEnd]);
 
   const getName = (players: any[], id: number) =>
     players?.find((p: any) => p.id === id)?.name ?? ("P" + (id + 1));
@@ -520,8 +554,6 @@ useEffect(() => {
       // Any pending prompt is stale once the event log changes. The engine's
       // awaitingBatsmanSlot / awaitingBowler now drive these.
       setPendingWicket(false);
-      setPendingBowlerAfterWicket(false);
-      pendingBowlerAfterWicketRef.current = false;
       setShowNewBowler(false);
       openerSelectionDoneRef.current = false;
     } catch (e: any) {
@@ -622,38 +654,23 @@ useEffect(() => {
     }
   };
 
+  // Both go through the engine (BOWLER_CHANGE / NEW_BATSMAN) instead of
+  // patching the innings node directly, so legality (no consecutive overs
+  // for a bowler) and awaitingBatsmanSlot/awaitingBowler are decided in one
+  // place. The picker modals themselves are hidden by the awaitingBatsmanSlot
+  // / awaitingBowler effect above once the engine confirms the change, not
+  // by this handler — so a rejected pick (e.g. the same bowler slipping
+  // through) leaves the picker open instead of vanishing with nothing done.
   const selectNewBowler = async (id: number) => {
-    if (!match) return;
-
-    const key = match.currentInnings === 1 ? "innings1" : "innings2";
-
-    setShowNewBowler(false);
-
-    await updateMatch(matchId, {
-      [key]: {
-        ...match[key],
-        currentBowlerId: id,
-      },
-    });
+    if (!match || saving) return;
+    await dispatchAction({ type: "BOWLER_CHANGE", bowlerId: id });
   };
 
   const selectNewBatsman = async (id: number) => {
-    const key = match.currentInnings === 1 ? "innings1" : "innings2";
-    const inn = match[key];
-    const updInn = {
-      ...inn,
-      ...(vacantSlotRef.current === 'nonStriker' ? { nonStrikerId: id } : { strikerId: id }),
-      ballHistory: [...(inn.ballHistory ?? []), { type: "NEW_BATSMAN", newBatsmanId: id }],
-    };
-    vacantSlotRef.current = 'striker'; // reset to the normal default for the next wicket
-    await updateMatch(matchId, { [key]: updInn });
-    setPendingWicket(false);
-    if (pendingBowlerAfterWicketRef.current) {
-      pendingBowlerAfterWicketRef.current = false;
-      setPendingBowlerAfterWicket(false);
-      setShowNewBowler(true);
-    }
+    if (!match || saving) return;
+    await dispatchAction({ type: "NEW_BATSMAN", playerId: id });
   };
+
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
   if (!match) return <View style={s.center}><Text style={s.err}>Match not found</Text></View>;
@@ -858,9 +875,16 @@ useEffect(() => {
             {batP.filter((p: any) => {
               const pwInn = postWicketInnRef.current ?? inn;
               const bs = pwInn?.batsmanStats?.[statKey(p.id)];
-              return !bs?.isOut && p.id !== pwInn?.strikerId && p.id !== pwInn?.nonStrikerId;
+              // Retired-hurt-and-not-yet-returned batters must come back only
+              // via Return to Bat (handleReturnToBat), which marks them
+              // returned. Picking them here would bring them back without
+              // ever clearing that flag.
+              const retiredNotReturned = (pwInn?.retired ?? []).some(
+                (r: any) => r.playerId === p.id && r.type === "RETIRED_HURT" && !r.returned
+              );
+              return !bs?.isOut && p.id !== pwInn?.strikerId && p.id !== pwInn?.nonStrikerId && !retiredNotReturned;
             }).map((p: any) => (
-              <TouchableOpacity key={p.id} style={s.pickerRow} onPress={() => selectNewBatsman(p.id)}>
+              <TouchableOpacity key={p.id} style={s.pickerRow} disabled={saving} onPress={() => selectNewBatsman(p.id)}>
                 <Text style={s.pickerName}>{p.name}{p.isCaptain?" (C)":""}{p.isWicketKeeper?" (WK)":""}</Text>
               </TouchableOpacity>
             ))}

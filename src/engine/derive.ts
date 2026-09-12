@@ -29,6 +29,7 @@ import {
   RunAttribution,
   RunType,
 } from './types';
+import { statKey } from './reduce';
 
 /**
  * Sanity ceiling for a single delivery. Deliberately generous — the brief
@@ -259,6 +260,31 @@ export const deriveEvent = (
   }
 
   if (action.type === 'BOWLER_CHANGE') {
+    // A BOWLER_CHANGE is only ever legal once the over that just ended has
+    // actually closed and the engine is awaiting the next bowler — never
+    // mid-over.
+    if (!state.awaitingBowler) {
+      throw new EngineError('OVER_IN_PROGRESS', 'A bowler can only be changed once the current over has finished');
+    }
+    // The same bowler cannot bowl two overs back to back. state.currentBowlerId
+    // still names the bowler of the over that just ended — a BOWLER_CHANGE is
+    // only ever legal once state.awaitingBowler is true, i.e. after that over
+    // closed and before this event replaces the bowler for the next one.
+    if (action.bowlerId === state.currentBowlerId) {
+      throw new EngineError('SAME_BOWLER', 'The same bowler cannot bowl consecutive overs');
+    }
+    // Same quota math as reduce.ts eligibleBowlers(): a bowler who has
+    // already used up rules.maxOversPerBowler overs cannot be brought back.
+    if (rules.maxOversPerBowler != null) {
+      const bs = state.bowlerStats[statKey(action.bowlerId)];
+      const oversUsed = bs ? bs.overs + (bs.balls > 0 ? 1 : 0) : 0;
+      if (oversUsed >= rules.maxOversPerBowler) {
+        throw new EngineError(
+          'MAX_OVERS_REACHED',
+          `This bowler has already bowled the maximum ${rules.maxOversPerBowler} over(s) allowed`
+        );
+      }
+    }
     return { ...base, kind: 'BOWLER_CHANGE', bowlerId: action.bowlerId };
   }
 

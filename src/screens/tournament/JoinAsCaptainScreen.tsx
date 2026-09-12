@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { resolveInviteCode, getTournamentPreview } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
+import AppIcon from '../../components/AppIcon';
 
 export default function JoinAsCaptainScreen({ navigation }: any) {
   const [code, setCode] = useState('');
@@ -38,6 +39,10 @@ export default function JoinAsCaptainScreen({ navigation }: any) {
     <View style={s.container}>
       <Header title="Join as Team Captain" onBack={() => navigation.goBack()} />
       <View style={s.content}>
+        <View style={s.logoBlock}>
+          <AppIcon emoji="🏏" size={48} color={COLORS.primary} />
+          <Text style={s.logoText}>CricketScorer</Text>
+        </View>
         <Text style={s.label}>Enter the invite code shared by your tournament organizer</Text>
         <TextInput
           style={s.input}
@@ -60,6 +65,8 @@ export default function JoinAsCaptainScreen({ navigation }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.lg },
+  logoBlock: { alignItems: 'center', marginBottom: SPACING.lg },
+  logoText: { color: COLORS.text, fontSize: 20, fontWeight: 'bold', marginTop: 6 },
   label: { color: COLORS.textSecondary, fontSize: 14, marginBottom: 16, lineHeight: 20 },
   input: { backgroundColor: COLORS.card, color: COLORS.text, padding: 16, borderRadius: RADIUS.md, fontSize: 20, borderWidth: 1, borderColor: COLORS.border, textAlign: 'center', letterSpacing: 4, marginBottom: 16 },
   btn: { backgroundColor: COLORS.primary, padding: 15, borderRadius: RADIUS.md, alignItems: 'center' },
