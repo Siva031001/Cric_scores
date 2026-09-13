@@ -577,6 +577,48 @@ export const linkPlayerToAccount = async (playerId, phoneNumber = null) => {
   clearLinkedPlayerCache();
 };
 
+/**
+ * Career statistics for ANY player, by their cross-match globalPlayerId.
+ *
+ * Read-only and safe for a viewer: it reads playerMatchIndex/{globalPlayerId}
+ * (rules allow a signed-in user to read a single player's index) and then the
+ * individual matches. It does NOT require the caller to own the player or the
+ * team, unlike getMatchHistory which is scoped to the signed-in user.
+ *
+ * Aggregation lives in src/engine/career.ts so it is unit-testable and has no
+ * Firebase dependency.
+ */
+export const getPlayerCareerStats = async (globalPlayerId: string) => {
+  const { aggregateCareer, emptyCareerStats } = require('../engine/career');
+  if (!globalPlayerId) return emptyCareerStats();
+  const matches = await getMatchesForPlayer(globalPlayerId);
+  return aggregateCareer(matches, globalPlayerId);
+};
+
+/**
+ * The public-facing bits of a player's identity: display name, role and photo.
+ * Reads players/{globalPlayerId}, which any signed-in user may read — unlike
+ * users/{uid}/profile, which only its owner can. syncProfileToLinkedPlayer is
+ * what mirrors the owner's details here.
+ */
+export const getPlayerPublicProfile = async (globalPlayerId: string) => {
+  if (!globalPlayerId) return null;
+  const snap = await database().ref('players/' + globalPlayerId).once('value');
+  return snap.val();
+};
+
+/** Batch version of the above, for rendering a squad list. */
+export const getPlayerPublicProfiles = async (globalPlayerIds: string[]) => {
+  const ids = Array.from(new Set((globalPlayerIds ?? []).filter(Boolean)));
+  if (ids.length === 0) return {};
+  const snaps = await Promise.all(
+    ids.map((id) => database().ref('players/' + id).once('value'))
+  );
+  const out: Record<string, any> = {};
+  ids.forEach((id, i) => { const v = snaps[i].val(); if (v) out[id] = v; });
+  return out;
+};
+
 export const getMatchesForPlayer = async (globalPlayerId: string): Promise<Match[]> => {
   if (!globalPlayerId) return [];
   const indexSnap = await database().ref('playerMatchIndex/' + globalPlayerId).once('value');

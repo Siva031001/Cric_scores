@@ -12,6 +12,7 @@ import HomeScreen from "./src/screens/home/HomeScreen";
 import CreateTeamScreen from "./src/screens/teams/CreateTeamScreen";
 import MyTeamsScreen from "./src/screens/teams/MyTeamsScreen";
 import TeamDetailScreen from "./src/screens/teams/TeamDetailScreen";
+import TeamPlayersScreen from "./src/screens/teams/TeamPlayersScreen";
 import ScoringScreen from "./src/screens/match/ScoringScreen";
 import ScorecardScreen from "./src/screens/match/ScorecardScreen";
 import NewMatchScreen from "./src/screens/match/NewMatchScreen";
@@ -32,6 +33,7 @@ import CreateTournamentScreen from "./src/screens/tournament/CreateTournamentScr
 import TournamentLeaderboardScreen from "./src/screens/tournament/LeaderboardScreen";
 import MyMatchesScreen from "./src/screens/stats/MyMatchesScreen";
 import MatchHistoryDetailScreen from "./src/screens/stats/MatchHistoryDetailScreen";
+import PlayerStatsScreen from "./src/screens/stats/PlayerStatsScreen";
 import { createNavigationContainerRef } from "@react-navigation/native";
 import { Alert } from "react-native";
 import { subscribeToSessionValidity, logoutLocalSession } from "./src/utils/pinAuthService";
@@ -176,6 +178,8 @@ export default function App() {
         <Stack.Screen name="CreateTeam"       component={CreateTeamScreen} />
         <Stack.Screen name="MyTeams"          component={MyTeamsScreen} />
         <Stack.Screen name="TeamDetail"       component={TeamDetailScreen} />
+        <Stack.Screen name="TeamPlayers"      component={TeamPlayersScreen} />
+        <Stack.Screen name="PlayerStats"      component={PlayerStatsScreen} />
 
         {/* -- Settings / Profile -- */}
         <Stack.Screen name="Profile"          component={ProfileScreen} />

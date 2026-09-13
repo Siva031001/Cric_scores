@@ -522,7 +522,16 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   return (
     <View key={i} style={styles.teamCard}>
       <View style={styles.teamLogoBox}><Text style={styles.teamLogoText}>{team.teamName.charAt(0).toUpperCase()}</Text></View>
-      <View style={styles.teamInfo}>
+      {/* Tapping a team opens its squad, read-only, for ANYONE viewing the
+          tournament — not just the organiser. The roster is passed straight
+          from the tournament record we already have, so TeamPlayersScreen
+          needs no permission of its own. Some teams (added before rosters
+          were saved, or via a captain invite) carry no players array; that
+          screen shows an empty state rather than failing. */}
+      <TouchableOpacity
+        style={styles.teamInfo}
+        onPress={() => navigation.navigate('TeamPlayers', { teamName: team.teamName, players: team.players ?? [] })}
+      >
         <Text style={styles.teamName}>{team.teamName}</Text>
         <Text style={styles.teamStats}>P:{team.played} W:{team.won} L:{team.lost} Pts:{team.points}</Text>
         {invite && (
@@ -533,7 +542,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 2 }}>
           {getTeamProgressLabel(team)} · Status: {getTeamRegistrationStatus(tournament, team)}
         </Text>
-      </View>
+      </TouchableOpacity>
       {canManage && invite && invite.status === 'submitted' && (
         <TouchableOpacity onPress={() => approveCaptainSubmission(tournamentId, team.teamId)} style={{ marginRight: 8 }}>
           <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: 'bold' }}>Approve</Text>
