@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, StatusBar } from "react-native";
-import { checkPhoneExists, createPinAccount, loginWithPin } from "../../utils/pinAuthService";
+import { checkPhoneExists, createPinAccount, loginWithPin, resetAuthTimings, getAuthTimings } from "../../utils/pinAuthService";
 import { startForgotPasswordOtp, verifyForgotPasswordOtp, checkOtpRateLimit, recordOtpSent } from "../../utils/pinAuthService";
 import AppIcon from "../../components/AppIcon";
 import { isValidPinFormat } from "../../utils/pinAuth";
@@ -147,15 +147,22 @@ export default function LoginScreen({ navigation }: any) {
       setConfirmPinValue("");
       return;
     }
+    const tStart = Date.now();
+    resetAuthTimings();
+    let failed: string | null = null;
     try {
       setLoading(true);
       const digits = phone.replace(/\D/g, "");
       await createPinAccount(digits, firstPin);
-      navigation.replace("Home");
     } catch (error: any) {
-      Alert.alert("Error", error?.message ?? "Could not create account.");
+      failed = error?.message ?? "Could not create account.";
     } finally {
       setLoading(false);
+      Alert.alert(
+        "TIMING — create account (temporary)",
+        getAuthTimings().join("\n") + `\n\nTOTAL: ${((Date.now() - tStart) / 1000).toFixed(1)}s`,
+        [{ text: "OK", onPress: () => { if (failed) Alert.alert("Error", failed); else navigation.replace("Home"); } }]
+      );
     }
   };
 
@@ -164,20 +171,26 @@ export default function LoginScreen({ navigation }: any) {
       Alert.alert("Invalid PIN", "PIN must be 4 to 6 digits.");
       return;
     }
+    const tStart = Date.now();
+    resetAuthTimings();
+    let outcome: { ok: boolean; msg?: string } = { ok: false, msg: "Unknown error" };
     try {
       setLoading(true);
       const digits = phone.replace(/\D/g, "");
       const result = await loginWithPin(digits, pin);
-      if (!result.success) {
-        Alert.alert("Login Failed", result.error ?? "Incorrect PIN.");
-        setPin("");
-        return;
-      }
-      navigation.replace("Home");
+      outcome = result.success ? { ok: true } : { ok: false, msg: result.error ?? "Incorrect PIN." };
     } catch (error: any) {
-      Alert.alert("Error", error?.message ?? "Unknown error");
+      outcome = { ok: false, msg: error?.message ?? "Unknown error" };
     } finally {
       setLoading(false);
+      Alert.alert(
+        "TIMING — login (temporary)",
+        getAuthTimings().join("\n") + `\n\nTOTAL: ${((Date.now() - tStart) / 1000).toFixed(1)}s`,
+        [{ text: "OK", onPress: () => {
+          if (outcome.ok) navigation.replace("Home");
+          else { Alert.alert("Login Failed", outcome.msg ?? ""); setPin(""); }
+        } }]
+      );
     }
   };
 

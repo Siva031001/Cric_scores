@@ -23,6 +23,22 @@ const LOCAL_PHONE_KEY = 'cricketscorer_phone';
 
 const PHONE_ERROR = 'Please enter a valid 10-digit mobile number.';
 
+// ── TEMPORARY DIAGNOSTIC — remove once the slowness is pinned down ──
+// Records how long each network step of a login / account-creation takes, so
+// the screen can show a breakdown. Measuring beats guessing: the first round
+// of these timings already disproved two of my theories about what was slow.
+let _timings: string[] = [];
+export const resetAuthTimings = () => { _timings = []; };
+export const getAuthTimings = () => _timings.slice();
+const step = async <T,>(label: string, fn: () => Promise<T>): Promise<T> => {
+  const t0 = Date.now();
+  try {
+    return await fn();
+  } finally {
+    _timings.push(`${label}: ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  }
+};
+
 // Checks if a phone number already has a PIN account set up.
 //
 // This reads pinAuth/{phone} directly. A checkPhoneExistsSafe Cloud Function
@@ -66,15 +82,15 @@ export const createPinAccount = async (phone: string, pin: string): Promise<stri
 // stay linked to the verified phone number regardless of which device
 // scores the match.
 const functionsMod = require('@react-native-firebase/functions').default;
-const { data: tokenData } = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
-const cred = await auth().signInWithCustomToken(tokenData.token);
+const { data: tokenData } = await step<any>('A mintToken(cloudFn)', () => functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key }));
+const cred = await step('B signInWithCustomToken', () => auth().signInWithCustomToken(tokenData.token));
 const user = cred.user;
 
 const salt = generateSalt();
 const pinHash = hashPin(pin, salt);
 const sessionId = generateSessionId();
 
-await database().ref(`pinAuth/${key}`).set({
+await step('C writePinAuth', () => database().ref(`pinAuth/${key}`).set({
   phoneNumber: key,
   salt,
   pinHash,
@@ -82,7 +98,7 @@ await database().ref(`pinAuth/${key}`).set({
   uid: user.uid, // stable: "phone_" + key, identical on every device
   createdAt: Date.now(),
   lastLoginAt: Date.now(),
-});
+}));
 
   await AsyncStorage.setItem(LOCAL_SESSION_KEY, sessionId);
   await AsyncStorage.setItem(LOCAL_PHONE_KEY, key);
@@ -101,8 +117,8 @@ await database().ref(`pinAuth/${key}`).set({
     // to this uid yet and create a brand-new empty one, leaving two
     // player records under the same account — one empty, one with the
     // real match history — with no reliable way to tell them apart later.
-    await retroactivelyLinkGuestPlayers(key);
-    await ensureMyPlayerLinked('', key);
+    await step('D retroLinkGuests(players query)', () => retroactivelyLinkGuestPlayers(key));
+    await step('E ensureMyPlayerLinked(players query)', () => ensureMyPlayerLinked('', key));
   } catch (e) {
     console.warn('Retroactive guest-player linking failed:', e);
   }
@@ -117,7 +133,7 @@ await database().ref(`pinAuth/${key}`).set({
 export const loginWithPin = async (phone: string, pin: string): Promise<{ success: boolean; error?: string }> => {
   const key = normalizePhone(phone);
   if (!isValidPhoneFormat(key)) return { success: false, error: PHONE_ERROR };
-  const snap = await database().ref(`pinAuth/${key}`).once('value');
+  const snap = await step('A readPinAuth', () => database().ref(`pinAuth/${key}`).once('value'));
   const record = snap.val();
 
   if (!record) {
@@ -137,9 +153,9 @@ export const loginWithPin = async (phone: string, pin: string): Promise<{ succes
     await auth().signOut();
   }
   const functionsMod = require('@react-native-firebase/functions').default;
-  let tokenData;
+  let tokenData: any;
   try {
-    const result = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
+    const result = await step<any>('B mintToken(cloudFn)', () => functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key }));
     tokenData = result.data;
   } catch (e: any) {
     // The PIN was already confirmed correct above, so ANY failure here is a
@@ -152,13 +168,13 @@ export const loginWithPin = async (phone: string, pin: string): Promise<{ succes
       error: `Could not sign in — this is a server problem, not your PIN.\n\n[${code || 'unknown'}] ${e?.message ?? ''}`.trim(),
     };
   }
-  await auth().signInWithCustomToken(tokenData.token);
+  await step('C signInWithCustomToken', () => auth().signInWithCustomToken(tokenData.token));
 
   const newSessionId = generateSessionId();
-  await database().ref(`pinAuth/${key}`).update({
+  await step('D writeSession', () => database().ref(`pinAuth/${key}`).update({
     activeSessionId: newSessionId,
     lastLoginAt: Date.now(),
-  });
+  }));
 
   await AsyncStorage.setItem(LOCAL_SESSION_KEY, newSessionId);
   await AsyncStorage.setItem(LOCAL_PHONE_KEY, key);
@@ -326,7 +342,7 @@ export const resetPinWithPhoneAuth = async (phone: string, newPin: string): Prom
   // context.auth; signInWithCustomToken below swaps to the stable uid
   // on its own, no prior signOut needed.
   const functionsMod = require('@react-native-firebase/functions').default;
-  let tokenData;
+  let tokenData: any;
   try {
     const result = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
     tokenData = result.data;
