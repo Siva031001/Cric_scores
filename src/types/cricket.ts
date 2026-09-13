@@ -251,6 +251,9 @@ export interface Tournament {
   startDate: string;
   endDate: string;
   ballType: BallType;
+  /** Tournament poster/photo, uploaded at creation. Rendered by
+   *  LiveTournamentCarousel and the TournamentDetail header. */
+  bannerUrl?: string | null;
   format?: string;
   tournamentFormat?: TournamentFormatType;
   pools?: Pool[];
@@ -329,6 +332,13 @@ export interface PlayerMaster {
   createdBy: string;
   createdAt: number;
   linkedAt?: number;
+  // Copied from the owner's users/{uid}/profile by syncProfileToLinkedPlayer
+  // once they register and save a profile. Mirrored here because this record
+  // is readable by any signed-in user, whereas the profile itself is not.
+  role?: PlayerRole;
+  battingStyle?: BattingStyle;
+  bowlingStyle?: string;
+  photo?: string | null;
 }
 
 export interface MOMCandidate {

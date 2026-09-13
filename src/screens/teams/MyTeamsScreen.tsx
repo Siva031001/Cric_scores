@@ -110,7 +110,7 @@ export default function MyTeamsScreen({ navigation, route }: any) {
       <Header
         title={selectMode ? "Select Team for Tournament" : "Teams"}
         onBack={() => navigation.goBack()}
-        rightText="+ New"
+        rightText="New"
         onRight={() => navigation.navigate('CreateTeam', selectMode ? { fromTournament: true, tournamentId } : undefined)}
     />
 
@@ -129,7 +129,7 @@ export default function MyTeamsScreen({ navigation, route }: any) {
           <Text style={s.emptyTxt}>{teamTab === 'my' ? 'No My Teams yet' : 'No Other Teams yet'}</Text>
           <Text style={s.emptySub}>{teamTab === 'my' ? 'Create teams you play in' : 'Add opponent or other teams'}</Text>
           <TouchableOpacity style={s.createBtn} onPress={() => navigation.navigate('CreateTeam')}>
-            <Text style={s.createBtnTxt}>+ Create Team</Text>
+            <Text style={s.createBtnTxt}>Create Team</Text>
           </TouchableOpacity>
         </View>
       ) : (

@@ -438,7 +438,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                 <Text style={s.emptySub}>Start a new match to see it appear here.</Text>
                 {filter === 'all' && (
                   <TouchableOpacity style={s.startBtn} onPress={() => navigation.navigate('NewMatch')} activeOpacity={0.85}>
-                    <Text style={s.startBtnTxt}>+ Start New Match</Text>
+                    <Text style={s.startBtnTxt}>Start New Match</Text>
                   </TouchableOpacity>
                 )}
               </View>

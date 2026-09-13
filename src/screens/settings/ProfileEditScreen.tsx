@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Image, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-import { getUserProfile, saveUserProfile, getCurrentUser, uploadLocalImageToStorage } from '../../utils/firebase';
+import { getUserProfile, saveUserProfile, getCurrentUser, uploadLocalImageToStorage, syncProfileToLinkedPlayer, getMyLinkedPlayerId } from '../../utils/firebase';
+import database from '@react-native-firebase/database';
 import { PlayerRole, BattingStyle } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import Header from '../../components/Header';
@@ -41,6 +42,24 @@ export default function ProfileEditScreen({ navigation }: any) {
     // Mobile number always reflects the number used to log in — not
     // editable here, since it's the account identity used by pinAuth.
     setMobile(loginPhone ?? p?.mobile ?? '');
+    // A user who just registered has no profile yet, but an organiser may
+    // already have added their phone number to a team — in which case their
+    // name (and possibly role) is sitting on the linked players/{id} record.
+    // Seed the form from it rather than showing a blank Name field.
+    if (!p?.name) {
+      try {
+        const linkedId = await getMyLinkedPlayerId();
+        if (linkedId) {
+          const snap = await database().ref('players/' + linkedId).once('value');
+          const master = snap.val();
+          if (master?.name) setName(master.name);
+          if (!p?.role && master?.role) setRole(master.role);
+          if (!p?.battingStyle && master?.battingStyle) setBattingStyle(master.battingStyle);
+          if (!p?.bowlingStyle && master?.bowlingStyle) setBowlingStyle(master.bowlingStyle);
+          if (!p?.photo && master?.photo) setPhoto(master.photo);
+        }
+      } catch (e) { console.warn('Could not prefill from linked player record:', e); }
+    }
     setLoading(false);
   })();
   }, []);
@@ -63,6 +82,13 @@ export default function ProfileEditScreen({ navigation }: any) {
         if (user) photoUrl = await uploadLocalImageToStorage(photo, `profile_photos/${user.uid}.jpg`);
       }
       await saveUserProfile({ name: name.trim(), mobile: mobile.trim(), email: email.trim(), role, battingStyle, bowlingStyle: bowlingStyle.trim(), country: country.trim(), photo: photoUrl });
+      // Mirror the details onto the shared players/{id} record so teams,
+      // scorecards and other users see this person's real name, role and
+      // photo — the profile node itself is readable only by its owner.
+      // A failure here must not block the save the user just made.
+      try {
+        await syncProfileToLinkedPlayer({ name: name.trim(), role, battingStyle, bowlingStyle: bowlingStyle.trim(), photo: photoUrl ?? null });
+      } catch (e) { console.warn('Profile -> player sync failed:', e); }
       Alert.alert('Saved!', 'Profile updated successfully', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e: any) { Alert.alert('Error', e?.message); }
     finally { setSaving(false); }

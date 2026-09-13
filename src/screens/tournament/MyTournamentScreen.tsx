@@ -45,7 +45,7 @@ export default function MyTournamentScreen({ navigation }: any) {
       <Header
         title="My Tournaments"
         onBack={() => navigation.goBack()}
-        rightText="+ New"
+        rightText="New"
         onRight={() => navigation.navigate('CreateTournament')}
       />
       {tournaments.length === 0 ? (
@@ -53,7 +53,7 @@ export default function MyTournamentScreen({ navigation }: any) {
           icon="🏆"
           title="No Tournaments"
           subtitle="Create your first tournament"
-          btnText="+ Create Tournament"
+          btnText="Create Tournament"
           onBtn={() => navigation.navigate('CreateTournament')}
         />
       ) : (

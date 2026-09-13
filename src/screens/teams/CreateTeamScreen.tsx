@@ -161,7 +161,22 @@ export default function CreateTeamScreen({ route, navigation }: any) {
     if (name) setLocalName(name);
     setPlayers((prev: any[]) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], phoneNumber: phone, playerType: 'registered', name: name || updated[index].name, globalPlayerId: master?.id ?? null };
+      // Pull through the registered player's own profile details, not just
+      // their name. syncProfileToLinkedPlayer mirrors role/battingStyle/
+      // bowlingStyle onto the player master when they save their profile, so
+      // these are the player's real choices rather than this screen's
+      // 'Batter'/'Right Hand' defaults. Fall back to whatever is already in
+      // the row when the player hasn't set a value.
+      updated[index] = {
+        ...updated[index],
+        phoneNumber: phone,
+        playerType: 'registered',
+        name: name || updated[index].name,
+        role: master?.role ?? updated[index].role,
+        battingStyle: master?.battingStyle ?? updated[index].battingStyle,
+        bowlingStyle: master?.bowlingStyle ?? updated[index].bowlingStyle,
+        globalPlayerId: master?.id ?? null,
+      };
     return updated;
       });
     setLookupStatus('linked');

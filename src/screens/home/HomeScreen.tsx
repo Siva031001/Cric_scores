@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Image, StatusBar, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory } from '../../utils/firebase';
+import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory, getTournamentsVersion } from '../../utils/firebase';
 import { AdBanner } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 import { getPublicTournaments, searchPublicTournaments, getHomePageTournaments, getTournamentDisplayStatus } from '../../utils/firebase';
@@ -20,24 +20,32 @@ export default function HomeScreen({ navigation }: any) {
   const [publicTournaments, setPublicTournaments] = useState<any[]>([]);
   const [tournamentFilter, setTournamentFilter] = useState<'all'|'live'|'upcoming'|'completed'|'mine'>('all');
 
-  // getPublicTournaments() reads the WHOLE tournaments node (there is no
-  // .indexOn for its orderByChild('createdAt'), so Firebase downloads every
-  // tournament — each with its teams, rosters, pools, fixtures and matches
-  // — and filters client-side). That is far too expensive to re-run on every
-  // focus, which is what a bare useFocusEffect did: navigating anywhere and
-  // coming back re-downloaded the entire collection, and Home took tens of
-  // seconds to settle. Refresh on focus is still useful so a newly created
-  // tournament appears, so keep it but throttle it.
+  // getPublicTournaments() reads the WHOLE tournaments node (each tournament
+  // carries its teams, rosters, pools, fixtures and matches). Measured against
+  // real data it is ~117 KB / 0.4s, so it is not the cause of any large delay —
+  // but a bare useFocusEffect re-ran it on every single return to this screen,
+  // which is needless repeated work on mobile data. Throttled, plus a version
+  // check so edits still appear at once.
   const tournamentsFetchedAtRef = useRef(0);
+  const tournamentsVersionRef = useRef(-1);
   const TOURNAMENTS_TTL_MS = 60 * 1000;
   useFocusEffect(useCallback(() => {
-    if (Date.now() - tournamentsFetchedAtRef.current < TOURNAMENTS_TTL_MS) return;
+    // Refetch when the throttle window has passed OR when any tournament was
+    // written since the last fetch. The version check is what makes an edit to
+    // the Start/End dates show up here immediately — those dates decide the
+    // Upcoming/Live/Completed badge, so waiting out the throttle would leave
+    // the dashboard showing a status the user just changed.
+    const version = getTournamentsVersion();
+    const stale = Date.now() - tournamentsFetchedAtRef.current >= TOURNAMENTS_TTL_MS;
+    if (!stale && version === tournamentsVersionRef.current) return;
     tournamentsFetchedAtRef.current = Date.now();
+    tournamentsVersionRef.current = version;
     getPublicTournaments()
       .then(setPublicTournaments)
       .catch(() => {
         // Allow an immediate retry on the next focus rather than caching the failure.
         tournamentsFetchedAtRef.current = 0;
+        tournamentsVersionRef.current = -1;
         setPublicTournaments([]);
       });
   }, []));

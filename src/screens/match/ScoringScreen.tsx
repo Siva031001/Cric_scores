@@ -176,7 +176,6 @@ export default function ScoringScreen({ route, navigation }: any) {
  useEffect(() => {
   if (!matchId) { setLoading(false); return; }
   const unsub = subscribeToMatch(matchId, (data: any) => {
-    console.log('[LISTENER FIRED]', new Date().toISOString(), data?.innings1?.runs, data?.currentInnings);
     setMatch(data);
     setLoading(false);
     if (data?.isLive !== undefined) setIsLive(data.isLive);
@@ -797,7 +796,7 @@ useEffect(() => {
         <View style={s.streamBar}>
           {!isStreaming ? (
             <TouchableOpacity style={s.addStreamBtn} onPress={() => setShowStreamModal(true)}>
-              <Text style={s.addStreamBtnTxt}>+ Add Stream URL</Text>
+              <Text style={s.addStreamBtnTxt}>Add Stream URL</Text>
             </TouchableOpacity>
           ) : (
             <View style={s.streamActiveBar}>

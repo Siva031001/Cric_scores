@@ -245,6 +245,7 @@ export const createTournament = async (data) => {
     ...data, id, createdBy: user.uid, createdAt: Date.now(),
   });
   await database().ref(`users/${user.uid}/tournaments/${id}`).set(true);
+  invalidateTournamentsCache();
   return id;
 };
 
@@ -369,8 +370,18 @@ export const addPoolMatch = async (tournamentId, poolId, matchData) => {
   return newMatch.id;
 };
 
+// Bumped on every tournament write. HomeScreen throttles its (whole-node)
+// tournament fetch, so without this signal an edit — changing the Start/End
+// dates in particular, which decide Upcoming/Live/Completed — would not show
+// up on the dashboard until the throttle window expired. Screens compare the
+// value they last fetched at against this counter and refetch when it moves.
+let _tournamentsVersion = 0;
+export const getTournamentsVersion = () => _tournamentsVersion;
+export const invalidateTournamentsCache = () => { _tournamentsVersion += 1; };
+
 export const updateTournament = async (id, data) => {
   await database().ref(`tournaments/${id}`).update(data);
+  invalidateTournamentsCache();
 };
 
 export const getMyTournaments = async () => {
@@ -445,6 +456,50 @@ export const getMyLinkedPlayerId = async (): Promise<string | null> => {
   if (count > 1) console.warn(`[Data Integrity] Multiple players linked to accountId ${user.uid}; using first match`);
   _linkedPlayerCache = { uid: user.uid, playerId: foundId };
   return foundId;
+};
+
+/**
+ * Copies the account owner's profile details onto their linked players/{id}
+ * record. Call after saveUserProfile.
+ *
+ * Why this is needed: when an organiser adds a phone number to a team, a GUEST
+ * players/{id} record is created carrying only the name the organiser typed.
+ * If that person later registers with the same number,
+ * retroactivelyLinkGuestPlayers promotes the record — it sets accountId,
+ * playerType and linkedAt, so match HISTORY links up correctly — but it never
+ * touches name, and role/battingStyle/bowlingStyle/photo were never on that
+ * record at all. So the player's own profile details never reached the record
+ * other people can see.
+ *
+ * Why it belongs here and not at registration: signup collects only a phone
+ * number and a PIN. createPinAccount passes '' as the display name because
+ * there is genuinely nothing to copy yet. The details first exist when the
+ * user saves their profile, so that is the moment to propagate them.
+ *
+ * The photo matters for a second reason: a profile photo lives at
+ * users/{uid}/profile, which the database rules make readable ONLY by its
+ * owner. players/{id} is readable by any signed-in user, so copying the URL
+ * here is what lets anyone else actually see the player's photo.
+ */
+export const syncProfileToLinkedPlayer = async (profile: {
+  name?: string;
+  role?: string;
+  battingStyle?: string;
+  bowlingStyle?: string;
+  photo?: string | null;
+}): Promise<void> => {
+  const playerId = await getMyLinkedPlayerId();
+  if (!playerId) return;
+  const patch: Record<string, any> = {};
+  // Only ever write a non-empty name: never blank out the name an organiser
+  // deliberately typed just because this profile field happens to be empty.
+  if (profile.name?.trim()) patch.name = formatPlayerName(profile.name);
+  if (profile.role) patch.role = profile.role;
+  if (profile.battingStyle) patch.battingStyle = profile.battingStyle;
+  if (profile.bowlingStyle?.trim()) patch.bowlingStyle = profile.bowlingStyle.trim();
+  if (profile.photo) patch.photo = profile.photo;
+  if (Object.keys(patch).length === 0) return;
+  await database().ref('players/' + playerId).update(patch);
 };
 
 export const retroactivelyLinkGuestPlayers = async (phoneNumber: string): Promise<void> => {
@@ -1259,6 +1314,7 @@ export const deleteTournament = async (tournamentId) => {
   if (!user) throw new Error('Not authenticated');
   await database().ref(`tournaments/${tournamentId}`).remove();
   await database().ref(`users/${user.uid}/tournaments/${tournamentId}`).remove();
+  invalidateTournamentsCache();
 };
 
 
@@ -1531,7 +1587,34 @@ const parseTournamentDate = (dateStr) => {
   const month = parseInt(parts[1], 10);
   const year = parseInt(parts[2], 10);
   if (!day || !month || !year) return null;
-  return new Date(year, month - 1, day);
+  const d = new Date(year, month - 1, day);
+  // Reject dates that don't round-trip. `new Date(2026, 1, 31)` silently
+  // becomes 3 March rather than failing, so "31/02/2026" would otherwise
+  // read as valid.
+  if (d.getDate() !== day || d.getMonth() !== month - 1 || d.getFullYear() !== year) return null;
+  return d;
+};
+
+/**
+ * Validates a tournament's Start/End date pair. Returns an error message, or
+ * null when the pair is valid. Both dates are REQUIRED: getTournamentDisplayStatus
+ * below falls back to the stored `status` field when either is missing, and
+ * nothing in the app ever updates that field, so a tournament saved without
+ * an end date reads "Upcoming" forever on the home dashboard.
+ *
+ * Shared by CreateTournamentScreen and TournamentDetailScreen's edit modal so
+ * the two cannot drift apart — validating only on create let an edit put the
+ * tournament straight back into the broken state.
+ */
+export const validateTournamentDates = (startDate?: string, endDate?: string): string | null => {
+  if (!startDate?.trim()) return 'Enter a start date';
+  if (!endDate?.trim()) return 'Enter an end date';
+  const start = parseTournamentDate(startDate.trim());
+  if (!start) return 'Start date must be a real date in DD/MM/YYYY format';
+  const end = parseTournamentDate(endDate.trim());
+  if (!end) return 'End date must be a real date in DD/MM/YYYY format';
+  if (end < start) return 'End date cannot be before the start date';
+  return null;
 };
 
 export const getTournamentDisplayStatus = (tournament) => {

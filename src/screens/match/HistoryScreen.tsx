@@ -80,7 +80,7 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
               ? `No matches found for "${search}"`
               : 'Start scoring to see history here'
           }
-          btnText={!search ? '+ Start Match' : undefined}
+          btnText={!search ? 'Start Match' : undefined}
           onBtn={!search ? () => navigation.navigate('NewMatch') : undefined}
         />
       ) : (
