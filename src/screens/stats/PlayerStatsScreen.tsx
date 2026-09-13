@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { getPlayerCareerStats } from '../../utils/firebase';
 import { AdRewardedGate } from '../../components/AdPlaceholder';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
+import AppIcon from '../../components/AppIcon';
 
 // Read-only career statistics for any player.
 //
@@ -44,8 +45,8 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
 
   const Row = ({ label, value }: { label: string; value: any }) => (
     <View style={s.statRow}>
-      <Text style={s.statLabel}>{label}</Text>
-      <Text style={s.statValue}>{value}</Text>
+      <Text style={s.statLabel} numberOfLines={1}>{label}</Text>
+      <Text style={s.statValue} numberOfLines={1}>{value}</Text>
     </View>
   );
 
@@ -68,7 +69,7 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
               ? <Image source={{ uri: photo }} style={s.avatarImg} />
               : <Text style={s.avatarText}>{(name ?? 'P').charAt(0).toUpperCase()}</Text>}
           </View>
-          <Text style={s.heroName}>{name ?? 'Player'}</Text>
+          <Text style={s.heroName} numberOfLines={2}>{name ?? 'Player'}</Text>
           {stats ? <Text style={s.heroSub}>{stats.matches} match{stats.matches === 1 ? '' : 'es'} played</Text> : null}
         </View>
 
@@ -90,8 +91,14 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
           </View>
         ) : (
           <>
-            <Text style={s.section}>Batting</Text>
-            <View style={s.card}>
+            <View style={[s.card, s.cardBatting]}>
+              <View pointerEvents="none" style={s.cardEdge} />
+              <View style={s.cardHead}>
+                <View style={[s.cardIconBox, { backgroundColor: COLORS.primary + '1f' }]}>
+                  <AppIcon emoji="🏏" size={16} color={COLORS.primary} />
+                </View>
+                <Text style={[s.section, { color: COLORS.primary }]}>Batting</Text>
+              </View>
               <Row label="Matches" value={b.matches} />
               <Row label="Innings" value={b.innings} />
               <Row label="Runs" value={b.runs} />
@@ -105,8 +112,14 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
               <Row label="Ducks" value={b.ducks} />
             </View>
 
-            <Text style={s.section}>Bowling</Text>
-            <View style={s.card}>
+            <View style={[s.card, s.cardBowling]}>
+              <View pointerEvents="none" style={s.cardEdge} />
+              <View style={s.cardHead}>
+                <View style={[s.cardIconBox, { backgroundColor: COLORS.blue + '1f' }]}>
+                  <AppIcon emoji="🎯" size={16} color={COLORS.blue} />
+                </View>
+                <Text style={[s.section, { color: COLORS.blue }]}>Bowling</Text>
+              </View>
               <Row label="Matches" value={w.matches} />
               <Row label="Innings" value={w.innings} />
               <Row label="Overs" value={`${Math.floor(w.balls / 6)}.${w.balls % 6}`} />
@@ -121,8 +134,14 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
               <Row label="2w / 4w" value={`${w.twoWickets} / ${w.fourWickets}`} />
             </View>
 
-            <Text style={s.section}>Fielding</Text>
-            <View style={s.card}>
+            <View style={[s.card, s.cardFielding]}>
+              <View pointerEvents="none" style={s.cardEdge} />
+              <View style={s.cardHead}>
+                <View style={[s.cardIconBox, { backgroundColor: COLORS.purple + '1f' }]}>
+                  <AppIcon emoji="🤚" size={16} color={COLORS.purple} />
+                </View>
+                <Text style={[s.section, { color: COLORS.purple }]}>Fielding</Text>
+              </View>
               <Row label="Catches" value={f.catches} />
               <Row label="Stumpings" value={f.stumpings} />
               <Row label="Run Outs" value={f.runOuts} />
@@ -142,18 +161,58 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  center: { justifyContent: 'center', alignItems: 'center', paddingVertical: 40, gap: 6 },
-  emptyText: { color: COLORS.textSecondary, fontSize: 14 },
-  emptyHint: { color: COLORS.textMuted, fontSize: 12, textAlign: 'center', paddingHorizontal: 20 },
-  hero: { alignItems: 'center', gap: 8, marginBottom: 20 },
-  avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  avatarImg: { width: 76, height: 76 },
-  avatarText: { color: COLORS.primary, fontSize: 30, fontWeight: 'bold' },
-  heroName: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
-  heroSub: { color: COLORS.textSecondary, fontSize: 12 },
-  section: { color: COLORS.primary, fontSize: 14, fontWeight: 'bold', marginBottom: 8, marginTop: 6 },
-  card: { backgroundColor: COLORS.card, borderRadius: RADIUS.md, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
-  statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border + '55' },
-  statLabel: { color: COLORS.textSecondary, fontSize: 13 },
-  statValue: { color: COLORS.text, fontSize: 13, fontWeight: 'bold' },
+  center: { justifyContent: 'center', alignItems: 'center', paddingVertical: SPACING.xxl, gap: 6 },
+  emptyText: { ...TYPE.title, color: COLORS.text, textAlign: 'center' },
+  emptyHint: { ...TYPE.caption, color: COLORS.textMuted, textAlign: 'center', paddingHorizontal: SPACING.lg },
+
+  // ── Player hero ──
+  hero: { alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.lg },
+  avatar: {
+    width: 84, height: 84, borderRadius: 42,
+    backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 2, borderColor: COLORS.primary,
+    ...SHADOW.glow(COLORS.primary),
+  },
+  avatarImg: { width: 84, height: 84 },
+  avatarText: { ...TYPE.displaySm, color: COLORS.primaryLight },
+  heroName: { ...TYPE.h1, color: COLORS.text, textAlign: 'center' },
+  heroSub: { ...TYPE.caption, color: COLORS.textSecondary },
+
+  // ── Stat groups ──
+  // One card per discipline, each with a single accent so batting, bowling and
+  // fielding are told apart at a glance while scrolling.
+  section: { ...TYPE.label, color: COLORS.primary },
+  card: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: 2,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+    overflow: 'hidden',
+    ...SHADOW.md,
+  },
+  cardBatting: { borderLeftWidth: 3, borderLeftColor: COLORS.primary },
+  cardBowling: { borderLeftWidth: 3, borderLeftColor: COLORS.blue },
+  cardFielding: { borderLeftWidth: 3, borderLeftColor: COLORS.purple },
+  cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  cardHead: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  cardIconBox: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
+
+  // ── Stat rows ──
+  // Label muted and value bold + tabular, so the figures form a clean right
+  // column that can be scanned without reading the labels.
+  statRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 9, gap: SPACING.sm,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft,
+  },
+  statLabel: { ...TYPE.body, color: COLORS.textSecondary, flexShrink: 1 },
+  statValue: { ...TYPE.num, fontSize: 15, color: COLORS.text },
 });

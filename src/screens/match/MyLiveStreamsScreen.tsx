@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { getMatchHistory } from '../../utils/firebase';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
+import Badge from '../../components/Badge';
 
 type Bucket = 'active' | 'scheduled' | 'completed' | 'draft';
 
@@ -74,14 +75,16 @@ export default function MyLiveStreamsScreen({ navigation }: any) {
           list.map((m: any) => (
             <TouchableOpacity
               key={m.id}
-              style={s.card}
+              style={[s.card, tab === 'active' && s.cardLive]}
+              activeOpacity={0.85}
               onPress={() => navigation.navigate(m.status === 'completed' ? 'Scorecard' : 'StreamingDashboard', { matchId: m.id })}
             >
               <View style={s.cardTop}>
                 <Text style={s.cardTeams}>{m.team1} vs {m.team2}</Text>
-                <View style={[s.badge, tab === 'active' && s.badgeLive, tab === 'completed' && s.badgeDone]}>
-                  <Text style={s.badgeTxt}>{tab === 'active' ? 'LIVE' : tab === 'scheduled' ? 'Ready' : 'Done'}</Text>
-                </View>
+                <Badge
+                  label={tab === 'active' ? 'LIVE' : tab === 'scheduled' ? 'Ready' : 'Done'}
+                  tone={tab === 'active' ? 'live' : tab === 'completed' ? 'success' : 'info'}
+                />
               </View>
               {m.venue ? <Text style={s.cardVenue}>{m.venue}</Text> : null}
               <Text style={s.cardMeta}>Match ID: {m.id}</Text>
@@ -97,22 +100,35 @@ export default function MyLiveStreamsScreen({ navigation }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
-  tabTxt: { color: COLORS.textSecondary, fontSize: 11, fontWeight: 'bold' },
-  tabTxtActive: { color: COLORS.primary },
+  // Segmented pill row instead of underlined tabs: four labels each carrying a
+  // count need a container to read as one control.
+  tabs: {
+    flexDirection: 'row', gap: 6,
+    marginHorizontal: SPACING.lg, marginTop: SPACING.sm,
+    padding: 4, borderRadius: RADIUS.round,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.borderSoft,
+  },
+  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: RADIUS.round },
+  tabActive: { backgroundColor: COLORS.primary, ...SHADOW.sm },
+  // numSm, not label: the trailing "(3)" is a figure and should not jitter as
+  // counts change width.
+  tabTxt: { ...TYPE.numSm, color: COLORS.textSecondary },
+  tabTxtActive: { color: COLORS.onPrimary },
   scroll: { flex: 1, padding: SPACING.lg },
-  card: { backgroundColor: COLORS.card, borderRadius: RADIUS.md, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardTeams: { color: COLORS.text, fontSize: 15, fontWeight: 'bold' },
-  badge: { backgroundColor: COLORS.card2, paddingHorizontal: 10, paddingVertical: 3, borderRadius: RADIUS.round },
-  badgeLive: { backgroundColor: COLORS.red + '33' },
-  badgeDone: { backgroundColor: COLORS.primary + '33' },
-  badgeTxt: { color: COLORS.text, fontSize: 10, fontWeight: 'bold' },
-  cardVenue: { color: COLORS.textSecondary, fontSize: 12, marginBottom: 4 },
-  cardMeta: { color: COLORS.textMuted, fontSize: 11 },
-  empty: { alignItems: 'center', paddingVertical: 60 },
-  emptyTxt: { color: COLORS.text, fontSize: 15, fontWeight: 'bold', marginBottom: 8 },
-  emptySub: { color: COLORS.textMuted, fontSize: 13, textAlign: 'center', paddingHorizontal: SPACING.xl },
+  card: {
+    backgroundColor: COLORS.card, borderRadius: RADIUS.lg,
+    padding: SPACING.md, marginBottom: SPACING.sm,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
+    ...SHADOW.sm,
+  },
+  // On-air stream gets a live-coloured left edge, matching the live card
+  // treatment on the home screen. COLORS.live, never COLORS.error.
+  cardLive: { borderLeftWidth: 3, borderLeftColor: COLORS.live, borderColor: COLORS.live + '44', ...SHADOW.md },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
+  cardTeams: { ...TYPE.title, color: COLORS.text, flex: 1, marginRight: SPACING.sm },
+  cardVenue: { ...TYPE.caption, color: COLORS.textSecondary, marginBottom: 3 },
+  cardMeta: { ...TYPE.numSm, fontSize: 11, color: COLORS.textMuted },
+  empty: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: SPACING.lg },
+  emptyTxt: { ...TYPE.title, color: COLORS.text, marginBottom: SPACING.sm, textAlign: 'center' },
+  emptySub: { ...TYPE.body, color: COLORS.textMuted, textAlign: 'center', lineHeight: 20, paddingHorizontal: SPACING.md },
 });

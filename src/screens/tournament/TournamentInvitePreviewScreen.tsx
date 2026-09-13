@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
+import Card from '../../components/Card';
+import AppIcon from '../../components/AppIcon';
 
 export default function TournamentInvitePreviewScreen({ route, navigation }: any) {
   const { preview, inviteResult } = route.params ?? {};
@@ -11,7 +13,7 @@ export default function TournamentInvitePreviewScreen({ route, navigation }: any
     return (
       <View style={s.container}>
         <Header title="Tournament Invite" onBack={() => navigation.goBack()} />
-        <Text style={{ color: COLORS.textMuted, textAlign: 'center', marginTop: 40 }}>Tournament not found.</Text>
+        <Text style={s.notFound}>Tournament not found.</Text>
       </View>
     );
   }
@@ -20,30 +22,41 @@ export default function TournamentInvitePreviewScreen({ route, navigation }: any
     <View style={s.container}>
       <Header title="Tournament Invite" onBack={() => navigation.goBack()} />
       <ScrollView style={s.scroll}>
-        <View style={s.card}>
+        <Card style={s.card} accent={COLORS.primary}>
           <Text style={s.tourneyName}>{preview.name}</Text>
-          {preview.venue ? <Text style={s.meta}>📍 {preview.venue}</Text> : null}
-          <Text style={s.meta}>{preview.startDate} — {preview.endDate}</Text>
+          {preview.venue ? (
+            <View style={s.metaRow}>
+              <AppIcon emoji="📍" size={13} color={COLORS.textMuted} />
+              <Text style={s.meta}>{preview.venue}</Text>
+            </View>
+          ) : null}
+          <View style={s.metaRow}>
+            <AppIcon emoji="📅" size={13} color={COLORS.textMuted} />
+            <Text style={s.metaNum}>{preview.startDate} — {preview.endDate}</Text>
+          </View>
           {preview.tournamentFormat ? <Text style={s.meta}>Format: {preview.tournamentFormat}</Text> : null}
-        </View>
+        </Card>
 
         <Text style={s.sectionTitle}>You're joining as captain of:</Text>
-        <View style={s.card}>
-          <Text style={s.teamName}>{inviteResult.teamName}</Text>
-        </View>
+        <Card style={s.card} tone="raised" accent={COLORS.primaryLight}>
+          <View style={s.captainRow}>
+            <AppIcon emoji="👑" size={18} color={COLORS.primaryLight} />
+            <Text style={s.teamName}>{inviteResult.teamName}</Text>
+          </View>
+        </Card>
 
         <Text style={s.sectionTitle}>Teams already in this tournament ({otherTeams.length})</Text>
         {otherTeams.length === 0 ? (
-          <Text style={{ color: COLORS.textMuted, fontSize: 13 }}>No other teams added yet.</Text>
+          <Text style={s.emptyTxt}>No other teams added yet.</Text>
         ) : (
           otherTeams.map((team: any, i: number) => (
-            <View key={i} style={s.card}>
+            <Card key={i} style={s.card} elevation="sm">
               <Text style={s.teamName}>{team.teamName}</Text>
-              <Text style={s.meta}>{team.players.length} players</Text>
+              <Text style={s.playerCount}>{team.players.length} players</Text>
               {team.players.length > 0 && (
                 <Text style={s.playerList}>{team.players.map((p: any) => p.name).join(', ')}</Text>
               )}
-            </View>
+            </Card>
           ))
         )}
 
@@ -70,12 +83,26 @@ export default function TournamentInvitePreviewScreen({ route, navigation }: any
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { flex: 1, padding: SPACING.lg },
-  card: { backgroundColor: COLORS.card, borderRadius: RADIUS.md, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
-  tourneyName: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
-  meta: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 2 },
-  sectionTitle: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold', marginTop: 14, marginBottom: 8 },
-  teamName: { color: COLORS.text, fontSize: 15, fontWeight: 'bold' },
-  playerList: { color: COLORS.textMuted, fontSize: 12, marginTop: 4 },
-  confirmBtn: { backgroundColor: COLORS.primary, padding: 15, borderRadius: RADIUS.md, alignItems: 'center', marginTop: 16 },
-  confirmBtnTxt: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  card: { marginBottom: SPACING.sm },
+  notFound: { ...TYPE.body, color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.xxl },
+  tourneyName: { ...TYPE.h2, color: COLORS.text, marginBottom: SPACING.xs },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
+  meta: { ...TYPE.caption, color: COLORS.textSecondary, marginBottom: 2 },
+  // Dates get tabular figures so the two halves of the range line up.
+  metaNum: { ...TYPE.numSm, color: COLORS.textSecondary },
+  // Micro-label: uppercase + tracking so a section reads as a section without
+  // competing with the tournament or team names below it.
+  sectionTitle: { ...TYPE.label, color: COLORS.primary, marginTop: SPACING.md, marginBottom: SPACING.sm },
+  captainRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  teamName: { ...TYPE.title, color: COLORS.text },
+  playerCount: { ...TYPE.numSm, color: COLORS.textSecondary, marginTop: 3 },
+  playerList: { ...TYPE.caption, color: COLORS.textMuted, marginTop: SPACING.xs, lineHeight: 17 },
+  emptyTxt: { ...TYPE.caption, color: COLORS.textMuted, paddingVertical: SPACING.xs },
+  confirmBtn: {
+    backgroundColor: COLORS.primary, height: 54,
+    borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
+    marginTop: SPACING.md,
+    ...SHADOW.glow(COLORS.primary),
+  },
+  confirmBtnTxt: { ...TYPE.button, color: COLORS.onPrimary },
 });

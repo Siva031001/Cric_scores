@@ -1,8 +1,16 @@
-﻿import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { COLORS, RADIUS } from '../constants/theme';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { COLORS, RADIUS, SPACING, TYPE } from '../constants/theme';
 import AppIcon from './AppIcon';
+import Button from './Button';
 
+/**
+ * Empty state. Props and conditional rendering are unchanged — the button
+ * still only appears when both btnText and onBtn are supplied.
+ *
+ * The icon now sits in a tinted disc rather than floating loose, which stops
+ * empty screens looking like a rendering failure.
+ */
 interface Props {
   icon: string;
   title: string;
@@ -14,23 +22,28 @@ interface Props {
 export default function EmptyState({ icon, title, subtitle, btnText, onBtn }: Props) {
   return (
     <View style={styles.container}>
-      <AppIcon emoji={icon} size={56} color={COLORS.textMuted} style={{ marginBottom: 16 }} />
+      <View style={styles.iconWrap}>
+        <AppIcon emoji={icon} size={40} color={COLORS.primary} />
+      </View>
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-      {btnText && onBtn && (
-        <TouchableOpacity style={styles.btn} onPress={onBtn}>
-          <Text style={styles.btnText}>{btnText}</Text>
-        </TouchableOpacity>
-      )}
+      {btnText && onBtn && <Button label={btnText} onPress={onBtn} size="md" />}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  icon: { fontSize: 64, marginBottom: 16 },
-  title: { color: COLORS.text, fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
-  subtitle: { color: COLORS.textSecondary, fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
-  btn: { backgroundColor: COLORS.primary, paddingHorizontal: 28, paddingVertical: 14, borderRadius: RADIUS.round },
-  btnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.xxl },
+  iconWrap: {
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1, borderColor: COLORS.primary + '33',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: SPACING.lg,
+  },
+  title: { ...TYPE.h2, color: COLORS.text, textAlign: 'center', marginBottom: 6 },
+  subtitle: {
+    ...TYPE.body, color: COLORS.textSecondary, textAlign: 'center',
+    marginBottom: SPACING.lg, lineHeight: 21, maxWidth: 280,
+  },
 });

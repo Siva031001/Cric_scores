@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native';import { getMatchHistory } from '../../utils/firebase';
 import { getPartnerships } from '../../utils/matchAnalytics';
 import { AdBanner, AdRewardedGate } from '../../components/AdPlaceholder';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 
@@ -226,7 +226,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   const StatRow = ({ label, value, highlight }: any) => (
     <View style={s.statRow}>
       <Text style={s.statLbl}>{label}</Text>
-      <Text style={[s.statVal, highlight && { color: COLORS.primary, fontWeight: '700' }]}>{value ?? '-'}</Text>
+      <Text style={[s.statVal, highlight && { color: COLORS.primaryLight }]}>{value ?? '-'}</Text>
     </View>
   );
 
@@ -354,7 +354,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
             <Text style={[s.dropdownItemTxt, dateFilter === k && { color: COLORS.primary, fontWeight: 'bold' }]}>{l}</Text>
           </TouchableOpacity>
         ))}
-        <View style={{ height: 1, backgroundColor: COLORS.border, marginVertical: 4 }} />
+        <View style={s.dropdownDivider} />
         {([['month60','Last 60 Days'],['custom','Custom Date Range'],['lifetime','Lifetime Statistics']] as const).map(([k, l]) => (
           <TouchableOpacity key={k} style={s.dropdownItem} onPress={() => handleSelectDateFilter(k as DateFilter)}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -385,7 +385,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
       <View style={s.tabs}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[s.tab, tab === t.key && s.tabActive]} onPress={() => setTab(t.key as any)} activeOpacity={0.7}>
-            <AppIcon emoji={t.icon} size={15} color={tab === t.key ? COLORS.primary : COLORS.textSecondary} />
+            <AppIcon emoji={t.icon} size={15} color={tab === t.key ? COLORS.onPrimary : COLORS.textSecondary} />
             <Text style={[s.tabTxt, tab === t.key && s.tabTxtActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
@@ -397,6 +397,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
           <View>
             {formResults.length > 0 && (
               <View style={s.formCard}>
+                <View style={s.cardEdge} pointerEvents="none" />
                 <Text style={s.formLabel}>RECENT FORM</Text>
                 <View style={s.formRow}>
                   {formResults.map((r: any, i: number) => (
@@ -415,6 +416,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
             {topPartnerships.length > 0 && (
               <View style={s.partnershipsBox}>
+                <View style={s.cardEdge} pointerEvents="none" />
                 <SectionHeader title="Best Partnerships" subtitle="Highest run-scoring pairs" />
                 {topPartnerships.map((p: any, i: number) => (
                   <View key={i} style={[s.partnershipRow, i === topPartnerships.length - 1 && { borderBottomWidth: 0 }]}>
@@ -433,7 +435,9 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
             {filteredMatches.length === 0 ? (
               <View style={s.empty}>
-                <AppIcon emoji="📭" size={40} color={COLORS.textMuted} />
+                <View style={s.emptyDisc}>
+                  <AppIcon emoji="📭" size={38} color={COLORS.textMuted} />
+                </View>
                 <Text style={s.emptyTxt}>{filter === 'all' ? 'No matches yet' : 'No ' + filter + ' matches'}</Text>
                 <Text style={s.emptySub}>Start a new match to see it appear here.</Text>
                 {filter === 'all' && (
@@ -448,16 +452,17 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                 {filteredMatches.map((m: any, i: number) => (
                   <TouchableOpacity key={m.id ?? i} style={s.matchCard} activeOpacity={0.85}
                     onPress={() => m.status === 'live' ? navigation.navigate('Scoring', { matchId: m.id }) : navigation.navigate('Scorecard', { matchId: m.id })}>
+                    <View style={s.cardEdge} pointerEvents="none" />
                     <View style={s.mCardTop}>
                       <Text style={s.mDate}>{m.matchDate ?? ''}</Text>
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         {m.tournamentId ? (
-                          <View style={[s.mBadge, { backgroundColor: COLORS.yellow + '33', borderColor: COLORS.yellow + '55' }]}>
+                          <View style={[s.mBadge, { backgroundColor: COLORS.yellow + '1f', borderColor: COLORS.yellow + '55' }]}>
                             <AppIcon emoji="🏆" size={10} color={COLORS.yellow} />
                           </View>
                         ) : null}
                         <View style={[s.mBadge, m.status === 'live' ? s.mBadgeLive : m.status === 'paused' ? s.mBadgePaused : s.mBadgeDone]}>
-                          <Text style={[s.mBadgeTxt, m.status === 'live' && { color: COLORS.red }, m.status === 'paused' && { color: COLORS.orange }, m.status === 'completed' && { color: COLORS.primary }]}>
+                          <Text style={[s.mBadgeTxt, m.status === 'live' && { color: COLORS.live }, m.status === 'paused' && { color: COLORS.warning }, m.status === 'completed' && { color: COLORS.success }]}>
                             {m.status === 'live' ? 'Live' : m.status === 'paused' ? 'Paused' : 'Done'}
                           </Text>
                         </View>
@@ -503,7 +508,9 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
           <View style={s.statsArea}>
             {Object.keys(batMap).length === 0 ? (
               <View style={s.empty}>
-                <AppIcon emoji="📭" size={40} color={COLORS.textMuted} />
+                <View style={s.emptyDisc}>
+                  <AppIcon emoji="📭" size={38} color={COLORS.textMuted} />
+                </View>
                 <Text style={s.emptyTxt}>No batting stats yet</Text>
                 <Text style={s.emptySub}>Stats appear here after you score matches where your team bats first (team1)</Text>
               </View>
@@ -524,6 +531,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
     const hundreds = bs.scores.filter((x: number) => x >= 100).length;
     return (
       <View key={id} style={[s.pCard, { width: 220, marginHorizontal: 0 }]}>
+        <View style={s.cardEdge} pointerEvents="none" />
         <View style={s.pCardHead}>
           <View style={s.pAvatar}>
             <Text style={s.pAvatarTxt}>{(bs.name ?? 'P').charAt(0).toUpperCase()}</Text>
@@ -556,7 +564,9 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
           <View style={s.statsArea}>
             {Object.keys(bolMap).length === 0 ? (
               <View style={s.empty}>
-                <AppIcon emoji="📭" size={40} color={COLORS.textMuted} />
+                <View style={s.emptyDisc}>
+                  <AppIcon emoji="📭" size={38} color={COLORS.textMuted} />
+                </View>
                 <Text style={s.emptyTxt}>No bowling stats yet</Text>
                 <Text style={s.emptySub}>Stats appear after your team bowls in the 2nd innings</Text>
               </View>
@@ -577,6 +587,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                   const bbf     = figs.length > 0 ? [...figs].sort((a: any, b: any) => b.w - a.w || a.r - b.r)[0] : null;
                   return (
                     <View key={id} style={s.pCard}>
+                      <View style={s.cardEdge} pointerEvents="none" />
                       <View style={s.pCardHead}>
                         <View style={[s.pAvatar, { backgroundColor: COLORS.red }]}>
                           <Text style={s.pAvatarTxt}>{(bw.name ?? 'P').charAt(0).toUpperCase()}</Text>
@@ -630,7 +641,9 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
             {fieldRows.length === 0 ? (
               <View style={s.empty}>
-                <AppIcon emoji="📭" size={40} color={COLORS.textMuted} />
+                <View style={s.emptyDisc}>
+                  <AppIcon emoji="📭" size={38} color={COLORS.textMuted} />
+                </View>
                 <Text style={s.emptyTxt}>No fielding stats yet</Text>
                 <Text style={s.emptySub}>
                   Fielding stats are recorded when you select a fielder during Caught, Stumped, or Run Out dismissals while scoring.
@@ -643,6 +656,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                   const total = (f.catches ?? 0) + (f.runOuts ?? 0) + (f.stumpings ?? 0);
                   return (
                     <View key={f.name ?? i} style={s.pCard}>
+                      <View style={s.cardEdge} pointerEvents="none" />
                       <View style={s.pCardHead}>
                         <View style={[s.pAvatar, { backgroundColor: COLORS.teal }]}>
                           <Text style={s.pAvatarTxt}>{(f.name ?? 'F').charAt(0).toUpperCase()}</Text>
@@ -672,26 +686,26 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-      <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.border }}>
+      <View style={s.adBar}>
         <AdBanner />
       </View>
 
       <Modal visible={showDateAdConfirm} transparent animationType="fade">
         <View style={s.dropdownOverlay}>
           <View style={[s.dropdownMenu, { padding: SPACING.lg, minWidth: 280 }]}>
-            <Text style={{ color: COLORS.text, fontSize: 16, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 }}>Unlock Extended History</Text>
-            <Text style={{ color: COLORS.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 16 }}>
+            <Text style={{ ...TYPE.title, color: COLORS.text, textAlign: 'center', marginBottom: SPACING.sm }}>Unlock Extended History</Text>
+            <Text style={{ ...TYPE.caption, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 18, marginBottom: SPACING.md }}>
               Watch a short ad to view {pendingDateFilter === 'month60' ? 'the last 60 days' : pendingDateFilter === 'custom' ? 'a custom date range' : 'your lifetime stats'}.
             </Text>
             <AdBanner />
             <TouchableOpacity
-              style={{ backgroundColor: COLORS.primary, padding: 14, borderRadius: RADIUS.md, alignItems: 'center', marginTop: 16 }}
+              style={{ backgroundColor: COLORS.primary, padding: 14, borderRadius: RADIUS.md, alignItems: 'center', marginTop: SPACING.md, ...SHADOW.glow(COLORS.primary) }}
               onPress={() => { setShowDateAdConfirm(false); setShowDateAdRewarded(true); }}
             >
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Watch Ad & Continue</Text>
+              <Text style={{ ...TYPE.button, color: COLORS.onPrimary }}>Watch Ad & Continue</Text>
             </TouchableOpacity>
             <TouchableOpacity style={{ padding: 12, alignItems: 'center' }} onPress={() => { setShowDateAdConfirm(false); setPendingDateFilter(null); }}>
-              <Text style={{ color: COLORS.textMuted, fontSize: 13 }}>Cancel</Text>
+              <Text style={{ ...TYPE.caption, color: COLORS.textMuted }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -717,112 +731,146 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background, gap: 12 },
-  loadingTxt: { color: COLORS.textSecondary, fontSize: 13 },
+  loadingTxt: { ...TYPE.body, color: COLORS.textSecondary },
 
-  filterBlock: { paddingTop: 10, paddingBottom: 8 },
-  dropdownBtn: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10 },
-  dropdownBtnTxt: { color: COLORS.text, fontSize: 12, fontWeight: '600' },
-  dropdownArrow: { color: COLORS.primary, fontSize: 10 },
-  dropdownOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  dropdownMenu: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, paddingVertical: 8, minWidth: 200, borderWidth: 1, borderColor: COLORS.border },
+  // Shared 1px lit top edge, reused by every card on this screen. On a
+  // near-black background this is what makes a surface read as raised —
+  // cheaper and less muddy than a heavier border.
+  cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  adBar: { paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft },
+
+  // ── Filter block ──
+  filterBlock: { paddingTop: SPACING.sm, paddingBottom: 8 },
+  dropdownBtn: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.borderSoft, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10, ...SHADOW.sm },
+  dropdownBtnTxt: { ...TYPE.caption, fontWeight: '700', color: COLORS.text },
+  dropdownArrow: { color: COLORS.primaryLight, fontSize: 9 },
+  dropdownOverlay: { flex: 1, backgroundColor: COLORS.scrim, justifyContent: 'center', alignItems: 'center' },
+  // Menus sit on the highest surface so they detach clearly from the cards
+  // behind them.
+  dropdownMenu: { backgroundColor: COLORS.surface3, borderRadius: RADIUS.lg, paddingVertical: 8, minWidth: 210, borderWidth: 1, borderColor: COLORS.border, ...SHADOW.lg },
   dropdownItem: { paddingVertical: 12, paddingHorizontal: 20 },
-  dropdownItemTxt: { color: COLORS.textSecondary, fontSize: 14 },
-  filterScrollRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SPACING.lg, alignItems: 'center' },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADIUS.round, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
-  filterChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  filterChipTxt: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '700' },
-  filterChipTxtActive: { color: '#fff' },
-  filterChipCount: { fontSize: 11, opacity: 0.7 },
-  filterDivider: { width: 1, height: 22, backgroundColor: COLORS.border, marginHorizontal: 2 },
+  dropdownItemTxt: { ...TYPE.body, color: COLORS.textSecondary },
+  dropdownDivider: { height: StyleSheet.hairlineWidth, backgroundColor: COLORS.borderSoft, marginVertical: 4 },
 
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.border, marginTop: 6 },
-  tab: { flex: 1, paddingVertical: 11, alignItems: 'center', gap: 2 },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
+  // Segmented pill track: the selected chip is a filled primary pill with dark
+  // ink, the same control used on Home / My Teams / Tournament Detail.
+  filterScrollRow: { flexDirection: 'row', gap: 4, alignItems: 'center', backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.borderSoft, borderRadius: RADIUS.round, padding: 4, marginHorizontal: SPACING.lg, ...SHADOW.sm },
+  filterChip: { flex: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADIUS.round, alignItems: 'center' },
+  filterChipActive: { backgroundColor: COLORS.primary },
+  filterChipTxt: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
+  filterChipTxtActive: { color: COLORS.onPrimary },
+  filterChipCount: { ...TYPE.numSm, fontSize: 11 },
+  filterDivider: { width: StyleSheet.hairlineWidth, height: 22, backgroundColor: COLORS.borderSoft, marginHorizontal: 2 },
+
+  // ── Tabs ──
+  tabs: { flexDirection: 'row', gap: 4, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.borderSoft, borderRadius: RADIUS.round, padding: 4, marginHorizontal: SPACING.lg, marginTop: SPACING.sm, ...SHADOW.sm },
+  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', gap: 2, borderRadius: RADIUS.round },
+  tabActive: { backgroundColor: COLORS.primary },
   tabIcon: { fontSize: 15 },
-  tabTxt: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '700' },
-  tabTxtActive: { color: COLORS.primary },
+  tabTxt: { ...TYPE.label, fontSize: 9, color: COLORS.textSecondary },
+  tabTxtActive: { color: COLORS.onPrimary },
 
   scroll: { flex: 1 },
 
-  sectionHeader: { paddingHorizontal: SPACING.lg, marginTop: SPACING.lg, marginBottom: 10 },
-  sectionHeaderTitle: { color: COLORS.text, fontSize: 16, fontWeight: '800' },
-  sectionHeaderSub: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
+  sectionHeader: { paddingHorizontal: SPACING.lg, marginTop: SPACING.lg, marginBottom: SPACING.sm },
+  sectionHeaderTitle: { ...TYPE.h2, fontSize: 17, color: COLORS.text },
+  sectionHeaderSub: { ...TYPE.caption, color: COLORS.textMuted, marginTop: 2 },
 
-  formCard: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, borderWidth: 1, borderColor: COLORS.border },
-  formLabel: { color: COLORS.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.2, marginBottom: 10 },
+  // ── Recent form strip ──
+  formCard: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  formLabel: { ...TYPE.label, color: COLORS.textMuted, marginBottom: SPACING.sm },
   formRow: { flexDirection: 'row', gap: 9 },
-  formPill: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center' },
-  formPillTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  formPill: { width: 34, height: 34, borderRadius: 17, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.borderSoft, justifyContent: 'center', alignItems: 'center', ...SHADOW.sm },
+  formPillTxt: { ...TYPE.bodyStrong, fontSize: 13, color: '#fff' },
 
 
-  partnershipsBox: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.lg, paddingHorizontal: 14, paddingBottom: 6, borderWidth: 1, borderColor: COLORS.border },
-  partnershipRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: COLORS.border + '55' },
-  partnershipRank: { width: 24, height: 24, borderRadius: 12, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  partnershipRankGold: { backgroundColor: COLORS.yellow },
-  partnershipRankTxt: { color: COLORS.textSecondary, fontSize: 11, fontWeight: '800' },
-  partnershipNames: { color: COLORS.text, fontSize: 13, fontWeight: '700' },
-  partnershipSub: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
-  partnershipRuns: { color: COLORS.primary, fontSize: 16, fontWeight: '800' },
-  partnershipBalls: { color: COLORS.textMuted, fontSize: 11, fontWeight: '400' },
+  // ── Best partnerships ──
+  // Rank medallion left, the pair's names at readable body weight, and runs as
+  // the heaviest figure on the row since that is what the list is sorted by.
+  partnershipsBox: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.lg, paddingHorizontal: 14, paddingBottom: 6, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  partnershipRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  partnershipRank: { width: 26, height: 26, borderRadius: 13, backgroundColor: COLORS.primarySoft, borderWidth: 1, borderColor: COLORS.primary + '44', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  partnershipRankGold: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow, ...SHADOW.glow(COLORS.yellow) },
+  partnershipRankTxt: { ...TYPE.num, fontSize: 11, color: COLORS.primaryLight },
+  partnershipNames: { ...TYPE.bodyStrong, fontSize: 13, color: COLORS.text },
+  partnershipSub: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
+  partnershipRuns: { ...TYPE.num, fontSize: 18, color: COLORS.primaryLight },
+  partnershipBalls: { ...TYPE.numSm, fontSize: 11, fontWeight: '500', color: COLORS.textMuted },
 
-  matchList: { paddingBottom: 10 },
-  matchCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, marginHorizontal: SPACING.lg, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
-  mCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  mDate: { color: COLORS.textMuted, fontSize: 11, fontWeight: '600' },
+  // ── Match cards ──
+  matchList: { paddingBottom: SPACING.sm },
+  matchCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, marginHorizontal: SPACING.lg, marginBottom: 12, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  mCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
+  mDate: { ...TYPE.numSm, fontSize: 11, color: COLORS.textMuted },
+  // Status badges use the app-wide semantics: live is COLORS.live (never red,
+  // which reads as an error), done is success, paused is warning.
   mBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: RADIUS.round, borderWidth: 1, borderColor: 'transparent' },
-  mBadgeLive: { backgroundColor: COLORS.red + '22', borderColor: COLORS.red + '55' },
-  mBadgeDone: { backgroundColor: COLORS.primary + '1a', borderColor: COLORS.primary + '44' },
-  mBadgePaused: { backgroundColor: COLORS.orange + '22', borderColor: COLORS.orange + '55' },
-  mBadgeTxt: { color: COLORS.text, fontSize: 10, fontWeight: '800' },
-  mTeams: { color: COLORS.text, fontSize: 16, fontWeight: '800', marginBottom: 3 },
-  mVsInline: { color: COLORS.textMuted, fontSize: 13, fontWeight: '500' },
-  mVenue: { color: COLORS.textSecondary, fontSize: 12, marginBottom: 12 },
-  mScoresBlock: { backgroundColor: COLORS.card2, borderRadius: RADIUS.md, padding: 10 },
+  mBadgeLive: { backgroundColor: COLORS.live + '1f', borderColor: COLORS.live + '55' },
+  mBadgeDone: { backgroundColor: COLORS.success + '1a', borderColor: COLORS.success + '44' },
+  mBadgePaused: { backgroundColor: COLORS.warning + '1f', borderColor: COLORS.warning + '55' },
+  mBadgeTxt: { ...TYPE.label, fontSize: 9, color: COLORS.text },
+  mTeams: { ...TYPE.title, fontSize: 16, color: COLORS.text, marginBottom: 3 },
+  mVsInline: { ...TYPE.body, fontSize: 13, color: COLORS.textMuted },
+  mVenue: { ...TYPE.caption, color: COLORS.textSecondary },
+  // Nested raised surface so the two scorelines read as a mini scoreboard
+  // rather than more body text.
+  mScoresBlock: { backgroundColor: COLORS.card2, borderRadius: RADIUS.md, padding: 12, marginTop: SPACING.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.borderSoft },
   mScoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-  mTeamName: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600', flex: 1, marginRight: 8 },
-  mScore: { color: COLORS.text, fontSize: 15, fontWeight: '800' },
-  mScoreOvers: { color: COLORS.textMuted, fontSize: 11, fontWeight: '500' },
-  mScoreDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: 2 },
-  mWinnerBanner: { marginTop: 10, backgroundColor: COLORS.yellow + '18', borderRadius: RADIUS.sm, paddingVertical: 7, paddingHorizontal: 10 },
-  mWinnerTxt: { color: COLORS.yellow, fontSize: 12, fontWeight: '800' },
+  mTeamName: { ...TYPE.bodyStrong, fontSize: 13, color: COLORS.textSecondary, flex: 1, marginRight: 8 },
+  mScore: { ...TYPE.num, fontSize: 19, color: COLORS.text },
+  mScoreOvers: { ...TYPE.numSm, fontSize: 11, fontWeight: '500', color: COLORS.textMuted },
+  mScoreDivider: { height: StyleSheet.hairlineWidth, backgroundColor: COLORS.borderSoft, marginVertical: 3 },
+  // Tinted, with a left accent rather than a filled bar: the result is
+  // information, not an alert.
+  mWinnerBanner: { marginTop: SPACING.sm, backgroundColor: COLORS.yellow + '14', borderRadius: RADIUS.sm, paddingVertical: 8, paddingHorizontal: 10, borderLeftWidth: 3, borderLeftColor: COLORS.yellow },
+  mWinnerTxt: { ...TYPE.bodyStrong, fontSize: 12, color: COLORS.yellow, flex: 1 },
 
+  // ── Empty states ──
   empty: { alignItems: 'center', paddingVertical: 56, paddingHorizontal: SPACING.xl },
-  emptyIcon: { fontSize: 40, marginBottom: 10, opacity: 0.6 },
-  emptyTxt: { color: COLORS.text, fontSize: 15, fontWeight: '700', marginBottom: 6 },
-  emptySub: { color: COLORS.textMuted, fontSize: 12, textAlign: 'center', lineHeight: 18, maxWidth: 280 },
-  startBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 26, paddingVertical: 13, borderRadius: RADIUS.round, marginTop: 16 },
-  startBtnTxt: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  // The icon sits in a tinted disc so it anchors the block instead of floating.
+  emptyDisc: { width: 76, height: 76, borderRadius: 38, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.borderSoft, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.md, ...SHADOW.sm },
+  emptyIcon: { fontSize: 40, marginBottom: SPACING.sm, opacity: 0.6 },
+  emptyTxt: { ...TYPE.title, color: COLORS.text, marginBottom: 6, textAlign: 'center' },
+  emptySub: { ...TYPE.caption, color: COLORS.textMuted, textAlign: 'center', lineHeight: 18, maxWidth: 280 },
+  startBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 26, paddingVertical: 13, borderRadius: RADIUS.round, marginTop: SPACING.md, ...SHADOW.glow(COLORS.primary) },
+  startBtnTxt: { ...TYPE.button, color: COLORS.onPrimary },
 
   statsArea: { paddingBottom: SPACING.lg, gap: 14 },
-  sortRow: { flexDirection: 'row', gap: 8, paddingHorizontal: SPACING.lg, marginBottom: 2 },
-  sortChip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: RADIUS.round, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border },
-  sortChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  sortChipTxt: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '700' },
-  sortChipTxtActive: { color: '#fff' },
+  sortRow: { flexDirection: 'row', gap: 4, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.borderSoft, borderRadius: RADIUS.round, padding: 4, marginHorizontal: SPACING.lg, marginBottom: 2, ...SHADOW.sm },
+  sortChip: { flex: 1, paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.round, alignItems: 'center' },
+  sortChipActive: { backgroundColor: COLORS.primary },
+  sortChipTxt: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
+  sortChipTxtActive: { color: COLORS.onPrimary },
 
-  pCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.md, marginHorizontal: SPACING.lg, borderWidth: 1, borderColor: COLORS.border },
-  pCardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  pAvatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
-  pAvatarTxt: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  pName: { color: COLORS.text, fontSize: 15, fontWeight: '800' },
-  pSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
-  pHighlight: { backgroundColor: COLORS.primary + '1a', borderRadius: RADIUS.md, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary, minWidth: 58 },
-  pHNum: { color: COLORS.primary, fontSize: 20, fontWeight: '800' },
-  pHLbl: { color: COLORS.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.4 },
+  // ── Player stat cards ──
+  pCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.md, marginHorizontal: SPACING.lg, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  pCardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SPACING.sm, paddingBottom: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  pAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', ...SHADOW.sm },
+  pAvatarTxt: { ...TYPE.title, color: '#fff' },
+  pName: { ...TYPE.title, fontSize: 15, color: COLORS.text },
+  pSub: { ...TYPE.caption, fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  // The headline figure (runs / wickets / total) is the biggest thing in the
+  // card, in tabular figures so it never shifts width.
+  pHighlight: { backgroundColor: COLORS.primarySoft, borderRadius: RADIUS.md, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary + '55', minWidth: 62 },
+  pHNum: { ...TYPE.displaySm, fontSize: 26, color: COLORS.primary },
+  pHLbl: { ...TYPE.label, fontSize: 9, color: COLORS.textMuted, marginTop: 1 },
 
   scoreStrip: { flexDirection: 'row', gap: 6, marginBottom: 12, flexWrap: 'wrap' },
-  scoreDot: { minWidth: 28, height: 24, borderRadius: RADIUS.sm, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5, borderWidth: 1, borderColor: COLORS.border },
-  scoreDotTxt: { color: COLORS.text, fontSize: 10, fontWeight: '700' },
+  scoreDot: { minWidth: 28, height: 24, borderRadius: RADIUS.sm, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5, borderWidth: 1, borderColor: COLORS.borderSoft },
+  scoreDotTxt: { ...TYPE.numSm, fontSize: 10, color: COLORS.text },
 
+  // Label left in uppercase tracking, figure right in tabular numerals, so the
+  // values form a clean right-hand column instead of ragged text.
   statGrid: { gap: 0 },
-  statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border + '55' },
-  statLbl: { color: COLORS.textSecondary, fontSize: 13 },
-  statVal: { color: COLORS.text, fontSize: 13, fontWeight: '600' },
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  statLbl: { ...TYPE.colLabel, color: COLORS.textMuted },
+  statVal: { ...TYPE.num, color: COLORS.text, textAlign: 'right' },
 
+  // ── Fielding summary grid ──
   fieldSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: SPACING.lg, marginBottom: 4 },
-  fieldingBox: { width: '46%', backgroundColor: COLORS.card2, borderRadius: RADIUS.lg, padding: 16, alignItems: 'center', borderWidth: 1 },
-  fieldingIcon: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginBottom: 9 },
+  fieldingBox: { width: '46%', backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, alignItems: 'center', borderWidth: 1, overflow: 'hidden', ...SHADOW.sm },
+  fieldingIcon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 9 },
   fieldingIconTxt: { fontSize: 20 },
-  fieldingVal: { fontSize: 28, fontWeight: '800' },
-  fieldingLbl: { color: COLORS.textSecondary, fontSize: 11, marginTop: 4, fontWeight: '600' },
+  fieldingVal: { ...TYPE.displaySm, fontSize: 26 },
+  fieldingLbl: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary, marginTop: 4 },
 });

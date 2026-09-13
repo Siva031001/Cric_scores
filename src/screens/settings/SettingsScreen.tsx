@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import { deleteAccount } from '../../utils/firebase';
 import auth from '@react-native-firebase/auth';
@@ -59,7 +59,8 @@ export default function SettingsScreen({ navigation }: any) {
       <ScrollView contentContainerStyle={styles.content}>
         {items.map((item: any, i) => (
             <TouchableOpacity key={i} style={[styles.item, item.danger && styles.dangerItem, item.warning && styles.warningItem]} onPress={item.onPress}>
-            <View style={styles.itemIcon}>
+            <View pointerEvents="none" style={styles.itemEdge} />
+            <View style={[styles.itemIcon, item.danger && styles.itemIconDanger, item.warning && styles.itemIconWarning]}>
             <AppIcon
               emoji={item.icon}
               size={20}
@@ -70,7 +71,7 @@ export default function SettingsScreen({ navigation }: any) {
               <Text style={[styles.itemLabel, item.danger && styles.dangerText, item.warning && styles.warningText]}>{item.label}</Text>
                 {item.sublabel && <Text style={styles.itemSub}>{item.sublabel}</Text>}
             </View>
-              <AppIcon emoji="›" size={20} color={COLORS.textSecondary} />
+              <AppIcon emoji="›" size={20} color={COLORS.textMuted} />
             </TouchableOpacity>
         ))}
         <Text style={styles.version}>Cricket Scorer v1.0.0</Text>
@@ -81,17 +82,33 @@ export default function SettingsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SPACING.lg, gap: 12 },
-  item: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, borderRadius: RADIUS.md, padding: 16, borderWidth: 1, borderColor: COLORS.border, gap: 14 },
-  dangerItem: { borderColor: COLORS.red + '55' },
-  warningItem: { borderColor: COLORS.orange + '55' },
-  itemIcon: { width: 42, height: 42, borderRadius: RADIUS.sm, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center' },
+  content: { padding: SPACING.lg, gap: SPACING.sm + 2 },
+  // Rows are now proper elevated cards with a hairline top highlight, matching
+  // the menu grid on the home screen — they used to be flat outlined boxes.
+  item: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: COLORS.card, borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.md, paddingHorizontal: SPACING.md,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
+    gap: 14, overflow: 'hidden', ...SHADOW.sm,
+  },
+  itemEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  // Destructive rows get a tinted border AND a tinted icon tile, so the two
+  // dangerous actions are readable at a glance without shouting.
+  dangerItem: { borderColor: COLORS.error + '55' },
+  warningItem: { borderColor: COLORS.warning + '55' },
+  itemIcon: {
+    width: 44, height: 44, borderRadius: RADIUS.md,
+    backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center',
+  },
+  itemIconDanger: { backgroundColor: COLORS.error + '1f' },
+  itemIconWarning: { backgroundColor: COLORS.warning + '1f' },
   itemIconText: { fontSize: 20 },
   itemInfo: { flex: 1 },
-  itemLabel: { color: COLORS.text, fontSize: 15, fontWeight: 'bold' },
-  dangerText: { color: COLORS.red },
-  warningText: { color: COLORS.orange },
-  itemSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
+  itemLabel: { ...TYPE.title, fontSize: 15, color: COLORS.text },
+  dangerText: { color: COLORS.error },
+  warningText: { color: COLORS.warning },
+  itemSub: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 2 },
   arrow: { color: COLORS.textSecondary, fontSize: 20 },
-  version: { color: COLORS.textMuted, textAlign: 'center', marginTop: 20, fontSize: 12 },
+  version: { ...TYPE.label, fontSize: 10, color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.lg },
 });

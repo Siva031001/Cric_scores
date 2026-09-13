@@ -3,10 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput,
 import { useFocusEffect } from '@react-navigation/native';
 import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory, getTournamentsVersion } from '../../utils/firebase';
 import { AdBanner } from '../../components/AdPlaceholder';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import { getPublicTournaments, searchPublicTournaments, getHomePageTournaments, getTournamentDisplayStatus } from '../../utils/firebase';
 import LiveTournamentCarousel from '../../components/LiveTournamentCarousel';
 import AppIcon from '../../components/AppIcon';
+import Badge from '../../components/Badge';
 
 export default function HomeScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
@@ -135,8 +136,8 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={st.profileName}>{profile?.name ?? 'Cricketer'}</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <AppIcon emoji="⚙️" size={24} color={COLORS.text} />
+        <TouchableOpacity style={st.settingsBtn} onPress={() => navigation.navigate('Settings')}>
+          <AppIcon emoji="⚙️" size={20} color={COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -173,15 +174,17 @@ export default function HomeScreen({ navigation }: any) {
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
           {liveMatches.length > 0 && (
             <View style={st.liveSection}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <AppIcon emoji="🔴" size={13} color={COLORS.red} />
-                <Text style={[st.liveSectionTitle, { marginBottom: 0 }]}>Live Matches</Text>
+              <View style={st.liveHeaderRow}>
+                <Badge label="Live" tone="live" />
+                <Text style={st.liveSectionTitle}>Live Matches</Text>
               </View>
               {liveMatches.map((m: any) => (
                 <TouchableOpacity key={m.id} style={st.liveCard} onPress={() => navigation.navigate('Scoring', { matchId: m.id })}>
-                  <Text style={st.liveTeams}>{m.team1} vs {m.team2}</Text>
+                  <View style={st.liveCardTop}>
+                    <Text style={st.liveTeams} numberOfLines={1}>{m.team1} vs {m.team2}</Text>
+                    <Text style={st.liveContinue}>Continue →</Text>
+                  </View>
                   <Text style={st.liveScore}>{m.innings1?.runs ?? 0}/{m.innings1?.wickets ?? 0}{m.currentInnings === 2 ? ' | ' + (m.innings2?.runs ?? 0) + '/' + (m.innings2?.wickets ?? 0) : ''}</Text>
-                  <Text style={st.liveContinue}>Tap to continue →</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -189,10 +192,10 @@ export default function HomeScreen({ navigation }: any) {
 
           {/* Public Tournament Discovery */}
           <View style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: SPACING.lg, marginBottom: 10 }}>
-              <Text style={[st.liveSectionTitle, { marginBottom: 0 }]}>Discover Tournaments</Text>
+            <View style={st.sectionRow}>
+              <Text style={st.sectionTitle}>Discover Tournaments</Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 6, marginHorizontal: SPACING.lg, marginBottom: 10 }}>
+            <View style={st.chipRow}>
               {[
                 { key: 'all', label: 'All' },
                 { key: 'live', label: 'Live Now' },
@@ -203,12 +206,9 @@ export default function HomeScreen({ navigation }: any) {
                 <TouchableOpacity
                   key={f.key}
                   onPress={() => setTournamentFilter(f.key as any)}
-                  style={{
-                    paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.round,
-                    backgroundColor: tournamentFilter === f.key ? COLORS.primary : COLORS.card2,
-                  }}
+                  style={[st.chip, tournamentFilter === f.key && st.chipActive]}
                 >
-                  <Text style={{ color: tournamentFilter === f.key ? '#fff' : COLORS.textSecondary, fontSize: 11, fontWeight: 'bold' }}>{f.label}</Text>
+                  <Text style={[st.chipText, tournamentFilter === f.key && st.chipTextActive]}>{f.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -249,6 +249,7 @@ export default function HomeScreen({ navigation }: any) {
           <View style={st.grid}>
             {MENU.map(item => (
               <TouchableOpacity key={item.id} style={st.menuCard} onPress={() => navigation.navigate(item.screen)}>
+                <View pointerEvents="none" style={st.menuEdge} />
                 <View style={[st.iconBox, { backgroundColor: item.color + '22' }]}>
                   <AppIcon emoji={item.icon} size={22} color={item.color} />
                 </View>
@@ -270,41 +271,67 @@ export default function HomeScreen({ navigation }: any) {
 const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: 55, paddingBottom: 15 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: 55, paddingBottom: SPACING.md },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 2, borderColor: COLORS.primary },
+  // Ring gap between border and image reads as a deliberate avatar frame
+  // rather than a cropped square.
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', borderWidth: 2, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
   avatarImg: { width: '100%', height: '100%' },
-  avatarText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  greeting: { color: COLORS.textSecondary, fontSize: 12 },
-  profileName: { color: COLORS.text, fontSize: 16, fontWeight: 'bold' },
+  avatarText: { ...TYPE.h2, color: COLORS.primary },
+  greeting: { ...TYPE.caption, color: COLORS.textSecondary },
+  profileName: { ...TYPE.title, color: COLORS.text, marginTop: 1 },
   settingsIcon: { fontSize: 24 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, marginHorizontal: SPACING.lg, borderRadius: RADIUS.round, paddingHorizontal: 15, paddingVertical: 10, marginBottom: 5, borderWidth: 1, borderColor: COLORS.border, gap: 8 },
+  settingsBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, marginHorizontal: SPACING.lg, borderRadius: RADIUS.round, paddingHorizontal: SPACING.md, paddingVertical: 12, marginBottom: SPACING.xs, borderWidth: 1, borderColor: COLORS.border, gap: SPACING.sm, ...SHADOW.sm },
   searchIcon: { fontSize: 16 },
-  searchInput: { flex: 1, color: COLORS.text, fontSize: 14, padding: 0 },
+  searchInput: { flex: 1, ...TYPE.body, color: COLORS.text, padding: 0 },
   clearBtn: { color: COLORS.textSecondary, fontSize: 16 },
-  searchResultsBox: { backgroundColor: COLORS.card, marginHorizontal: SPACING.lg, borderRadius: RADIUS.md, marginTop: 5, borderWidth: 1, borderColor: COLORS.border, maxHeight: 350 },
-  noResults: { color: COLORS.textSecondary, padding: 20, textAlign: 'center' },
-  searchResultItem: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  searchResultsBox: { backgroundColor: COLORS.card, marginHorizontal: SPACING.lg, borderRadius: RADIUS.lg, marginTop: SPACING.xs, borderWidth: 1, borderColor: COLORS.border, maxHeight: 350, overflow: 'hidden', ...SHADOW.lg },
+  noResults: { ...TYPE.body, color: COLORS.textSecondary, padding: SPACING.lg, textAlign: 'center' },
+  searchResultItem: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
   searchResultIcon: { fontSize: 22 },
-  searchResultTitle: { color: COLORS.text, fontSize: 14, fontWeight: 'bold' },
-  searchResultSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
-  searchResultType: { color: COLORS.primary, fontSize: 11, fontWeight: 'bold', backgroundColor: COLORS.primary + '22', paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.round },
-  liveSection: { paddingHorizontal: SPACING.lg, marginBottom: 10, marginTop: 10 },
-  liveSectionTitle: { color: COLORS.red, fontSize: 13, fontWeight: 'bold', marginBottom: 8 },
-  liveCard: { backgroundColor: COLORS.red + '22', borderRadius: RADIUS.md, padding: 12, borderWidth: 1, borderColor: COLORS.red + '55', marginBottom: 8 },
-  liveTeams: { color: COLORS.text, fontSize: 14, fontWeight: 'bold' },
-  liveScore: { color: COLORS.primary, fontSize: 16, fontWeight: 'bold', marginTop: 3 },
-  liveContinue: { color: COLORS.red, fontSize: 11, marginTop: 4 },
-  featuredBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.primary, marginHorizontal: SPACING.lg, borderRadius: RADIUS.lg, padding: 18, marginBottom: 20, marginTop: 10 },
+  searchResultTitle: { ...TYPE.bodyStrong, color: COLORS.text },
+  searchResultSub: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 2 },
+  searchResultType: { ...TYPE.label, fontSize: 9, color: COLORS.primary, backgroundColor: COLORS.primarySoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.round, overflow: 'hidden' },
+
+  // ── Live section ──
+  // Given the strongest treatment on the screen: it is the one thing a scorer
+  // opens the app to reach.
+  liveSection: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.sm, marginTop: SPACING.md },
+  liveHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
+  liveSectionTitle: { ...TYPE.label, color: COLORS.live },
+  liveCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.live + '44', borderLeftWidth: 3, borderLeftColor: COLORS.live, marginBottom: SPACING.sm, ...SHADOW.md },
+  liveCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm },
+  liveTeams: { ...TYPE.title, color: COLORS.text },
+  // The score is the largest thing in the card, with tabular figures so it
+  // does not shift as runs tick over.
+  liveScore: { ...TYPE.displaySm, color: COLORS.primaryLight, marginTop: 2 },
+  liveContinue: { ...TYPE.caption, color: COLORS.textSecondary },
+
+  // ── Filter chips ──
+  chipRow: { flexDirection: 'row', gap: 6, marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, flexWrap: 'wrap' },
+  chip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: RADIUS.round, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border },
+  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipText: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
+  chipTextActive: { color: COLORS.onPrimary },
+
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: SPACING.lg, marginBottom: SPACING.sm },
+  sectionTitle: { ...TYPE.h2, color: COLORS.text },
+
+  // ── Primary call to action ──
+  featuredBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.primary, marginHorizontal: SPACING.lg, borderRadius: RADIUS.lg, padding: 18, marginBottom: SPACING.lg, marginTop: SPACING.sm, ...SHADOW.glow(COLORS.primary) },
   featuredLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   featuredIcon: { fontSize: 32 },
-  featuredTitle: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
-  featuredSub: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 },
-  featuredArrow: { color: '#fff', fontSize: 22 },
+  featuredTitle: { ...TYPE.title, fontSize: 17, color: COLORS.onPrimary },
+  featuredSub: { ...TYPE.caption, color: 'rgba(4,20,10,0.7)', marginTop: 2 },
+  featuredArrow: { color: COLORS.onPrimary, fontSize: 22 },
+
+  // ── Menu grid ──
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SPACING.md, gap: 12 },
-  menuCard: { width: '46%', backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, borderWidth: 1, borderColor: COLORS.border },
-  iconBox: { width: 44, height: 44, borderRadius: RADIUS.md, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  menuCard: { width: '46%', backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.sm },
+  menuEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  iconBox: { width: 44, height: 44, borderRadius: RADIUS.md, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.sm },
   menuIcon: { fontSize: 22 },
-  menuLabel: { color: COLORS.text, fontSize: 14, fontWeight: 'bold', marginBottom: 3 },
-  menuSub: { color: COLORS.textSecondary, fontSize: 11 },
+  menuLabel: { ...TYPE.bodyStrong, color: COLORS.text, marginBottom: 2 },
+  menuSub: { ...TYPE.caption, fontSize: 11, color: COLORS.textSecondary },
 });

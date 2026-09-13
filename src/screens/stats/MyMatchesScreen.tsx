@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { getMyLinkedPlayerId, getMatchesForPlayer } from '../../utils/firebase';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
+import AppIcon from '../../components/AppIcon';
 import { AdBanner } from '../../components/AdPlaceholder';
 
 export default function MyMatchesScreen({ navigation }: any) {
@@ -48,7 +49,7 @@ export default function MyMatchesScreen({ navigation }: any) {
             <Text style={s.startBtnTxt}>Go to Teams</Text>
           </TouchableOpacity>
         </View>
-        <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.border }}>
+        <View style={s.adBar}>
           <AdBanner />
         </View>
       </View>
@@ -198,6 +199,7 @@ export default function MyMatchesScreen({ navigation }: any) {
         if (formResults.length === 0) return null;
         return (
           <View style={s.formCard}>
+            <View pointerEvents="none" style={s.cardEdge} />
             <Text style={s.formLabel}>RECENT FORM</Text>
             <View style={s.formRow}>
               {formResults.map((r: any, i: number) => (
@@ -239,6 +241,7 @@ export default function MyMatchesScreen({ navigation }: any) {
               </View>
             ) : (
               <View style={s.pCard}>
+                <View pointerEvents="none" style={s.cardEdge} />
                 <View style={s.pCardHead}>
                   <View style={s.pAvatar}>
                     <Text style={s.pAvatarTxt}>{(myName || 'M').charAt(0).toUpperCase()}</Text>
@@ -275,6 +278,7 @@ export default function MyMatchesScreen({ navigation }: any) {
               </View>
             ) : (
               <View style={s.pCard}>
+                <View pointerEvents="none" style={s.cardEdge} />
                 <View style={s.pCardHead}>
                   <View style={[s.pAvatar, { backgroundColor: COLORS.red }]}>
                     <Text style={s.pAvatarTxt}>{(myName || 'M').charAt(0).toUpperCase()}</Text>
@@ -310,9 +314,10 @@ export default function MyMatchesScreen({ navigation }: any) {
                 { icon: '🥅', label: 'Stumpings', value: fieldAgg.stumpings,          color: COLORS.purple },
                 { icon: '📋', label: 'Matches',   value: matches.length,              color: COLORS.primary },
               ].map((f, i) => (
-                <View key={i} style={[s.fieldBox, { borderColor: f.color }]}>
+                <View key={i} style={[s.fieldBox, { borderColor: f.color + '55' }]}>
+                  <View pointerEvents="none" style={s.cardEdge} />
                   <View style={[s.fieldIcon, { backgroundColor: f.color + '22' }]}>
-                    <Text style={s.fieldIconTxt}>{f.icon}</Text>
+                    <AppIcon emoji={f.icon} size={20} color={f.color} />
                   </View>
                   <Text style={[s.fieldVal, { color: f.color }]}>{f.value}</Text>
                   <Text style={s.fieldLbl}>{f.label}</Text>
@@ -333,7 +338,7 @@ export default function MyMatchesScreen({ navigation }: any) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-      <View style={{ paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.border }}>
+      <View style={s.adBar}>
         <AdBanner />
       </View>
     </View>
@@ -343,45 +348,71 @@ export default function MyMatchesScreen({ navigation }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
-  profileBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  profileAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
-  profileAvatarTxt: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  profileName: { color: COLORS.text, fontSize: 16, fontWeight: 'bold' },
-  profileSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
-  formCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, margin: SPACING.lg, marginBottom: 0, borderWidth: 1, borderColor: COLORS.border },
-  formLabel: { color: COLORS.textMuted, fontSize: 10, fontWeight: 'bold', letterSpacing: 1.2, marginBottom: 10 },
+
+  // Shared 1px lit top edge, reused by every card on this screen. Cheaper than
+  // a full border and it is what makes a dark surface read as raised.
+  cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  adBar: { paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft },
+
+  // ── Identity banner ──
+  // Ringed avatar with a soft glow, matching the Home screen, so the two
+  // screens read as the same product.
+  profileBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  profileAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  profileAvatarTxt: { ...TYPE.h2, color: COLORS.primary },
+  profileName: { ...TYPE.title, color: COLORS.text },
+  profileSub: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 2 },
+
+  // ── Recent form strip ──
+  formCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, margin: SPACING.lg, marginBottom: 0, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  formLabel: { ...TYPE.label, color: COLORS.textMuted, marginBottom: 10 },
   formRow: { flexDirection: 'row', gap: 9 },
-  formPill: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center' },
-  formPillTxt: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
-  tabTxt: { color: COLORS.textSecondary, fontSize: 12, fontWeight: 'bold' },
-  tabTxtActive: { color: COLORS.primary },
+  formPill: { width: 34, height: 34, borderRadius: 17, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.borderSoft, justifyContent: 'center', alignItems: 'center', ...SHADOW.sm },
+  formPillTxt: { ...TYPE.bodyStrong, fontSize: 13, color: '#fff' },
+
+  // ── Tabs ──
+  // Hairline base + a 2px primary underline on the active tab: the underline is
+  // the only strong line, so it is unmistakable which tab is selected.
+  tabs: { flexDirection: 'row', gap: 4, marginHorizontal: SPACING.md, marginBottom: SPACING.sm, backgroundColor: COLORS.card, borderRadius: RADIUS.round, padding: 4, borderWidth: 1, borderColor: COLORS.borderSoft },
+  tab: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: RADIUS.round },
+  tabActive: { backgroundColor: COLORS.primary },
+  tabTxt: { ...TYPE.label, color: COLORS.textSecondary },
+  tabTxtActive: { color: COLORS.onPrimary },
+
   scroll: { flex: 1 },
   statsArea: { padding: SPACING.lg, gap: 14 },
+
   empty: { alignItems: 'center', paddingVertical: 50, paddingHorizontal: SPACING.xl },
-  emptyTxt: { color: COLORS.textSecondary, fontSize: 15, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
-  emptySub: { color: COLORS.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
-  startBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: RADIUS.round },
-  startBtnTxt: { color: '#fff', fontWeight: 'bold' },
-  pCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border },
-  pCardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  pAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
-  pAvatarTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  pName: { color: COLORS.text, fontSize: 15, fontWeight: 'bold' },
-  pSub: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
-  pHighlight: { backgroundColor: COLORS.primary + '22', borderRadius: RADIUS.md, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary },
-  pHNum: { color: COLORS.primary, fontSize: 22, fontWeight: 'bold' },
-  pHLbl: { color: COLORS.textMuted, fontSize: 9 },
-  statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border + '66' },
-  statLbl: { color: COLORS.textSecondary, fontSize: 13 },
-  statVal: { color: COLORS.text, fontSize: 13 },
-  // Fielding summary grid
+  emptyTxt: { ...TYPE.title, color: COLORS.text, marginBottom: SPACING.sm, textAlign: 'center' },
+  emptySub: { ...TYPE.body, color: COLORS.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: SPACING.md },
+  startBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 26, paddingVertical: 13, borderRadius: RADIUS.round, ...SHADOW.glow(COLORS.primary) },
+  startBtnTxt: { ...TYPE.button, color: COLORS.onPrimary },
+
+  // ── Player stat card ──
+  pCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  pCardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SPACING.sm, paddingBottom: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  pAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', ...SHADOW.sm },
+  pAvatarTxt: { ...TYPE.title, color: '#fff' },
+  pName: { ...TYPE.title, fontSize: 15, color: COLORS.text },
+  pSub: { ...TYPE.caption, fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  // The headline figure (runs / wickets) is the single biggest thing in the
+  // card, in tabular figures so it never shifts width.
+  pHighlight: { backgroundColor: COLORS.primarySoft, borderRadius: RADIUS.md, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary + '55', minWidth: 62 },
+  pHNum: { ...TYPE.displaySm, fontSize: 24, color: COLORS.primary },
+  pHLbl: { ...TYPE.label, fontSize: 9, color: COLORS.textMuted, marginTop: 1 },
+
+  // ── Stat rows ──
+  // Label left in uppercase tracking, figure right in tabular numerals, so the
+  // values form a clean right-hand column instead of ragged text.
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  statLbl: { ...TYPE.colLabel, color: COLORS.textMuted },
+  statVal: { ...TYPE.num, color: COLORS.text, textAlign: 'right' },
+
+  // ── Fielding summary grid ──
   fieldGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  fieldBox: { width: '46%', backgroundColor: COLORS.card2, borderRadius: RADIUS.md, padding: 16, alignItems: 'center', borderWidth: 1 },
-  fieldIcon: { width: 40, height: 40, borderRadius: RADIUS.sm, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  fieldBox: { width: '46%', backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, alignItems: 'center', borderWidth: 1, overflow: 'hidden', ...SHADOW.sm },
+  fieldIcon: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.sm },
   fieldIconTxt: { fontSize: 20 },
-  fieldVal: { fontSize: 28, fontWeight: 'bold' },
-  fieldLbl: { color: COLORS.textSecondary, fontSize: 11, marginTop: 4 },
+  fieldVal: { ...TYPE.displaySm, fontSize: 26 },
+  fieldLbl: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary, marginTop: 4 },
 });

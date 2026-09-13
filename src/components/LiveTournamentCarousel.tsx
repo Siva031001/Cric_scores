@@ -1,9 +1,14 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, Image } from 'react-native';
-import { COLORS, RADIUS, SPACING } from '../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../constants/theme';
 import { getTournamentDisplayStatus } from '../utils/firebase';
+import Badge from './Badge';
 
+// Poster-style cards, so the banner is the card rather than a strip inside it.
+// Taller and wider than before: this is the visual centrepiece of the home
+// screen, and a 70px band could not carry an uploaded poster.
 const CARD_WIDTH = Dimensions.get('window').width * 0.72;
+const CARD_HEIGHT = 210;
 
 // Generates a consistent, distinct gradient-ish two-tone look per tournament
 // name, so cards are visually distinguishable from each other without any
@@ -40,54 +45,78 @@ export default function LiveTournamentCarousel({ tournaments, onPress }: { tourn
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.scrollContent} snapToInterval={CARD_WIDTH + 12} decelerationRate="fast">
-      {tournaments.map((t) => (
-        <TouchableOpacity key={t.id} style={[s.card, { width: CARD_WIDTH }]} onPress={() => onPress(t)}>
-          {t.bannerUrl ? (
-            <Image source={{ uri: t.bannerUrl }} style={s.banner} resizeMode="cover" />
-          ) : (
-            <View style={[s.banner, { backgroundColor: getBannerPalette(t.name)[0] }]}>
-              <View style={[s.bannerAccent, { backgroundColor: getBannerPalette(t.name)[1] }]} />
-              <Text style={s.bannerInitial}>{(t.name ?? '?').charAt(0).toUpperCase()}</Text>
+      {tournaments.map((t) => {
+        // Computed once per card instead of calling getTournamentDisplayStatus
+        // four times in the JSX. Same function, same argument, same result —
+        // no change to how status is derived.
+        const status = getTournamentDisplayStatus(t);
+        const palette = getBannerPalette(t.name);
+        return (
+          <TouchableOpacity key={t.id} style={[s.card, { width: CARD_WIDTH, height: CARD_HEIGHT }]} onPress={() => onPress(t)} activeOpacity={0.85}>
+            {t.bannerUrl ? (
+              <Image source={{ uri: t.bannerUrl }} style={s.banner} resizeMode="cover" />
+            ) : (
+              <View style={[s.banner, { backgroundColor: palette[0] }]}>
+                <View style={[s.bannerAccent, { backgroundColor: palette[1] }]} />
+                <View style={[s.bannerAccent2, { backgroundColor: palette[1] }]} />
+                <Text style={s.bannerInitial}>{(t.name ?? '?').charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+
+            {/* Scrim so white text stays legible over any uploaded poster,
+                however bright it is. */}
+            <View pointerEvents="none" style={s.scrim} />
+
+            {status === 'live' && <View style={s.badgeSlot}><Badge label="Live" tone="live" /></View>}
+
+            <View style={s.info}>
+              <Text style={s.name} numberOfLines={1}>{t.name}</Text>
+              <Text style={s.meta} numberOfLines={1}>{t.venue || 'Venue TBD'}</Text>
+              <View style={s.metaRow}>
+                <View style={s.tag}><Text style={s.tagTxt}>{t.tournamentFormat || 'League'}</Text></View>
+                <View style={s.tag}><Text style={s.tagTxt}>{(t.teams ?? []).length} teams</Text></View>
+                {status !== 'live' && (
+                  <Badge
+                    label={status === 'completed' ? 'Completed' : 'Upcoming'}
+                    tone={status === 'completed' ? 'success' : 'info'}
+                    style={s.pushRight}
+                  />
+                )}
+              </View>
             </View>
-          )}
-          {getTournamentDisplayStatus(t) === 'live' && (
-            <View style={s.liveBadge}>
-              <View style={s.liveDot} />
-              <Text style={s.liveTxt}>LIVE</Text>
-            </View>
-          )}
-          <Text style={s.name} numberOfLines={1}>{t.name}</Text>
-          <Text style={s.meta} numberOfLines={1}>📍 {t.venue || 'Venue TBD'}</Text>
-          <View style={s.metaRow}>
-            <Text style={s.metaSmall}>{t.tournamentFormat || 'League'}</Text>
-            <Text style={s.metaSmall}>{(t.teams ?? []).length} teams</Text>
-            <View style={[s.statusPill, getTournamentDisplayStatus(t) === 'live' && s.statusPillLive, getTournamentDisplayStatus(t) === 'completed' && s.statusPillDone]}>
-              <Text style={s.statusPillTxt}>{getTournamentDisplayStatus(t) === 'live' ? 'Live' : getTournamentDisplayStatus(t) === 'completed' ? 'Completed' : 'Upcoming'}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      ))}
+          </TouchableOpacity>
+        );
+      })}
     </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  scrollContent: { paddingHorizontal: SPACING.lg, gap: 12 },
+  scrollContent: { paddingHorizontal: SPACING.lg, gap: 12, paddingBottom: SPACING.sm },
   emptyBox: { padding: SPACING.lg, alignItems: 'center' },
-  emptyTxt: { color: COLORS.textMuted, fontSize: 13 },
-  card: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 12, borderWidth: 1, borderColor: COLORS.border, marginRight: 12 },
-  banner: { height: 70, borderRadius: RADIUS.md, justifyContent: 'center', alignItems: 'center', marginBottom: 8, position: 'relative', overflow: 'hidden' },
-  bannerAccent: { position: 'absolute', right: -20, top: -20, width: 90, height: 90, borderRadius: 45, opacity: 0.6 },
-  bannerInitial: { color: COLORS.primary, fontSize: 28, fontWeight: 'bold' },
-  liveBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: COLORS.red, borderRadius: RADIUS.round, paddingHorizontal: 8, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  liveTxt: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
-  name: { color: COLORS.text, fontSize: 14, fontWeight: 'bold', marginBottom: 2 },
-  meta: { color: COLORS.textSecondary, fontSize: 11, marginBottom: 6 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  metaSmall: { color: COLORS.textMuted, fontSize: 10 },
-  statusPill: { backgroundColor: COLORS.card2, paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.round, marginLeft: 'auto' },
-  statusPillLive: { backgroundColor: COLORS.red + '33' },
-  statusPillDone: { backgroundColor: COLORS.primary + '33' },
-  statusPillTxt: { color: COLORS.text, fontSize: 9, fontWeight: 'bold' },
+  emptyTxt: { ...TYPE.body, color: COLORS.textMuted },
+  card: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+    marginRight: 12,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+    ...SHADOW.lg,
+  },
+  // Fills the whole card rather than sitting in a band at the top.
+  banner: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
+  bannerAccent: { position: 'absolute', right: -30, top: -30, width: 140, height: 140, borderRadius: 70, opacity: 0.55 },
+  bannerAccent2: { position: 'absolute', left: -40, bottom: -50, width: 160, height: 160, borderRadius: 80, opacity: 0.3 },
+  bannerInitial: { fontSize: 64, fontWeight: '800', color: 'rgba(255,255,255,0.28)' },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(6,6,14,0.45)' },
+  badgeSlot: { position: 'absolute', top: SPACING.sm, right: SPACING.sm },
+  info: { padding: SPACING.md, gap: 3 },
+  name: { ...TYPE.h2, color: '#fff' },
+  meta: { ...TYPE.caption, color: 'rgba(255,255,255,0.72)', marginBottom: 4 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tag: { backgroundColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.round },
+  tagTxt: { ...TYPE.label, fontSize: 9, color: '#fff' },
+  pushRight: { marginLeft: 'auto' },
 });

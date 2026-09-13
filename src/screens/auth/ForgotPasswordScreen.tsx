@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import { startForgotPasswordOtp, verifyForgotPasswordOtp, resetPinWithPhoneAuth, getOtpSendNumber, recordFailedOtpAttempt, resetOtpAttempts, checkOtpRateLimit } from "../../utils/pinAuthService";
 import { AdRewardedGate } from "../../components/AdPlaceholder";
-import { COLORS, RADIUS, SPACING } from "../../constants/theme";
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from "../../constants/theme";
 import Header from "../../components/Header";
+import Card from "../../components/Card";
 
 type Step = "phone" | "otp" | "newPin";
 
@@ -125,37 +126,41 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
       <View style={s.content}>
         {step === "phone" && (
           <>
-            <Text style={s.label}>Enter your registered mobile number</Text>
-            <TextInput
-              style={s.input}
-              placeholder="10-digit mobile number (no +91, no spaces)"
-              placeholderTextColor={COLORS.textMuted}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
+            <Card tone="base" elevation="md" style={s.card}>
+              <Text style={s.label}>Enter your registered mobile number</Text>
+              <TextInput
+                style={s.input}
+                placeholder="10-digit mobile number (no +91, no spaces)"
+                placeholderTextColor={COLORS.textMuted}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </Card>
             <TouchableOpacity style={s.btn} onPress={handleSendOtp} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Send OTP</Text>}
+              {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={s.btnTxt}>Send OTP</Text>}
             </TouchableOpacity>
           </>
         )}
 
         {step === "otp" && (
           <>
-            <Text style={s.label}>Enter the OTP sent to {phone}</Text>
-            <Text style={{ color: COLORS.textMuted, fontSize: 12, marginBottom: 8 }}>
-              {verifyAttemptsLeft < 5 ? `${verifyAttemptsLeft} attempt${verifyAttemptsLeft !== 1 ? "s" : ""} remaining` : "Valid for 15 minutes"}
-            </Text>
-            <TextInput
-              style={s.input}
-              placeholder="6-digit code"
-              placeholderTextColor={COLORS.textMuted}
-              value={otp}
-              onChangeText={setOtp}
-              keyboardType="number-pad"
-            />
+            <Card tone="base" elevation="md" style={s.card}>
+              <Text style={s.label}>Enter the OTP sent to {phone}</Text>
+              <Text style={s.hint}>
+                {verifyAttemptsLeft < 5 ? `${verifyAttemptsLeft} attempt${verifyAttemptsLeft !== 1 ? "s" : ""} remaining` : "Valid for 15 minutes"}
+              </Text>
+              <TextInput
+                style={s.codeInput}
+                placeholder="6-digit code"
+                placeholderTextColor={COLORS.textMuted}
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+              />
+            </Card>
             <TouchableOpacity style={s.btn} onPress={handleVerifyOtp} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Verify OTP</Text>}
+              {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={s.btnTxt}>Verify OTP</Text>}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleSendOtp}
@@ -174,29 +179,31 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
 
         {step === "newPin" && (
           <>
-            <Text style={s.label}>Set a new PIN</Text>
-            <TextInput
-              style={s.input}
-              placeholder="New PIN (4-6 digits)"
-              placeholderTextColor={COLORS.textMuted}
-              value={newPin}
-              onChangeText={setNewPin}
-              keyboardType="number-pad"
-              secureTextEntry
-              maxLength={6}
-            />
-            <TextInput
-              style={s.input}
-              placeholder="Confirm New PIN"
-              placeholderTextColor={COLORS.textMuted}
-              value={confirmPin}
-              onChangeText={setConfirmPin}
-              keyboardType="number-pad"
-              secureTextEntry
-              maxLength={6}
-            />
+            <Card tone="base" elevation="md" style={s.card}>
+              <Text style={s.label}>Set a new PIN</Text>
+              <TextInput
+                style={s.input}
+                placeholder="New PIN (4-6 digits)"
+                placeholderTextColor={COLORS.textMuted}
+                value={newPin}
+                onChangeText={setNewPin}
+                keyboardType="number-pad"
+                secureTextEntry
+                maxLength={6}
+              />
+              <TextInput
+                style={[s.input, s.inputLast]}
+                placeholder="Confirm New PIN"
+                placeholderTextColor={COLORS.textMuted}
+                value={confirmPin}
+                onChangeText={setConfirmPin}
+                keyboardType="number-pad"
+                secureTextEntry
+                maxLength={6}
+              />
+            </Card>
             <TouchableOpacity style={s.btn} onPress={handleResetPin} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnTxt}>Reset PIN</Text>}
+              {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={s.btnTxt}>Reset PIN</Text>}
             </TouchableOpacity>
           </>
         )}
@@ -225,9 +232,32 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.lg, gap: 12 },
-  label: { color: COLORS.textSecondary, fontSize: 14, marginBottom: 8 },
-  input: { backgroundColor: COLORS.card, color: COLORS.text, padding: 14, borderRadius: RADIUS.md, fontSize: 15, borderWidth: 1, borderColor: COLORS.border },
-  btn: { backgroundColor: COLORS.primary, padding: 15, borderRadius: RADIUS.md, alignItems: "center", marginTop: 6 },
-  btnTxt: { color: "#fff", fontSize: 15, fontWeight: "bold" },
-  link: { color: COLORS.primary, textAlign: "center", marginTop: 10, fontSize: 13 },
+  // Each step's fields now sit in one elevated card, so the screen reads as a
+  // single task rather than controls stacked on a flat background.
+  card: { padding: SPACING.md + 2 },
+  label: { ...TYPE.label, color: COLORS.textSecondary, marginBottom: SPACING.sm },
+  hint: { ...TYPE.caption, color: COLORS.textMuted, marginTop: -4, marginBottom: SPACING.sm },
+  // Taller target, raised surface against the card, and a heavier radius.
+  input: {
+    backgroundColor: COLORS.card2, color: COLORS.text,
+    ...TYPE.body, fontSize: 15,
+    paddingHorizontal: SPACING.md, paddingVertical: 16,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border,
+    marginBottom: SPACING.sm,
+  },
+  inputLast: { marginBottom: 0 },
+  // A one-time code is a number, not prose: centred, spaced, tabular.
+  codeInput: {
+    backgroundColor: COLORS.card2, color: COLORS.text,
+    ...TYPE.displaySm, fontSize: 22, textAlign: "center", letterSpacing: 8,
+    paddingVertical: 16, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  btn: {
+    backgroundColor: COLORS.primary, height: 54,
+    borderRadius: RADIUS.md, alignItems: "center", justifyContent: "center",
+    marginTop: SPACING.xs, ...SHADOW.glow(COLORS.primary),
+  },
+  btnTxt: { ...TYPE.button, fontSize: 16, color: COLORS.background },
+  link: { ...TYPE.bodyStrong, color: COLORS.primaryLight, textAlign: "center", paddingVertical: SPACING.sm },
 });

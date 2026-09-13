@@ -3,8 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'rea
 import { updateMatch } from '../../utils/firebase';
 import { STREAM_THEMES } from '../../utils/streamThemes';
 import LiveScoreOverlay from '../../components/LiveScoreOverlay';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
+import AppIcon from '../../components/AppIcon';
 
 export default function ThemeSelectorScreen({ route, navigation }: any) {
   const { matchId, match, currentThemeId } = route.params ?? {};
@@ -40,14 +41,18 @@ export default function ThemeSelectorScreen({ route, navigation }: any) {
             key={theme.id}
             style={[s.themeCard, currentThemeId === theme.id && s.themeCardActive]}
             onPress={() => handleSelect(theme.id, theme.isPremium)}
+            activeOpacity={0.85}
           >
             <View style={s.previewWrap}>
               <LiveScoreOverlay match={match} themeId={theme.id} />
             </View>
-            <View style={s.themeFooter}>
+            <View style={[s.themeFooter, currentThemeId === theme.id && s.themeFooterActive]}>
               <Text style={s.themeName}>{theme.name}</Text>
               {theme.isPremium ? (
-                <View style={s.premiumTag}><Text style={s.premiumTagTxt}>🔒 Premium</Text></View>
+                <View style={s.premiumTag}>
+                  <AppIcon emoji="🔒" size={11} color={COLORS.yellow} />
+                  <Text style={s.premiumTagTxt}>Premium</Text>
+                </View>
               ) : (
                 <View style={s.freeTag}><Text style={s.freeTagTxt}>Free</Text></View>
               )}
@@ -61,14 +66,47 @@ export default function ThemeSelectorScreen({ route, navigation }: any) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { padding: SPACING.lg, gap: 14 },
-  themeCard: { borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.border, overflow: 'hidden' },
-  themeCardActive: { borderColor: COLORS.primary },
-  previewWrap: { padding: 4 },
-  themeFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, backgroundColor: COLORS.card },
-  themeName: { color: COLORS.text, fontWeight: 'bold', fontSize: 14 },
-  premiumTag: { backgroundColor: COLORS.yellow + '33', paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.round },
-  premiumTagTxt: { color: COLORS.yellow, fontSize: 11, fontWeight: 'bold' },
-  freeTag: { backgroundColor: COLORS.primary + '33', paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.round },
-  freeTagTxt: { color: COLORS.primary, fontSize: 11, fontWeight: 'bold' },
+  scroll: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
+  // Each option is a preview card: the overlay renders inside it, so the choice
+  // is made by looking at the thing rather than reading its name.
+  themeCard: {
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+    backgroundColor: COLORS.card,
+    overflow: 'hidden',
+    ...SHADOW.md,
+  },
+  // Selection is carried by a brand-coloured edge plus a glow, so the current
+  // theme is obvious at a glance in a scrolling list of similar cards.
+  themeCardActive: {
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    ...SHADOW.glow(COLORS.primary),
+  },
+  // Darker inset so the overlay preview reads as a broadcast frame rather than
+  // as part of the card chrome.
+  previewWrap: { padding: SPACING.sm, backgroundColor: COLORS.background },
+  themeFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm + 1,
+    backgroundColor: COLORS.card2,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft,
+  },
+  themeFooterActive: { backgroundColor: COLORS.primarySoft },
+  // A theme's own name, so title weight — not the uppercase label treatment.
+  themeName: { ...TYPE.title, color: COLORS.text },
+  premiumTag: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: COLORS.yellow + '1f',
+    borderWidth: 1, borderColor: COLORS.yellow + '55',
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.round,
+  },
+  premiumTagTxt: { ...TYPE.label, color: COLORS.yellow },
+  freeTag: {
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1, borderColor: COLORS.primary + '55',
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.round,
+  },
+  freeTagTxt: { ...TYPE.label, color: COLORS.primary },
 });

@@ -3,9 +3,11 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { WebView } from 'react-native-webview';
 import { subscribeToMatch } from '../../utils/firebase';
 import { getOversString, getRunRate, getRequiredRunRate, statKey } from '../../utils/cricketLogic';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, SHADOW, TYPE } from '../../constants/theme';
 import Header from '../../components/Header';
 import LiveScoreOverlay from '../../components/LiveScoreOverlay';
+import Badge from '../../components/Badge';
+import AppIcon from '../../components/AppIcon';
 import { getBallByBall, getCurrentPartnership, getWormData, getWinProbability } from '../../utils/matchAnalytics';
 import WormGraph from '../../components/WormGraph';
 
@@ -91,11 +93,10 @@ export default function LiveViewScreen({ navigation }: any) {
           <Text style={s.backTxt}>Back</Text>
         </TouchableOpacity>
         <View style={s.headerCenter}>
-          <View style={s.livePill}>
-            <View style={s.liveDot} />
-            <Text style={s.liveTxt}>LIVE</Text>
-          </View>
-          <Text style={s.headerTeams}>{match.team1} vs {match.team2}</Text>
+          {/* Same LIVE indicator, now the shared Badge: it pulses its own dot
+              on the native driver, so no state or timer lives in this screen. */}
+          <Badge label="LIVE" tone="live" />
+          <Text style={s.headerTeams} numberOfLines={1}>{match.team1} vs {match.team2}</Text>
         </View>
         <Text style={s.matchIdTxt}>#{matchId.toUpperCase()}</Text>
       </View>
@@ -176,7 +177,7 @@ export default function LiveViewScreen({ navigation }: any) {
               <Text style={s.strikerName}>* {getName(batP, inn?.strikerId)}</Text>
               <Text style={s.playerRoleLbl}>batting</Text>
             </View>
-            <Text style={[s.pdCell, s.pdStat, {color: COLORS.primary, fontWeight:'bold'}]}>{ss?.runs ?? 0}</Text>
+            <Text style={[s.pdCell, s.pdStat, s.pdStatStrong]}>{ss?.runs ?? 0}</Text>
             <Text style={[s.pdCell, s.pdStat]}>{ss?.balls ?? 0}</Text>
             <Text style={[s.pdCell, s.pdStat]}>{ss?.fours ?? 0}</Text>
             <Text style={[s.pdCell, s.pdStat]}>{ss?.sixes ?? 0}</Text>
@@ -214,7 +215,7 @@ export default function LiveViewScreen({ navigation }: any) {
             </View>
             <Text style={[s.pdCell, s.pdStat]}>{bws?.overs ?? 0}.{bws?.balls ?? 0}</Text>
             <Text style={[s.pdCell, s.pdStat]}>{bws?.runs ?? 0}</Text>
-            <Text style={[s.pdCell, s.pdStat, {color: (bws?.wickets ?? 0) > 0 ? COLORS.red : COLORS.text}]}>{bws?.wickets ?? 0}</Text>
+            <Text style={[s.pdCell, s.pdStat, s.pdStatStrong, {color: (bws?.wickets ?? 0) > 0 ? COLORS.live : COLORS.text}]}>{bws?.wickets ?? 0}</Text>
             <Text style={[s.pdCell, s.pdStat]}>
               {bws && (bws.overs + bws.balls/6) > 0 ? (bws.runs / (bws.overs + bws.balls/6)).toFixed(1) : '0.0'}
             </Text>
@@ -243,20 +244,25 @@ export default function LiveViewScreen({ navigation }: any) {
 )}
 
         <TouchableOpacity style={s.linkBtn} onPress={() => navigation.navigate('Scorecard', { matchId: matchId.toUpperCase() })}>
-  <Text style={s.linkBtnTxt}>📊 View Full Scorecard</Text>
+  <AppIcon emoji="📊" size={16} color={COLORS.primaryLight} />
+  <Text style={s.linkBtnTxt}>View Full Scorecard</Text>
 </TouchableOpacity>
 {match.tournamentId && (
   <TouchableOpacity style={s.linkBtn} onPress={() => navigation.navigate('TournamentLeaderboard', { tournamentId: match.tournamentId })}>
-    <Text style={s.linkBtnTxt}>🏆 View Tournament Points Table</Text>
+    <AppIcon emoji="🏆" size={16} color={COLORS.primaryLight} />
+    <Text style={s.linkBtnTxt}>View Tournament Points Table</Text>
   </TouchableOpacity>
 )}
 
 <View style={s.analyticsCard}>
-  <Text style={s.analyticsTitle}>🤖 AI Commentary</Text>
+  <View style={s.analyticsTitleRow}>
+    <AppIcon emoji="🤖" size={14} color={COLORS.primaryLight} />
+    <Text style={s.analyticsTitle}>AI Commentary</Text>
+  </View>
   {inn?.latestCommentaryText ? (
-    <Text style={{ color: COLORS.text, fontSize: 14 }}>{inn.latestCommentaryText}</Text>
+    <Text style={s.commentaryTxt}>{inn.latestCommentaryText}</Text>
   ) : (
-    <Text style={{ color: COLORS.textMuted, fontSize: 12, fontStyle: 'italic' }}>Commentary will appear here once scoring begins.</Text>
+    <Text style={s.commentaryEmpty}>Commentary will appear here once scoring begins.</Text>
   )}
 </View>
 
@@ -336,114 +342,134 @@ export default function LiveViewScreen({ navigation }: any) {
   );
 }
 
+// ── Styles ───────────────────────────────────────────────────
+// Visual pass only. Every key that existed before is still defined under the
+// same name — including the four `videoOverlay`/`overlay*` keys and the
+// `livePill`/`liveDot`/`liveTxt` trio, which the LiveScoreOverlay and Badge
+// components now render instead. Removing a key here is a runtime crash that
+// the type-checker cannot catch, so nothing is deleted.
+//
+// Intent: the score is the loudest thing on the screen (tabular figures, so
+// digits don't jump on every ball), each block is a distinct elevated card,
+// and the tables use uppercase column labels with hairline row rules.
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
-  connectTxt: { color: COLORS.textSecondary, marginTop: 12 },
+  connectTxt: { ...TYPE.body, color: COLORS.textSecondary, marginTop: SPACING.md },
 
   // Join screen
   joinBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
-  joinBadge: { backgroundColor: COLORS.red, paddingHorizontal: 20, paddingVertical: 8, borderRadius: RADIUS.round, marginBottom: 20 },
-  joinBadgeTxt: { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 3 },
-  joinTitle: { color: COLORS.text, fontSize: 22, fontWeight: 'bold', marginBottom: 8 },
-  joinSub: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 28, textAlign: 'center' },
-  joinInput: { backgroundColor: COLORS.card, color: COLORS.text, padding: 16, borderRadius: RADIUS.md, fontSize: 22, letterSpacing: 6, textAlign: 'center', width: '100%', borderWidth: 2, borderColor: COLORS.primary, marginBottom: 16 },
-  joinBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: RADIUS.md, width: '100%', alignItems: 'center', marginBottom: 12 },
-  joinBtnTxt: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  joinHint: { color: COLORS.textMuted, fontSize: 12, textAlign: 'center' },
+  joinBadge: { backgroundColor: COLORS.live, paddingHorizontal: 22, paddingVertical: 9, borderRadius: RADIUS.round, marginBottom: SPACING.lg, ...SHADOW.glow(COLORS.live) },
+  joinBadgeTxt: { fontSize: 18, fontWeight: '800', letterSpacing: 3, color: '#fff' },
+  joinTitle: { ...TYPE.h1, color: COLORS.text, marginBottom: SPACING.sm },
+  joinSub: { ...TYPE.caption, fontSize: 13, color: COLORS.textSecondary, marginBottom: 28, textAlign: 'center' },
+  joinInput: { backgroundColor: COLORS.card, color: COLORS.text, padding: SPACING.md, borderRadius: RADIUS.md, fontSize: 22, fontWeight: '700', letterSpacing: 6, textAlign: 'center', width: '100%', borderWidth: 1, borderColor: COLORS.primary + '88', marginBottom: SPACING.md, fontVariant: ['tabular-nums'] },
+  joinBtn: { backgroundColor: COLORS.primary, paddingVertical: SPACING.md, borderRadius: RADIUS.md, width: '100%', alignItems: 'center', marginBottom: SPACING.md, ...SHADOW.md },
+  joinBtnTxt: { ...TYPE.button, fontSize: 16, color: '#04140a' },
+  joinHint: { ...TYPE.caption, color: COLORS.textMuted, textAlign: 'center' },
 
   // Header
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 50, paddingBottom: 10, backgroundColor: COLORS.background, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  backBtn: { backgroundColor: COLORS.card, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.round, borderWidth: 1, borderColor: COLORS.border },
-  backTxt: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold' },
-  headerCenter: { flex: 1, alignItems: 'center', gap: 4 },
-  livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.red, paddingHorizontal: 10, paddingVertical: 3, borderRadius: RADIUS.round, gap: 5 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 50, paddingBottom: SPACING.sm, backgroundColor: COLORS.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  backBtn: { backgroundColor: COLORS.card2, paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.round, borderWidth: 1, borderColor: COLORS.border },
+  backTxt: { ...TYPE.caption, fontWeight: '700', color: COLORS.primaryLight },
+  headerCenter: { flex: 1, alignItems: 'center', gap: 5 },
+  // Kept for compatibility — the pulsing Badge renders the LIVE indicator now.
+  livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.live, paddingHorizontal: 10, paddingVertical: 3, borderRadius: RADIUS.round, gap: 5 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  liveTxt: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  headerTeams: { color: COLORS.text, fontSize: 13, fontWeight: 'bold' },
-  matchIdTxt: { color: COLORS.textMuted, fontSize: 11 },
+  liveTxt: { ...TYPE.label, fontSize: 9, color: '#fff' },
+  headerTeams: { ...TYPE.caption, fontWeight: '700', color: COLORS.text },
+  matchIdTxt: { ...TYPE.numSm, fontSize: 11, color: COLORS.textMuted },
   scroll: { flex: 1 },
 
-  // Video
+  // Video — deliberately full-bleed and square-cornered: a WebView inside a
+  // rounded, overflow-hidden parent clips badly on Android.
   videoBox: { height: 220, backgroundColor: '#000', position: 'relative' },
-  videoPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
-  videoPlaceholderTxt: { color: '#fff', fontSize: 14 },
-  videoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  videoPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0d0d0d' },
+  videoPlaceholderTxt: { ...TYPE.body, color: 'rgba(255,255,255,0.75)' },
+  videoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: COLORS.scrim, paddingHorizontal: 12, paddingVertical: SPACING.sm, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   overlayLeft: {},
-  overlayScore: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
-  overlayOvers: { color: COLORS.primary, fontSize: 13 },
+  overlayScore: { ...TYPE.displaySm, color: '#fff' },
+  overlayOvers: { ...TYPE.numSm, fontSize: 13, color: COLORS.primaryLight },
   overlayRight: { alignItems: 'flex-end' },
-  overlayTeam: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
-  overlayRR: { color: '#fff', fontSize: 12 },
-  overlayTgt: { color: COLORS.red, fontSize: 12, fontWeight: 'bold' },
-  videoToggle: { backgroundColor: COLORS.card2, padding: 8, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  videoToggleTxt: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold' },
+  overlayTeam: { ...TYPE.caption, fontSize: 11, color: 'rgba(255,255,255,0.7)' },
+  overlayRR: { ...TYPE.numSm, color: '#fff' },
+  overlayTgt: { ...TYPE.num, fontSize: 13, color: COLORS.live },
+  videoToggle: { backgroundColor: COLORS.card2, paddingVertical: 9, alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  videoToggleTxt: { ...TYPE.caption, fontWeight: '700', color: COLORS.primaryLight },
 
-  // Score card
-  scoreCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: 10, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.primary + '55' },
-  scoreCardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  scoreCardTeam: { color: COLORS.textSecondary, fontSize: 11 },
-  scoreCardInn: { color: COLORS.primary, fontSize: 11 },
-  scoreMainRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
-  scoreBig: { color: COLORS.text, fontSize: 52, fontWeight: 'bold', lineHeight: 58 },
-  scoreMeta: { alignItems: 'flex-end', paddingBottom: 6 },
-  scoreOvers: { color: COLORS.primary, fontSize: 16, fontWeight: 'bold' },
-  scoreRR: { color: COLORS.textSecondary, fontSize: 12 },
-  scoreTgt: { color: COLORS.red, fontSize: 13, fontWeight: 'bold' },
-  scoreRRR: { color: COLORS.orange, fontSize: 12 },
-  ballsRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  ballsLbl: { color: COLORS.textMuted, fontSize: 10 },
-  ball: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-  bW: { backgroundColor: COLORS.red }, b4: { backgroundColor: COLORS.blue }, b6: { backgroundColor: COLORS.yellow }, bExtra: { backgroundColor: COLORS.orange },
-  ballTxt: { color: COLORS.text, fontSize: 8, fontWeight: 'bold' },
+  // Score card — the dominant element. Green top stripe + heaviest elevation
+  // so it reads as a broadcast scoreboard rather than one more card.
+  scoreCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, borderTopWidth: 3, borderTopColor: COLORS.primary, ...SHADOW.lg },
+  scoreCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  scoreCardTeam: { ...TYPE.caption, fontSize: 11, fontWeight: '700', color: COLORS.textSecondary, flex: 1 },
+  scoreCardInn: { ...TYPE.numSm, fontSize: 11, color: COLORS.primaryLight },
+  scoreMainRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: SPACING.md },
+  scoreBig: { fontSize: 54, fontWeight: '800', lineHeight: 58, letterSpacing: -1.5, color: COLORS.text, fontVariant: ['tabular-nums'] },
+  scoreMeta: { alignItems: 'flex-end', paddingBottom: 7 },
+  scoreOvers: { ...TYPE.num, fontSize: 16, color: COLORS.primaryLight },
+  scoreRR: { ...TYPE.numSm, color: COLORS.textSecondary, marginTop: 1 },
+  scoreTgt: { ...TYPE.num, fontSize: 13, color: COLORS.live, marginTop: 4 },
+  scoreRRR: { ...TYPE.numSm, color: COLORS.warning, marginTop: 1 },
+  ballsRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft, paddingTop: SPACING.sm },
+  ballsLbl: { ...TYPE.label, fontSize: 9, color: COLORS.textMuted },
+  ball: { width: 30, height: 30, borderRadius: 15, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
+  bW: { backgroundColor: COLORS.error, borderColor: COLORS.error }, b4: { backgroundColor: COLORS.blue, borderColor: COLORS.blue }, b6: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow }, bExtra: { backgroundColor: COLORS.orange, borderColor: COLORS.orange },
+  ballTxt: { ...TYPE.numSm, fontSize: 9, color: COLORS.text },
 
   // Players card
-  playersCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: 8, borderRadius: RADIUS.md, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border },
-  playersSectionLbl: { color: COLORS.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1, marginBottom: 6, marginTop: 4 },
-  playerTableHeader: { flexDirection: 'row', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: COLORS.border, marginBottom: 4 },
-  phCell: { flex: 1, textAlign: 'center', color: COLORS.textMuted, fontSize: 10, fontWeight: 'bold' },
+  playersCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, paddingBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.md },
+  playersSectionLbl: { ...TYPE.label, fontSize: 10, color: COLORS.primaryLight, marginBottom: 7, marginTop: 6 },
+  playerTableHeader: { flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: COLORS.border, marginBottom: 2 },
+  phCell: { flex: 1, textAlign: 'center', ...TYPE.colLabel, fontSize: 10, color: COLORS.textMuted },
   phName: { flex: 2.5, textAlign: 'left' },
-  playerRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border + '55' },
-  strikerRow: { backgroundColor: COLORS.primary + '11', borderRadius: RADIUS.sm },
+  playerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  // The batter on strike: a tinted row, no extra border, so the eye lands on
+  // it without the table gaining a second grid line.
+  strikerRow: { backgroundColor: COLORS.primarySoft, borderRadius: RADIUS.sm },
   pdCell: { flex: 1, textAlign: 'center', justifyContent: 'center', alignItems: 'center' },
   pdName: { flex: 2.5, textAlign: 'left', alignItems: 'flex-start' },
-  pdStat: { color: COLORS.text, fontSize: 13 },
-  strikerName: { color: COLORS.text, fontSize: 14, fontWeight: 'bold' },
-  nonStrikerName: { color: COLORS.textSecondary, fontSize: 13 },
-  bowlerName: { color: COLORS.text, fontSize: 13, fontWeight: 'bold' },
-  playerRoleLbl: { color: COLORS.textMuted, fontSize: 9, marginTop: 1 },
-  playerDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: 10 },
+  pdStat: { ...TYPE.numSm, fontSize: 13, color: COLORS.textSecondary },
+  /** Runs on strike, wickets for the bowler — the figures the row exists for. */
+  pdStatStrong: { ...TYPE.num, fontSize: 15, color: COLORS.primaryLight },
+  strikerName: { ...TYPE.title, fontSize: 14, color: COLORS.text },
+  nonStrikerName: { ...TYPE.body, fontSize: 13, color: COLORS.textSecondary },
+  bowlerName: { ...TYPE.bodyStrong, fontSize: 13, color: COLORS.text },
+  playerRoleLbl: { ...TYPE.label, fontSize: 8, color: COLORS.textMuted, marginTop: 2 },
+  playerDivider: { height: StyleSheet.hairlineWidth, backgroundColor: COLORS.border, marginVertical: SPACING.sm },
 
   // Extras
-  extrasCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.card2, marginHorizontal: SPACING.md, marginTop: 6, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 8 },
-  extrasLbl: { color: COLORS.textSecondary, fontSize: 12, fontWeight: 'bold' },
-  extrasDtl: { color: COLORS.textMuted, fontSize: 11 },
+  extrasCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACING.sm, backgroundColor: COLORS.card2, marginHorizontal: SPACING.md, marginTop: 6, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: COLORS.borderSoft },
+  extrasLbl: { ...TYPE.num, fontSize: 12, color: COLORS.textSecondary },
+  extrasDtl: { ...TYPE.numSm, fontSize: 11, color: COLORS.textMuted },
 
   // No stream
-  noStreamBox: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: 8, borderRadius: RADIUS.md, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-  noStreamBadge: { backgroundColor: COLORS.card2, paddingHorizontal: 12, paddingVertical: 4, borderRadius: RADIUS.round, marginBottom: 10 },
-  noStreamBadgeTxt: { color: COLORS.textSecondary, fontSize: 11, fontWeight: 'bold', letterSpacing: 1 },
-  noStreamTxt: { color: COLORS.textSecondary, fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
-  noStreamSub: { color: COLORS.textMuted, fontSize: 12 },
+  noStreamBox: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.lg, alignItems: 'center', borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.sm },
+  noStreamBadge: { backgroundColor: COLORS.card2, paddingHorizontal: 12, paddingVertical: 5, borderRadius: RADIUS.round, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.border },
+  noStreamBadgeTxt: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
+  noStreamTxt: { ...TYPE.bodyStrong, color: COLORS.textSecondary, marginBottom: 3 },
+  noStreamSub: { ...TYPE.caption, color: COLORS.textMuted, textAlign: 'center' },
 
-  viewTabs: { flexDirection: 'row', marginHorizontal: SPACING.md, marginTop: 8, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, padding: 3, gap: 3 },
-  viewTab: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, alignItems: 'center' },
-  viewTabActive: { backgroundColor: COLORS.primary },
-  viewTabTxt: { color: COLORS.textSecondary, fontSize: 12, fontWeight: 'bold' },
-  viewTabTxtActive: { color: '#fff' },
-  analyticsCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: 8, borderRadius: RADIUS.md, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border },
-  analyticsTitle: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold', marginBottom: 8, letterSpacing: 0.5 },
-  partnershipTxt: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
-  bbRow: { flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: COLORS.border + '55' },
-  bbOver: { color: COLORS.textMuted, fontSize: 12, width: 50 },
-  bbResult: { color: COLORS.text, fontSize: 13, fontWeight: 'bold' },
-  winProbBar: { flexDirection: 'row', height: 24, borderRadius: RADIUS.round, overflow: 'hidden', marginBottom: 8 },
+  viewTabs: { flexDirection: 'row', marginHorizontal: SPACING.md, marginTop: SPACING.sm, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, padding: 3, gap: 3, borderWidth: 1, borderColor: COLORS.borderSoft },
+  viewTab: { flex: 1, paddingVertical: 9, borderRadius: RADIUS.sm, alignItems: 'center' },
+  viewTabActive: { backgroundColor: COLORS.primary, ...SHADOW.sm },
+  viewTabTxt: { ...TYPE.caption, fontWeight: '700', color: COLORS.textSecondary },
+  viewTabTxtActive: { color: '#04140a' },
+  analyticsCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.sm },
+  analyticsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  analyticsTitle: { ...TYPE.label, color: COLORS.primaryLight, marginBottom: SPACING.sm },
+  commentaryTxt: { ...TYPE.body, color: COLORS.text, lineHeight: 21 },
+  commentaryEmpty: { ...TYPE.caption, color: COLORS.textMuted, fontStyle: 'italic' },
+  partnershipTxt: { ...TYPE.displaySm, fontSize: 22, color: COLORS.text },
+  bbRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  bbOver: { ...TYPE.numSm, color: COLORS.textMuted, width: 44 },
+  bbResult: { ...TYPE.num, fontSize: 13, color: COLORS.text, flex: 1 },
+  winProbBar: { flexDirection: 'row', height: 22, borderRadius: RADIUS.round, overflow: 'hidden', marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.borderSoft },
   winProbFill: { height: '100%' },
   winProbLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  winProbLabel: { color: COLORS.text, fontSize: 12, fontWeight: 'bold' },
-  winProbNote: { color: COLORS.textMuted, fontSize: 10, fontStyle: 'italic' },
-  linkBtn: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: 8, padding: 14, borderRadius: RADIUS.md, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-  linkBtnTxt: { color: COLORS.primary, fontWeight: 'bold', fontSize: 13 },
-  milestoneBanner: { backgroundColor: COLORS.yellow + '33', margin: SPACING.md, padding: 14, borderRadius: RADIUS.md, borderWidth: 2, borderColor: COLORS.yellow, alignItems: 'center' },
-  milestoneTxt: { color: COLORS.yellow, fontWeight: 'bold', fontSize: 14 },
+  winProbLabel: { ...TYPE.numSm, color: COLORS.text },
+  winProbNote: { ...TYPE.caption, fontSize: 10, color: COLORS.textMuted, fontStyle: 'italic', lineHeight: 15 },
+  linkBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.sm },
+  linkBtnTxt: { ...TYPE.button, fontSize: 13, color: COLORS.primaryLight },
+  milestoneBanner: { backgroundColor: COLORS.yellow + '14', marginHorizontal: SPACING.md, marginTop: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.yellow + '55', borderLeftWidth: 3, borderLeftColor: COLORS.yellow, alignItems: 'center', ...SHADOW.md },
+  milestoneTxt: { ...TYPE.bodyStrong, color: COLORS.yellow, textAlign: 'center' },
 });

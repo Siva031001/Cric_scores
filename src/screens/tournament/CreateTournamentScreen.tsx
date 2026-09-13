@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert,
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { createTournament, uploadLocalImageToStorage, validateTournamentDates } from '../../utils/firebase';
 import { BallType } from '../../types/cricket';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 
 const getTodayString = () => { const d = new Date(); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); };
@@ -85,8 +85,11 @@ export default function CreateTournamentScreen({ navigation }: any) {
               <Image source={{ uri: banner }} style={styles.bannerImg} resizeMode="cover" />
             ) : (
               <View style={styles.bannerPlaceholder}>
-                <Text style={styles.bannerPlaceholderIcon}>+</Text>
+                <View style={styles.bannerIconWrap}>
+                  <Text style={styles.bannerPlaceholderIcon}>+</Text>
+                </View>
                 <Text style={styles.bannerLabel}>Add Tournament Photo</Text>
+                <Text style={styles.bannerSub}>Shown on the home screen</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -155,21 +158,50 @@ export default function CreateTournamentScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { flex: 1 },
-  form: { padding: SPACING.lg },
-  label: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold', marginBottom: 8, marginTop: 5 },
-  input: { backgroundColor: COLORS.card, color: COLORS.text, padding: 14, borderRadius: RADIUS.md, marginBottom: 15, fontSize: 15, borderWidth: 1, borderColor: COLORS.border },
+  form: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
+  label: { ...TYPE.label, color: COLORS.textSecondary, marginBottom: SPACING.sm, marginTop: SPACING.xs },
+  input: {
+    backgroundColor: COLORS.card2, color: COLORS.text,
+    paddingHorizontal: SPACING.md, paddingVertical: 14,
+    borderRadius: RADIUS.md, marginBottom: SPACING.md,
+    ...TYPE.body, fontSize: 15,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
   dateRow: { flexDirection: 'row', gap: 12 },
-  dateHint: { color: COLORS.textSecondary, fontSize: 11, marginTop: -10, marginBottom: 15 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 },
-  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADIUS.round, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
-  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  chipText: { color: COLORS.textSecondary, fontSize: 13 },
-  chipTextActive: { color: '#fff', fontWeight: 'bold' },
-  bannerBox: { height: 140, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: 18, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.card },
+  dateHint: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted, marginTop: -SPACING.sm, marginBottom: SPACING.md, lineHeight: 16 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.md },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: RADIUS.round,
+    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+  },
+  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  chipText: { ...TYPE.body, fontSize: 13, color: COLORS.textSecondary },
+  chipTextActive: { color: COLORS.onPrimary, fontWeight: '700' },
+
+  // ── Poster upload ──
+  // Taller and dashed when empty so it reads as a drop target rather than an
+  // image that failed to load.
+  bannerBox: {
+    height: 160, borderRadius: RADIUS.lg, overflow: 'hidden',
+    marginBottom: SPACING.lg,
+    borderWidth: 1.5, borderColor: COLORS.border, borderStyle: 'dashed',
+    backgroundColor: COLORS.card,
+  },
   bannerImg: { width: '100%', height: '100%' },
-  bannerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4 },
-  bannerPlaceholderIcon: { color: COLORS.primary, fontSize: 30, fontWeight: 'bold' },
-  bannerLabel: { color: COLORS.textSecondary, fontSize: 12 },
-  nextBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: RADIUS.md, alignItems: 'center', marginTop: 10 },
-  nextBtnText: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  bannerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: SPACING.sm },
+  bannerIconWrap: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1, borderColor: COLORS.primary + '33',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  bannerPlaceholderIcon: { color: COLORS.primary, fontSize: 26, fontWeight: '700', marginTop: -2 },
+  bannerLabel: { ...TYPE.bodyStrong, color: COLORS.text },
+  bannerSub: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted },
+
+  nextBtn: {
+    backgroundColor: COLORS.primary, paddingVertical: 17, borderRadius: RADIUS.md,
+    alignItems: 'center', marginTop: SPACING.sm, ...SHADOW.glow(COLORS.primary),
+  },
+  nextBtnText: { ...TYPE.button, fontSize: 16, color: COLORS.onPrimary },
 });

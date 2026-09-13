@@ -4,9 +4,12 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { getUserProfile, saveUserProfile, getCurrentUser, uploadLocalImageToStorage, syncProfileToLinkedPlayer, getMyLinkedPlayerId } from '../../utils/firebase';
 import database from '@react-native-firebase/database';
 import { PlayerRole, BattingStyle } from '../../types/cricket';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
+import SectionHeader from '../../components/SectionHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ROLES: PlayerRole[] = ['Batter', 'Bowler', 'Wicket Keeper', 'All Rounder'];
@@ -109,47 +112,61 @@ export default function ProfileEditScreen({ navigation }: any) {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={pickPhoto} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <TouchableOpacity onPress={pickPhoto} style={styles.changePhotoBtn}>
             <AppIcon emoji="📷" size={14} color={COLORS.primary} />
             <Text style={styles.changePhoto}>Change Photo</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.form}>
-          <Text style={styles.label}>Full Name *</Text>
-          <TextInput style={styles.input} placeholder="Enter your name" placeholderTextColor={COLORS.textMuted} value={name} onChangeText={setName} />
-          <Text style={styles.label}>Mobile Number</Text>
-            <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card2 }]}>
-          <Text style={{ color: COLORS.textSecondary, fontSize: 15, flex: 1 }}>{mobile ? '+91 ' + mobile : 'Not set'}</Text>
-          <AppIcon emoji="🔒" size={14} color={COLORS.textMuted} />
-          </View>
-          <Text style={styles.label}>Email ID</Text>
-          <TextInput style={styles.input} placeholder="Enter email address" placeholderTextColor={COLORS.textMuted} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-          <Text style={styles.label}>Playing Role</Text>
-          <View style={styles.chipRow}>
-            {ROLES.map(r => (
-              <TouchableOpacity key={r} style={[styles.chip, role === r && styles.chipActive]} onPress={() => setRole(r)}>
-                <Text style={[styles.chipText, role === r && styles.chipTextActive]}>{r}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.label}>Batting Style</Text>
-          <View style={styles.chipRow}>
-            {BATTING_STYLES.map(s => (
-              <TouchableOpacity key={s} style={[styles.chip, battingStyle === s && styles.chipActive]} onPress={() => setBattingStyle(s)}>
-                <Text style={[styles.chipText, battingStyle === s && styles.chipTextActive]}>{s}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.label}>Bowling Style</Text>
-          <TextInput style={styles.input} placeholder="e.g. Right Arm Fast, Left Arm Spin..." placeholderTextColor={COLORS.textMuted} value={bowlingStyle} onChangeText={setBowlingStyle} />
-          <Text style={styles.label}>Country</Text>
-          <TouchableOpacity style={styles.dropdownBtn} onPress={() => setShowCountry(true)}>
-            <Text style={styles.dropdownText}>{country}</Text>
-            <AppIcon emoji="▼" size={12} color={COLORS.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.saveBtn, saving && styles.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
-            <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Profile'}</Text>
-          </TouchableOpacity>
+          <SectionHeader title="Personal Details" />
+          <Card tone="base" elevation="md" style={styles.group}>
+            <Text style={styles.label}>Full Name *</Text>
+            <TextInput style={styles.input} placeholder="Enter your name" placeholderTextColor={COLORS.textMuted} value={name} onChangeText={setName} />
+            <Text style={styles.label}>Mobile Number</Text>
+            <View style={[styles.input, styles.lockedRow]}>
+              <Text style={styles.lockedText}>{mobile ? '+91 ' + mobile : 'Not set'}</Text>
+              <AppIcon emoji="🔒" size={14} color={COLORS.textMuted} />
+            </View>
+            <Text style={styles.label}>Email ID</Text>
+            <TextInput style={[styles.input, styles.inputLast]} placeholder="Enter email address" placeholderTextColor={COLORS.textMuted} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+          </Card>
+
+          <SectionHeader title="Playing Details" />
+          <Card tone="base" elevation="md" style={styles.group}>
+            <Text style={styles.label}>Playing Role</Text>
+            <View style={styles.chipRow}>
+              {ROLES.map(r => (
+                <TouchableOpacity key={r} style={[styles.chip, role === r && styles.chipActive]} onPress={() => setRole(r)}>
+                  <Text style={[styles.chipText, role === r && styles.chipTextActive]}>{r}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.label}>Batting Style</Text>
+            <View style={styles.chipRow}>
+              {BATTING_STYLES.map(s => (
+                <TouchableOpacity key={s} style={[styles.chip, battingStyle === s && styles.chipActive]} onPress={() => setBattingStyle(s)}>
+                  <Text style={[styles.chipText, battingStyle === s && styles.chipTextActive]}>{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.label}>Bowling Style</Text>
+            <TextInput style={styles.input} placeholder="e.g. Right Arm Fast, Left Arm Spin..." placeholderTextColor={COLORS.textMuted} value={bowlingStyle} onChangeText={setBowlingStyle} />
+            <Text style={styles.label}>Country</Text>
+            <TouchableOpacity style={styles.dropdownBtn} onPress={() => setShowCountry(true)}>
+              <Text style={styles.dropdownText}>{country}</Text>
+              <AppIcon emoji="▼" size={12} color={COLORS.primary} />
+            </TouchableOpacity>
+          </Card>
+
+          <Button
+            label={saving ? 'Saving...' : 'Save Profile'}
+            onPress={handleSave}
+            disabled={saving}
+            variant="primary"
+            size="lg"
+            full
+            style={styles.saveBtn}
+          />
         </View>
         <View style={{ height: 50 }} />
       </ScrollView>
@@ -157,6 +174,7 @@ export default function ProfileEditScreen({ navigation }: any) {
       <Modal visible={showCountry} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
+            <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Select Country</Text>
             <FlatList
               data={COUNTRIES}
@@ -184,34 +202,86 @@ export default function ProfileEditScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
-  photoSection: { alignItems: 'center', paddingVertical: 20 },
-  photoCircle: { width: 100, height: 100, borderRadius: 50, overflow: 'hidden', borderWidth: 3, borderColor: COLORS.primary, marginBottom: 10 },
+  photoSection: { alignItems: 'center', paddingVertical: SPACING.lg },
+  // Ring + glow, so the avatar reads as the subject of the screen rather than
+  // a cropped square.
+  photoCircle: {
+    width: 108, height: 108, borderRadius: 54, overflow: 'hidden',
+    borderWidth: 3, borderColor: COLORS.primary,
+    marginBottom: SPACING.sm, ...SHADOW.glow(COLORS.primary),
+  },
   photoImg: { width: '100%', height: '100%' },
-  photoPlaceholder: { flex: 1, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center' },
-  photoPlus: { fontSize: 28 },
-  photoLabel: { color: COLORS.textSecondary, fontSize: 11, marginTop: 4 },
-  changePhoto: { color: COLORS.primary, fontSize: 14, fontWeight: 'bold' },
+  photoPlaceholder: { flex: 1, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center' },
+  photoLabel: { ...TYPE.label, fontSize: 9, color: COLORS.textSecondary, marginTop: 4 },
+  // The "Change Photo" affordance is a tinted pill, not bare text — it used to
+  // be indistinguishable from a caption.
+  changePhotoBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: SPACING.md, paddingVertical: 8,
+    borderRadius: RADIUS.round, backgroundColor: COLORS.primarySoft,
+  },
+  changePhoto: { ...TYPE.bodyStrong, color: COLORS.primary },
   form: { paddingHorizontal: SPACING.lg },
-  label: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold', marginBottom: 8, marginTop: 5 },
-  input: { backgroundColor: COLORS.card, color: COLORS.text, padding: 14, borderRadius: RADIUS.md, marginBottom: 15, fontSize: 15, borderWidth: 1, borderColor: COLORS.border },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADIUS.round, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
-  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  chipText: { color: COLORS.textSecondary, fontSize: 13 },
-  chipTextActive: { color: '#fff', fontWeight: 'bold' },
-  dropdownBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.card, padding: 14, borderRadius: RADIUS.md, marginBottom: 15, borderWidth: 1, borderColor: COLORS.border },
-  dropdownText: { color: COLORS.text, fontSize: 15 },
+  // Related fields grouped on one elevated surface per section.
+  group: { padding: SPACING.md, marginBottom: SPACING.lg },
+  label: { ...TYPE.label, color: COLORS.textSecondary, marginBottom: SPACING.sm },
+  input: {
+    backgroundColor: COLORS.card2, color: COLORS.text,
+    ...TYPE.body, fontSize: 15,
+    paddingHorizontal: SPACING.md, paddingVertical: 15,
+    borderRadius: RADIUS.md, marginBottom: SPACING.md,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  inputLast: { marginBottom: 0 },
+  // Read-only identity field: same shape as an input so the form stays aligned,
+  // with the lock icon carrying the "not editable" message.
+  lockedRow: { flexDirection: 'row', alignItems: 'center' },
+  lockedText: { ...TYPE.body, fontSize: 15, color: COLORS.textSecondary, flex: 1 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.md },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADIUS.round,
+    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+  },
+  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  chipText: { ...TYPE.bodyStrong, fontSize: 13, color: COLORS.textSecondary },
+  // Dark ink on the green chip: white on this green is barely legible.
+  chipTextActive: { color: COLORS.background },
+  dropdownBtn: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: COLORS.card2, paddingHorizontal: SPACING.md, paddingVertical: 15,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border,
+  },
+  dropdownText: { ...TYPE.body, fontSize: 15, color: COLORS.text },
   dropdownArrow: { color: COLORS.primary, fontSize: 12 },
-  saveBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: RADIUS.md, alignItems: 'center', marginTop: 10 },
-  saveBtnDisabled: { backgroundColor: COLORS.textMuted },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: COLORS.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SPACING.lg },
-  modalTitle: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  countryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  countryRowActive: { backgroundColor: COLORS.primary + '22' },
-  countryText: { color: COLORS.text, fontSize: 15 },
-  countryTextActive: { color: COLORS.primary, fontWeight: 'bold' },
-  modalClose: { backgroundColor: COLORS.card2, padding: 14, borderRadius: RADIUS.md, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: COLORS.border },
-  modalCloseText: { color: COLORS.text, fontSize: 15, fontWeight: 'bold' },
+  saveBtn: { marginTop: SPACING.xs },
+  modalOverlay: { flex: 1, backgroundColor: COLORS.scrim, justifyContent: 'flex-end' },
+  // Highest surface level, plus a grabber, so the sheet reads as a layer above
+  // the form rather than a panel welded to the bottom.
+  modal: {
+    backgroundColor: COLORS.surface3,
+    borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.lg, paddingTop: SPACING.sm,
+    borderTopWidth: 1, borderTopColor: COLORS.edgeHighlight,
+    ...SHADOW.lg,
+  },
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: COLORS.border, alignSelf: 'center', marginBottom: SPACING.md,
+  },
+  modalTitle: { ...TYPE.h2, color: COLORS.text, marginBottom: SPACING.md, textAlign: 'center' },
+  countryRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 14, paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft,
+  },
+  countryRowActive: { backgroundColor: COLORS.primarySoft },
+  countryText: { ...TYPE.body, fontSize: 15, color: COLORS.text },
+  countryTextActive: { ...TYPE.bodyStrong, fontSize: 15, color: COLORS.primary },
+  modalClose: {
+    backgroundColor: COLORS.card2, height: 48, borderRadius: RADIUS.md,
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: SPACING.md, borderWidth: 1, borderColor: COLORS.border,
+  },
+  modalCloseText: { ...TYPE.button, color: COLORS.text },
 });

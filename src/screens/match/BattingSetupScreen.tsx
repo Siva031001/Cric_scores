@@ -6,8 +6,10 @@ import {
 import { createMatch, attachMatchIdToFixture } from '../../utils/firebase';
 import { createEmptyInnings } from '../../utils/cricketLogic';
 import { Player } from '../../types/cricket';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
+import Card from '../../components/Card';
+import AppIcon from '../../components/AppIcon';
 
 type SelectionTab = 'striker' | 'nonstriker' | 'bowler';
 
@@ -132,28 +134,38 @@ export default function BattingSetupScreen({ route, navigation }: any) {
 
       {/* Toss Result */}
       {tossWinner && tossChoice && (
-        <View style={styles.tossCard}>
-          <Text style={styles.tossText}>
-            🪙 {tossWinner} won toss • chose to {tossChoice}
-          </Text>
-          <Text style={styles.battingFirst}>
-            🏏 {battingTeam} batting first
-          </Text>
-        </View>
+        <Card tone="base" elevation="md" accent={COLORS.primary} style={styles.tossCard}>
+          <View style={styles.tossRow}>
+            <AppIcon emoji="🪙" size={14} color={COLORS.warning} />
+            <Text style={styles.tossText}>
+              {tossWinner} won toss • chose to {tossChoice}
+            </Text>
+          </View>
+          <View style={styles.tossRow}>
+            <AppIcon emoji="🏏" size={14} color={COLORS.primary} />
+            <Text style={styles.battingFirst}>
+              {battingTeam} batting first
+            </Text>
+          </View>
+        </Card>
       )}
 
       {/* Teams */}
-      <View style={styles.teamsCard}>
-        <View style={styles.teamInfo}>
-          <Text style={styles.teamRole}>BATTING</Text>
-          <Text style={styles.teamName}>{battingTeam}</Text>
+      <Card tone="base" elevation="md" style={styles.teamsCard}>
+        <View style={styles.teamsRow}>
+          <View style={styles.teamInfo}>
+            <Text style={styles.teamRole}>BATTING</Text>
+            <Text style={styles.teamName}>{battingTeam}</Text>
+          </View>
+          <View style={styles.vsBadge}>
+            <Text style={styles.vs}>VS</Text>
+          </View>
+          <View style={styles.teamInfo}>
+            <Text style={styles.teamRole}>BOWLING</Text>
+            <Text style={styles.teamName}>{bowlingTeam}</Text>
+          </View>
         </View>
-        <Text style={styles.vs}>VS</Text>
-        <View style={styles.teamInfo}>
-          <Text style={styles.teamRole}>BOWLING</Text>
-          <Text style={styles.teamName}>{bowlingTeam}</Text>
-        </View>
-      </View>
+      </Card>
 
       {/* Selection Summary */}
       <View style={styles.summaryRow}>
@@ -170,7 +182,7 @@ export default function BattingSetupScreen({ route, navigation }: any) {
       </View>
 
       {/* Player Selection */}
-      <View style={styles.card}>
+      <Card tone="base" elevation="md" style={styles.card}>
         <View style={styles.tabBar}>
           {TABS.map(t => (
             <TouchableOpacity key={t.key}
@@ -179,7 +191,7 @@ export default function BattingSetupScreen({ route, navigation }: any) {
               <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>
                 {t.label}
               </Text>
-              <Text style={[styles.tabTeam, activeTab === t.key && { color: 'rgba(255,255,255,0.7)' }]}>
+              <Text style={[styles.tabTeam, activeTab === t.key && styles.tabTeamActive]}>
                 {t.team}
               </Text>
             </TouchableOpacity>
@@ -222,13 +234,13 @@ export default function BattingSetupScreen({ route, navigation }: any) {
               </View>
               {isSelected && (
                 <View style={styles.checkCircle}>
-                  <Text style={styles.checkMark}>✓</Text>
+                  <AppIcon emoji="✓" size={14} color={COLORS.background} />
                 </View>
               )}
             </TouchableOpacity>
           );
         })}
-      </View>
+      </Card>
 
       <TouchableOpacity
         style={[styles.startBtn, loading && styles.startBtnDisabled]}
@@ -246,78 +258,85 @@ export default function BattingSetupScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  // Toss outcome is context, not an action: a left-accented card rather than a
+  // fully green panel competing with the Start button.
   tossCard: {
-    backgroundColor: COLORS.primary + '22',
     margin: SPACING.lg, marginBottom: 0,
-    borderRadius: RADIUS.md, padding: 12,
-    borderWidth: 1, borderColor: COLORS.primary,
+    padding: SPACING.md, gap: 6,
+  },
+  tossRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tossText: { ...TYPE.caption, color: COLORS.textSecondary },
+  battingFirst: { ...TYPE.bodyStrong, color: COLORS.text },
+  teamsCard: { margin: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md },
+  teamsRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center',
   },
-  tossText: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold' },
-  battingFirst: { color: COLORS.text, fontSize: 14, fontWeight: 'bold', marginTop: 4 },
-  teamsCard: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', backgroundColor: COLORS.card,
-    margin: SPACING.lg, marginBottom: 8,
-    borderRadius: RADIUS.md, padding: 16,
-    borderWidth: 1, borderColor: COLORS.border,
-  },
   teamInfo: { flex: 1, alignItems: 'center' },
-  teamRole: { color: COLORS.primary, fontSize: 10, fontWeight: 'bold', marginBottom: 4 },
-  teamName: { color: COLORS.text, fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
-  vs: { color: COLORS.textSecondary, fontSize: 16, fontWeight: 'bold', paddingHorizontal: 10 },
+  teamRole: { ...TYPE.label, fontSize: 10, color: COLORS.primary, marginBottom: 4 },
+  teamName: { ...TYPE.title, color: COLORS.text, textAlign: 'center' },
+  vsBadge: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  vs: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
   summaryRow: {
     flexDirection: 'row', marginHorizontal: SPACING.lg,
     marginBottom: SPACING.md, gap: 8,
   },
+  // Three at-a-glance slots. Raised surface + hairline border so they read as
+  // filled-in state, not as buttons.
   summaryBox: {
-    flex: 1, backgroundColor: COLORS.card, borderRadius: RADIUS.sm,
-    padding: 10, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border,
+    flex: 1, backgroundColor: COLORS.card2, borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm, paddingHorizontal: 8,
+    alignItems: 'center', borderWidth: 1, borderColor: COLORS.borderSoft,
   },
-  summaryLabel: { color: COLORS.textSecondary, fontSize: 10, marginBottom: 4 },
-  summaryValue: { color: COLORS.text, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
-  card: {
-    backgroundColor: COLORS.card, margin: SPACING.lg, marginTop: 0,
-    borderRadius: RADIUS.md, padding: SPACING.md,
-    borderWidth: 1, borderColor: COLORS.border,
-  },
+  summaryLabel: { ...TYPE.label, fontSize: 9, color: COLORS.textMuted, marginBottom: 4 },
+  summaryValue: { ...TYPE.bodyStrong, fontSize: 12, color: COLORS.text, textAlign: 'center' },
+  card: { margin: SPACING.lg, marginTop: 0, padding: SPACING.md },
   tabBar: {
-    flexDirection: 'row', backgroundColor: COLORS.card2,
-    borderRadius: RADIUS.md, padding: 4, gap: 4, marginBottom: 12,
+    flexDirection: 'row', backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md, padding: 4, gap: 4, marginBottom: SPACING.md,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
   },
-  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: RADIUS.sm },
+  tab: { flex: 1, paddingVertical: SPACING.sm, alignItems: 'center', borderRadius: RADIUS.sm },
   tabActive: { backgroundColor: COLORS.primary },
-  tabText: { color: COLORS.textSecondary, fontSize: 11, fontWeight: 'bold' },
-  tabTextActive: { color: '#fff' },
-  tabTeam: { color: COLORS.textMuted, fontSize: 9, marginTop: 2 },
+  tabText: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
+  tabTextActive: { color: COLORS.background },
+  tabTeam: { ...TYPE.caption, fontSize: 9, color: COLORS.textMuted, marginTop: 2 },
+  tabTeamActive: { color: COLORS.background, opacity: 0.7 },
   playerRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: COLORS.card2, padding: 12,
-    borderRadius: RADIUS.md, marginBottom: 8,
-    borderWidth: 1, borderColor: COLORS.border, gap: 12,
+    borderRadius: RADIUS.md, marginBottom: SPACING.sm - 2,
+    borderWidth: 1, borderColor: COLORS.borderSoft, gap: 12,
   },
-  playerRowSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '22' },
+  playerRowSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySoft },
   playerRowDisabled: { opacity: 0.4 },
   avatar: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.border,
   },
-  avatarSelected: { backgroundColor: COLORS.primary },
-  avatarText: { color: COLORS.text, fontSize: 16, fontWeight: 'bold' },
+  avatarSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  avatarText: { ...TYPE.title, color: COLORS.text },
   playerInfo: { flex: 1 },
-  playerName: { color: COLORS.textSecondary, fontSize: 14 },
-  playerNameSelected: { color: COLORS.text, fontWeight: 'bold' },
-  playerRole: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
+  playerName: { ...TYPE.body, color: COLORS.textSecondary },
+  playerNameSelected: { ...TYPE.bodyStrong, color: COLORS.text },
+  playerRole: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
   checkCircle: {
-    width: 24, height: 24, borderRadius: 12,
+    width: 26, height: 26, borderRadius: 13,
     backgroundColor: COLORS.primary,
     justifyContent: 'center', alignItems: 'center',
   },
-  checkMark: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  // The single most important action on the screen, so it carries the glow.
   startBtn: {
     backgroundColor: COLORS.primary, margin: SPACING.lg,
-    padding: 18, borderRadius: RADIUS.md, alignItems: 'center',
+    height: 56, borderRadius: RADIUS.md,
+    alignItems: 'center', justifyContent: 'center',
+    ...SHADOW.glow(COLORS.primary),
   },
-  startBtnDisabled: { backgroundColor: COLORS.textMuted },
-  startBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  startBtnDisabled: { backgroundColor: COLORS.primaryDark, shadowOpacity: 0, elevation: 0 },
+  startBtnText: { ...TYPE.button, fontSize: 17, color: COLORS.background },
 });

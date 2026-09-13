@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { COLORS, RADIUS, SPACING } from '../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../constants/theme';
 
 // TODO: Replace with real ad SDK (e.g. react-native-google-mobile-ads) once
 // a provider is chosen. Banner shows a static placeholder; Rewarded
@@ -54,14 +54,14 @@ export function AdRewardedGate({ visible, onComplete, onSkip }: { visible: boole
 }
 
 const s = StyleSheet.create({
-  banner: { backgroundColor: COLORS.card2, borderRadius: RADIUS.sm, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed' },
-  bannerText: { color: COLORS.textMuted, fontSize: 11 },
-  rewardedOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
-  rewardedBox: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.xl, alignItems: 'center', width: '85%' },
-  rewardedTitle: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
-  rewardedText: { color: COLORS.textSecondary, fontSize: 13, marginTop: 8, marginBottom: 16, textAlign: 'center' },
-  watchBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: RADIUS.md, marginBottom: 8, width: '100%', alignItems: 'center' },
-  watchBtnText: { color: '#fff', fontWeight: 'bold' },
-  skipBtn: { padding: 8 },
-  skipBtnText: { color: COLORS.textMuted, fontSize: 12 },
+  banner: { backgroundColor: COLORS.card, borderRadius: RADIUS.md, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed' },
+  bannerText: { ...TYPE.label, fontSize: 9, color: COLORS.textMuted },
+  rewardedOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
+  rewardedBox: { backgroundColor: COLORS.surface3, borderRadius: RADIUS.xl, padding: SPACING.xl, alignItems: 'center', width: '85%', borderWidth: 1, borderColor: COLORS.border, ...SHADOW.lg },
+  rewardedTitle: { ...TYPE.h1, color: COLORS.text, marginBottom: 6, textAlign: 'center' },
+  rewardedText: { ...TYPE.body, color: COLORS.textSecondary, marginTop: SPACING.sm, marginBottom: SPACING.lg, textAlign: 'center', lineHeight: 20 },
+  watchBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 15, borderRadius: RADIUS.md, marginBottom: SPACING.sm, width: '100%', alignItems: 'center', ...SHADOW.glow(COLORS.primary) },
+  watchBtnText: { ...TYPE.button, color: COLORS.onPrimary },
+  skipBtn: { paddingVertical: 10, paddingHorizontal: 16 },
+  skipBtnText: { ...TYPE.caption, color: COLORS.textMuted },
 });

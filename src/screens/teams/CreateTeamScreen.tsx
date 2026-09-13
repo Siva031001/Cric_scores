@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, Flat
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { saveTeam, updateTeam, getMyTeams, formatPlayerName, formatTeamName, ensureMyPlayerLinked, createPlayerMaster, getMyLinkedPlayerId, findAccountByPhone, createGuestPlayerByPhone, getPlayerMasterByAccountPhone, uploadLocalImageToStorage } from '../../utils/firebase';
 import { Player } from '../../types/cricket';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 import database from '@react-native-firebase/database';
@@ -28,6 +28,7 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
 
   return (
     <View style={styles.playerCard}>
+      <View pointerEvents="none" style={styles.cardEdge} />
       <View style={styles.playerHeader}>
         <View style={styles.playerNumBox}>
           <Text style={styles.playerNum}>{index + 1}</Text>
@@ -44,40 +45,43 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
         />
         {lookupStatus !== 'idle' && lookupStatus !== 'checking' && (
             player.name ? (
-        <Text style={{ color: COLORS.text, fontSize: 13, flex: 1, paddingHorizontal: 4 }} numberOfLines={1}>
+        <Text style={styles.playerNameText} numberOfLines={1}>
           {player.name}
         </Text>
           ) : (
-        <TouchableOpacity style={{ flex: 1, paddingHorizontal: 4 }} onPress={() => onEditName(index)}>
-        <Text style={{ color: COLORS.orange, fontSize: 13, fontWeight: 'bold' }}>Edit Name</Text>
+        <TouchableOpacity style={styles.editNameBtn} activeOpacity={0.7} onPress={() => onEditName(index)}>
+        <Text style={styles.editNameText} numberOfLines={1}>Edit Name</Text>
         </TouchableOpacity>
           )
           )}
-        <TouchableOpacity style={[styles.roleBtn, captainId === player.id && styles.captainActive]} onPress={() => onCaptain(player.id)}>
-          <Text style={styles.roleBtnText}>C</Text>
+        <TouchableOpacity style={[styles.roleBtn, captainId === player.id && styles.captainActive]} activeOpacity={0.7} onPress={() => onCaptain(player.id)}>
+          <Text style={[styles.roleBtnText, captainId === player.id && styles.roleBtnTextOnLight]}>C</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.roleBtn, wicketKeeperId === player.id && styles.wkActive]} onPress={() => onWK(player.id)}>
+        <TouchableOpacity style={[styles.roleBtn, wicketKeeperId === player.id && styles.wkActive]} activeOpacity={0.7} onPress={() => onWK(player.id)}>
           <Text style={styles.roleBtnText}>WK</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => onExpand(player.id)}>
+        <TouchableOpacity style={styles.expandBtnWrap} activeOpacity={0.7} onPress={() => onExpand(player.id)}>
           <Text style={styles.expandBtn}>{isExpanded ? '-' : '+'}</Text>
         </TouchableOpacity>
       </View>
       {lookupStatus === 'checking' && (
-        <Text style={{ color: COLORS.textMuted, fontSize: 11, paddingHorizontal: 10, paddingBottom: 6 }}>Checking phone number...</Text>
+        <Text style={[styles.lookupNote, styles.lookupNoteChecking]}>Checking phone number...</Text>
       )}
       {lookupStatus === 'linked' && (
-        <Text style={{ color: COLORS.primary, fontSize: 11, paddingHorizontal: 10, paddingBottom: 6 }}>✓ Linked to registered account</Text>
+        <View style={styles.lookupNoteRow}>
+          <AppIcon emoji="✓" size={12} color={COLORS.primary} />
+          <Text style={[styles.lookupNote, styles.lookupNoteLinked]}>Linked to registered account</Text>
+        </View>
       )}
       {lookupStatus === 'guest' && (
-        <Text style={{ color: COLORS.orange, fontSize: 11, paddingHorizontal: 10, paddingBottom: 6 }}>No account yet — playing as guest</Text>
+        <Text style={[styles.lookupNote, styles.lookupNoteGuest]}>No account yet — playing as guest</Text>
       )}
       {isExpanded && (
         <View style={styles.playerDetails}>
           <Text style={styles.detailLabel}>Role</Text>
           <View style={styles.chipRow}>
             {ROLES.map(r => (
-              <TouchableOpacity key={r} style={[styles.chip, player.role === r && styles.chipActive]} onPress={() => onFieldChange(index, 'role', r)}>
+              <TouchableOpacity key={r} style={[styles.chip, player.role === r && styles.chipActive]} activeOpacity={0.7} onPress={() => onFieldChange(index, 'role', r)}>
                 <Text style={[styles.chipText, player.role === r && styles.chipTextActive]}>{r}</Text>
               </TouchableOpacity>
             ))}
@@ -85,7 +89,7 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
           <Text style={styles.detailLabel}>Batting Style</Text>
           <View style={styles.chipRow}>
             {BAT_STYLES.map(s => (
-              <TouchableOpacity key={s} style={[styles.chip, player.battingStyle === s && styles.chipActive]} onPress={() => onFieldChange(index, 'battingStyle', s)}>
+              <TouchableOpacity key={s} style={[styles.chip, player.battingStyle === s && styles.chipActive]} activeOpacity={0.7} onPress={() => onFieldChange(index, 'battingStyle', s)}>
                 <Text style={[styles.chipText, player.battingStyle === s && styles.chipTextActive]}>{s}</Text>
               </TouchableOpacity>
             ))}
@@ -356,33 +360,33 @@ Alert.alert(
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Header title={existingTeam ? 'Edit Team' : 'Create Team'} onBack={() => navigation.goBack()} rightText={saving ? 'Saving...' : 'Save'} onRight={handleSave} />
       <View style={styles.topSection}>
-        <TouchableOpacity style={styles.logoCircle} onPress={pickLogo}>
+        <TouchableOpacity style={styles.logoCircle} activeOpacity={0.8} onPress={pickLogo}>
           {logo ? <Image source={{ uri: logo }} style={styles.logoImg} /> : (
             <View style={styles.logoPlaceholder}>
-            <AppIcon emoji="📷" size={22} color={COLORS.text} />
+            <AppIcon emoji="📷" size={22} color={COLORS.primary} />
             <Text style={styles.logoLabel}>Add Logo</Text>
-            </View> 
+            </View>
              )}
         </TouchableOpacity>
         <View style={styles.topRight}>
           <TextInput style={styles.teamNameInput} placeholder="Team Name *" placeholderTextColor={COLORS.textMuted} defaultValue={teamNameDisplay} onChangeText={text => { teamNameRef.current = text; }} onEndEditing={e => setTeamNameDisplay(e.nativeEvent.text)} autoCorrect={false} autoCapitalize="words" editable={!captainInviteMode} />
           {/* Team Type Selector */}
           {!existingTeam && (
-            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
-              <TouchableOpacity style={[styles.roleBtn, teamType === 'my' && styles.captainActive, { flex: 1, alignItems: 'center', paddingVertical: 6 }]} onPress={() => setTeamType('my')}>
-                <Text style={[styles.roleBtnText, { fontSize: 12 }]}>My Team</Text>
+            <View style={styles.teamTypeRow}>
+              <TouchableOpacity style={[styles.roleBtn, teamType === 'my' && styles.teamTypeActive, styles.teamTypeBtn]} activeOpacity={0.8} onPress={() => setTeamType('my')}>
+                <Text style={[styles.roleBtnText, styles.teamTypeText]}>My Team</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.roleBtn, teamType === 'other' && { backgroundColor: COLORS.blue, borderColor: COLORS.blue }, { flex: 1, alignItems: 'center', paddingVertical: 6 }]} onPress={() => setTeamType('other')}>
-                <Text style={[styles.roleBtnText, { fontSize: 12 }]}>Other Team</Text>
+              <TouchableOpacity style={[styles.roleBtn, teamType === 'other' && styles.teamTypeOtherActive, styles.teamTypeBtn]} activeOpacity={0.8} onPress={() => setTeamType('other')}>
+                <Text style={[styles.roleBtnText, styles.teamTypeText]}>Other Team</Text>
               </TouchableOpacity>
             </View>
           )}
           <View style={styles.roleStatusRow}>
             <View style={[styles.roleStatus, captainId !== null && styles.roleStatusDone]}>
-              <Text style={styles.roleStatusText}>{captainId !== null ? `C: ${players.find((p: Player) => p.id === captainId)?.name || 'Captain'}` : 'Set Captain *'}</Text>
+              <Text style={styles.roleStatusText} numberOfLines={1}>{captainId !== null ? `C: ${players.find((p: Player) => p.id === captainId)?.name || 'Captain'}` : 'Set Captain *'}</Text>
             </View>
             <View style={[styles.roleStatus, wicketKeeperId !== null && styles.roleStatusDone]}>
-              <Text style={styles.roleStatusText}>{wicketKeeperId !== null ? `WK: ${players.find((p: Player) => p.id === wicketKeeperId)?.name || 'WK'}` : 'Set WK *'}</Text>
+              <Text style={styles.roleStatusText} numberOfLines={1}>{wicketKeeperId !== null ? `WK: ${players.find((p: Player) => p.id === wicketKeeperId)?.name || 'WK'}` : 'Set WK *'}</Text>
             </View>
           </View>
         </View>
@@ -403,7 +407,7 @@ Alert.alert(
         removeClippedSubviews={false}
         ListFooterComponent={
           <View style={styles.footer}>
-            <TouchableOpacity style={[styles.saveBtn, saving && styles.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
+            <TouchableOpacity style={[styles.saveBtn, saving && styles.saveBtnDisabled]} activeOpacity={0.85} onPress={handleSave} disabled={saving}>
               <Text style={styles.saveBtnText}>{saving ? 'Saving...' : existingTeam ? 'Update Team' : 'Save Team'}</Text>
             </TouchableOpacity>
             <View style={{ height: 50 }} />
@@ -412,14 +416,15 @@ Alert.alert(
       />
 
       <Modal visible={namePromptFor !== null} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: SPACING.lg }}>
-          <View style={{ backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.border }}>
-            <Text style={{ color: COLORS.text, fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>Enter Display Name</Text>
-            <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 12 }}>
+        <View style={styles.modalScrim}>
+          <View style={styles.modalCard}>
+            <View pointerEvents="none" style={styles.cardEdge} />
+            <Text style={styles.modalTitle}>Enter Display Name</Text>
+            <Text style={styles.modalBody}>
               This is a temporary name for this match only — it will be replaced automatically once this number registers.
             </Text>
             <TextInput
-              style={{ backgroundColor: COLORS.background, color: COLORS.text, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16 }}
+              style={styles.modalInput}
               placeholder="e.g. King"
               placeholderTextColor={COLORS.textMuted}
               value={namePromptValue}
@@ -427,8 +432,8 @@ Alert.alert(
               autoFocus
               autoCapitalize="words"
             />
-            <TouchableOpacity style={{ backgroundColor: COLORS.primary, padding: 14, borderRadius: RADIUS.md, alignItems: 'center' }} onPress={confirmNamePrompt}>
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save Name</Text>
+            <TouchableOpacity style={styles.modalBtn} activeOpacity={0.85} onPress={confirmNamePrompt}>
+              <Text style={styles.modalBtnText}>Save Name</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -439,42 +444,169 @@ Alert.alert(
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  topSection: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: 12, gap: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  logoCircle: { width: 70, height: 70, borderRadius: 35, overflow: 'hidden', borderWidth: 2, borderColor: COLORS.primary, flexShrink: 0 },
+
+  // ── Team identity block ──
+  topSection: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, gap: SPACING.md,
+    backgroundColor: COLORS.card,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft,
+    ...SHADOW.sm,
+  },
+  logoCircle: {
+    width: 74, height: 74, borderRadius: 37, overflow: 'hidden',
+    borderWidth: 2, borderColor: COLORS.primary, flexShrink: 0,
+    ...SHADOW.glow(COLORS.primary),
+  },
   logoImg: { width: '100%', height: '100%' },
-  logoPlaceholder: { flex: 1, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center' },
+  logoPlaceholder: { flex: 1, backgroundColor: COLORS.primarySoft, justifyContent: 'center', alignItems: 'center' },
   cameraIcon: { fontSize: 22 },
-  logoLabel: { color: COLORS.textMuted, fontSize: 9, marginTop: 2 },
-  topRight: { flex: 1, gap: 8 },
-  teamNameInput: { backgroundColor: COLORS.card, color: COLORS.text, padding: 12, borderRadius: RADIUS.md, fontSize: 15, borderWidth: 1, borderColor: COLORS.primary },
+  logoLabel: { ...TYPE.label, fontSize: 8, color: COLORS.primaryLight, marginTop: 3 },
+  topRight: { flex: 1, gap: SPACING.sm },
+  // The team name is the primary field on the screen, so it gets the accent
+  // border and the largest type in this block.
+  teamNameInput: {
+    backgroundColor: COLORS.card2, color: COLORS.text,
+    paddingHorizontal: SPACING.md, paddingVertical: 12,
+    borderRadius: RADIUS.md,
+    ...TYPE.title,
+    borderWidth: 1, borderColor: COLORS.primary,
+  },
+
+  // ── My Team / Other Team switch ──
+  teamTypeRow: { flexDirection: 'row', gap: 6 },
+  teamTypeBtn: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: RADIUS.round },
+  // Tinted rather than solid, so the white label keeps its contrast.
+  teamTypeActive: { backgroundColor: COLORS.primary + '2e', borderColor: COLORS.primary },
+  teamTypeOtherActive: { backgroundColor: COLORS.blue + '2e', borderColor: COLORS.blue },
+  // Case preserved deliberately: TYPE.label would uppercase these button
+  // labels, and the switch reads better in sentence case next to the name field.
+  teamTypeText: { ...TYPE.caption, fontSize: 11, fontWeight: '700', textTransform: 'none' },
+
   roleStatusRow: { flexDirection: 'row', gap: 8 },
-  roleStatus: { flex: 1, backgroundColor: COLORS.card, borderRadius: RADIUS.sm, padding: 6, borderWidth: 1, borderColor: COLORS.red, alignItems: 'center' },
-  roleStatusDone: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '22' },
-  roleStatusText: { color: COLORS.text, fontSize: 10, fontWeight: 'bold' },
-  playersHeader: { paddingHorizontal: SPACING.lg, paddingVertical: 8, backgroundColor: COLORS.card2 },
-  playersTitle: { color: COLORS.text, fontSize: 14, fontWeight: 'bold' },
-  playersHint: { color: COLORS.textSecondary, fontSize: 11, marginTop: 2 },
-  playerCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.lg, marginTop: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
-  playerHeader: { flexDirection: 'row', alignItems: 'center', padding: 10, gap: 6 },
-  playerNumBox: { width: 26, height: 26, borderRadius: 13, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  playerNum: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
-  playerInput: { flex: 1, color: COLORS.text, fontSize: 14, paddingVertical: 8, paddingHorizontal: 6, backgroundColor: COLORS.card2, borderRadius: RADIUS.sm },
-  roleBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, flexShrink: 0 },
+  roleStatus: {
+    flex: 1, backgroundColor: COLORS.card2,
+    borderRadius: RADIUS.round, paddingVertical: 6, paddingHorizontal: 10,
+    borderWidth: 1, borderColor: COLORS.warning + '66', alignItems: 'center',
+  },
+  roleStatusDone: { borderColor: COLORS.primary + '77', backgroundColor: COLORS.primarySoft },
+  // Holds a player's name, so it must not be uppercased.
+  roleStatusText: { ...TYPE.caption, fontSize: 10, fontWeight: '700', color: COLORS.text },
+
+  // ── Squad list ──
+  playersHeader: {
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.background,
+  },
+  playersTitle: { ...TYPE.bodyStrong, color: COLORS.text },
+  playersHint: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted, marginTop: 3 },
+  playerCard: {
+    backgroundColor: COLORS.card,
+    marginHorizontal: SPACING.lg, marginTop: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
+    overflow: 'hidden',
+    ...SHADOW.sm,
+  },
+  cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  playerHeader: { flexDirection: 'row', alignItems: 'center', padding: SPACING.sm, gap: 6 },
+  playerNumBox: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1, borderColor: COLORS.primary + '55',
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+  },
+  // Tabular so slots 1-9 and 10-15 keep the same width.
+  playerNum: { ...TYPE.numSm, fontSize: 11, color: COLORS.primaryLight },
+  playerInput: {
+    flex: 1, color: COLORS.text,
+    ...TYPE.body,
+    paddingVertical: 9, paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.card2, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
+  },
+  playerNameText: { ...TYPE.bodyStrong, color: COLORS.text, flex: 1, paddingHorizontal: 4 },
+  editNameBtn: { flex: 1, paddingHorizontal: 4 },
+  editNameText: { ...TYPE.caption, fontWeight: '700', color: COLORS.warning },
+
+  roleBtn: {
+    minWidth: 32, paddingHorizontal: 8, paddingVertical: 6,
+    borderRadius: RADIUS.sm, alignItems: 'center',
+    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, flexShrink: 0,
+  },
   captainActive: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow },
   wkActive: { backgroundColor: COLORS.blue, borderColor: COLORS.blue },
   regActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  roleBtnText: { color: COLORS.text, fontSize: 11, fontWeight: 'bold' },
-  expandBtn: { color: COLORS.primary, fontSize: 20, fontWeight: 'bold', paddingHorizontal: 4 },
-  playerDetails: { padding: 12, borderTopWidth: 1, borderTopColor: COLORS.border, backgroundColor: COLORS.card2 },
-  detailLabel: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold', marginBottom: 6, marginTop: 6 },
+  roleBtnText: { ...TYPE.label, fontSize: 10, color: COLORS.text },
+  // Dark ink on the yellow captain pill — white on yellow was unreadable.
+  roleBtnTextOnLight: { color: COLORS.onAccent },
+  expandBtnWrap: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.card2,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
+  },
+  expandBtn: { color: COLORS.primary, fontSize: 18, fontWeight: '800', lineHeight: 20 },
+
+  // ── Phone-lookup feedback ──
+  lookupNote: { ...TYPE.caption, fontSize: 11, paddingHorizontal: 12, paddingBottom: 8 },
+  lookupNoteRow: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingBottom: 8 },
+  lookupNoteChecking: { color: COLORS.textMuted },
+  lookupNoteLinked: { color: COLORS.primary, paddingHorizontal: 0, paddingBottom: 0 },
+  lookupNoteGuest: { color: COLORS.warning },
+
+  // ── Expanded player details ──
+  playerDetails: {
+    padding: SPACING.md,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft,
+    backgroundColor: COLORS.card2,
+  },
+  detailLabel: { ...TYPE.label, color: COLORS.textSecondary, marginBottom: 8, marginTop: 6 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
-  chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.round, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
+  chip: {
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.round,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border,
+  },
   chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  chipText: { color: COLORS.textSecondary, fontSize: 11 },
-  chipTextActive: { color: '#fff', fontWeight: 'bold' },
-  detailInput: { backgroundColor: COLORS.card, color: COLORS.text, padding: 8, borderRadius: RADIUS.sm, fontSize: 13, borderWidth: 1, borderColor: COLORS.border },
+  chipText: { ...TYPE.caption, fontWeight: '600', color: COLORS.textSecondary },
+  chipTextActive: { color: COLORS.onPrimary, fontWeight: '700' },
+  detailInput: {
+    backgroundColor: COLORS.card, color: COLORS.text,
+    paddingHorizontal: SPACING.sm, paddingVertical: 10,
+    borderRadius: RADIUS.sm, ...TYPE.body,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+
+  // ── Save ──
   footer: { paddingHorizontal: SPACING.lg },
-  saveBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: RADIUS.md, alignItems: 'center', marginTop: 15 },
-  saveBtnDisabled: { backgroundColor: COLORS.textMuted },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  saveBtn: {
+    backgroundColor: COLORS.primary, paddingVertical: 16,
+    borderRadius: RADIUS.md, alignItems: 'center', marginTop: SPACING.md,
+    ...SHADOW.glow(COLORS.primary),
+  },
+  saveBtnDisabled: { backgroundColor: COLORS.card2, shadowOpacity: 0, elevation: 0 },
+  saveBtnText: { ...TYPE.button, fontSize: 16, color: COLORS.onPrimary },
+
+  // ── Display-name prompt ──
+  modalScrim: { flex: 1, backgroundColor: COLORS.scrim, justifyContent: 'center', padding: SPACING.lg },
+  modalCard: {
+    backgroundColor: COLORS.surface3, borderRadius: RADIUS.xl,
+    padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.borderSoft,
+    overflow: 'hidden',
+    ...SHADOW.lg,
+  },
+  modalTitle: { ...TYPE.h2, color: COLORS.text, marginBottom: SPACING.sm },
+  modalBody: { ...TYPE.body, color: COLORS.textSecondary, marginBottom: SPACING.md, lineHeight: 20 },
+  modalInput: {
+    backgroundColor: COLORS.card, color: COLORS.text,
+    paddingHorizontal: SPACING.md, paddingVertical: 12,
+    borderRadius: RADIUS.md, ...TYPE.body,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md,
+  },
+  modalBtn: {
+    backgroundColor: COLORS.primary, paddingVertical: 14,
+    borderRadius: RADIUS.md, alignItems: 'center',
+    ...SHADOW.glow(COLORS.primary),
+  },
+  modalBtnText: { ...TYPE.button, color: COLORS.onPrimary },
 });

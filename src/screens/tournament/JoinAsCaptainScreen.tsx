@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { resolveInviteCode, getTournamentPreview } from '../../utils/firebase';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 
@@ -40,7 +40,9 @@ export default function JoinAsCaptainScreen({ navigation }: any) {
       <Header title="Join as Team Captain" onBack={() => navigation.goBack()} />
       <View style={s.content}>
         <View style={s.logoBlock}>
-          <AppIcon emoji="🏏" size={48} color={COLORS.primary} />
+          <View style={s.logoRing}>
+            <AppIcon emoji="🏏" size={40} color={COLORS.primary} />
+          </View>
           <Text style={s.logoText}>CricketScorer</Text>
         </View>
         <Text style={s.label}>Enter the invite code shared by your tournament organizer</Text>
@@ -65,10 +67,34 @@ export default function JoinAsCaptainScreen({ navigation }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.lg },
-  logoBlock: { alignItems: 'center', marginBottom: SPACING.lg },
-  logoText: { color: COLORS.text, fontSize: 20, fontWeight: 'bold', marginTop: 6 },
-  label: { color: COLORS.textSecondary, fontSize: 14, marginBottom: 16, lineHeight: 20 },
-  input: { backgroundColor: COLORS.card, color: COLORS.text, padding: 16, borderRadius: RADIUS.md, fontSize: 20, borderWidth: 1, borderColor: COLORS.border, textAlign: 'center', letterSpacing: 4, marginBottom: 16 },
-  btn: { backgroundColor: COLORS.primary, padding: 15, borderRadius: RADIUS.md, alignItems: 'center' },
-  btnTxt: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
+  logoBlock: { alignItems: 'center', marginBottom: SPACING.xl, marginTop: SPACING.sm },
+  // Tinted ring around the mark: gives the bare glyph a surface to sit on so
+  // the top of the form reads as branded rather than as a stray icon.
+  logoRing: {
+    width: 76, height: 76, borderRadius: 38,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1, borderColor: COLORS.primary + '55',
+    alignItems: 'center', justifyContent: 'center',
+    ...SHADOW.glow(COLORS.primary),
+  },
+  logoText: { ...TYPE.h2, color: COLORS.text, marginTop: SPACING.sm },
+  label: { ...TYPE.body, color: COLORS.textSecondary, marginBottom: SPACING.md, lineHeight: 20, textAlign: 'center' },
+  // Code field: tabular figures + wide tracking so a 6-character code reads as
+  // discrete characters, which is how people check one against a message.
+  input: {
+    backgroundColor: COLORS.card2, color: COLORS.text,
+    paddingVertical: SPACING.md, paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg, fontSize: 22, fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+    borderWidth: 1, borderColor: COLORS.border,
+    textAlign: 'center', letterSpacing: 6,
+    marginBottom: SPACING.md,
+    ...SHADOW.sm,
+  },
+  btn: {
+    backgroundColor: COLORS.primary, height: 54,
+    borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
+    ...SHADOW.glow(COLORS.primary),
+  },
+  btnTxt: { ...TYPE.button, color: COLORS.onPrimary },
 });

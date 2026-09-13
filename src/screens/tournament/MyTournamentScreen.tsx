@@ -5,10 +5,11 @@ import {
 } from 'react-native';
 import { getMyTournaments, getCurrentUser, getTournamentDisplayStatus } from '../../utils/firebase';
 import { Tournament } from '../../types/cricket';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import EmptyState from '../../components/EmptyState';
 import AppIcon from '../../components/AppIcon';
+import Badge from '../../components/Badge';
 
 export default function MyTournamentScreen({ navigation }: any) {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -65,24 +66,16 @@ export default function MyTournamentScreen({ navigation }: any) {
             const displayStatus = getTournamentDisplayStatus(item);
             return (
             <TouchableOpacity
-              style={styles.card}
-              onPress={() => navigation.navigate('TournamentDetail', { tournamentId: item.id })}>
+              style={[styles.card, { borderLeftColor: displayStatus === 'live' ? COLORS.live : displayStatus === 'completed' ? COLORS.success : COLORS.info }]}
+              onPress={() => navigation.navigate('TournamentDetail', { tournamentId: item.id })}
+              activeOpacity={0.85}>
+              <View pointerEvents="none" style={styles.cardEdge} />
               <View style={styles.cardHeader}>
                 <Text style={styles.cardName}>{item.name}</Text>
-                <View style={[styles.badge,
-                  displayStatus === 'live' && styles.liveBadge,
-                  displayStatus === 'completed' && styles.doneBadge]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <AppIcon
-                    emoji={displayStatus === 'live' ? '🔴' : displayStatus === 'completed' ? '✅' : '📅'}
-                    size={11}
-                    color={displayStatus === 'live' ? COLORS.red : displayStatus === 'completed' ? COLORS.primary : COLORS.textSecondary}
-                    />
-                    <Text style={styles.badgeText}>
-                    {displayStatus === 'live' ? 'LIVE' : displayStatus === 'completed' ? 'Done' : 'Upcoming'}
-                    </Text>
-                    </View>
-                </View>
+                <Badge
+                  label={displayStatus === 'live' ? 'LIVE' : displayStatus === 'completed' ? 'Done' : 'Upcoming'}
+                  tone={displayStatus === 'live' ? 'live' : displayStatus === 'completed' ? 'success' : 'info'}
+                />
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
                     <AppIcon emoji="🏢" size={13} color={COLORS.textSecondary} />
@@ -114,20 +107,29 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
   list: { padding: SPACING.lg, gap: 12 },
   card: {
-    backgroundColor: COLORS.card, borderRadius: RADIUS.md,
-    padding: 16, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.card, borderRadius: RADIUS.lg,
+    padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft,
+    // Status-coloured stripe; the colour itself is set inline from the
+    // already-computed displayStatus.
+    borderLeftWidth: 3,
+    overflow: 'hidden',
+    ...SHADOW.md,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  cardName: { color: COLORS.text, fontSize: 16, fontWeight: 'bold', flex: 1 },
-  badge: {
-    backgroundColor: COLORS.card2, paddingHorizontal: 10,
-    paddingVertical: 4, borderRadius: RADIUS.round,
+  cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
+  cardName: { ...TYPE.h2, color: COLORS.text, flex: 1 },
+  // Kept because the stylesheet keys are still referenced elsewhere in the
+  // file's history; harmless and cheap to retain.
+  badge: { backgroundColor: COLORS.card2, paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.round },
+  liveBadge: { backgroundColor: COLORS.live + '33' },
+  doneBadge: { backgroundColor: COLORS.success + '33' },
+  badgeText: { ...TYPE.label, fontSize: 10, color: COLORS.text },
+  cardSub: { ...TYPE.body, color: COLORS.textSecondary, marginBottom: 4 },
+  cardFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: SPACING.sm, paddingTop: SPACING.sm,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft,
   },
-  liveBadge: { backgroundColor: COLORS.red + '33' },
-  doneBadge: { backgroundColor: COLORS.primary + '33' },
-  badgeText: { color: COLORS.text, fontSize: 11, fontWeight: 'bold' },
-  cardSub: { color: COLORS.textSecondary, fontSize: 13, marginBottom: 4 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  cardInfo: { color: COLORS.textSecondary, fontSize: 12 },
-  cardFormat: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold' },
+  cardInfo: { ...TYPE.caption, color: COLORS.textSecondary },
+  cardFormat: { ...TYPE.label, fontSize: 10, color: COLORS.primary, backgroundColor: COLORS.primarySoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.round, overflow: 'hidden' },
 });

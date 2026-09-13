@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, LayoutChangeEvent } from 'react-native';
-import { COLORS, RADIUS } from '../constants/theme';
+import { COLORS, RADIUS, TYPE, SHADOW } from '../constants/theme';
 
 interface Props {
   innings1Points: { over: number; runs: number }[];
@@ -67,12 +67,13 @@ export default function WormGraph({ innings1Points, innings2Points, totalOvers, 
 }
 
 const s = StyleSheet.create({
-  container: { backgroundColor: COLORS.card, borderRadius: RADIUS.md, padding: 12, borderWidth: 1, borderColor: COLORS.border },
-  legend: { flexDirection: 'row', gap: 16, marginBottom: 8 },
+  container: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.sm },
+  legend: { flexDirection: 'row', gap: 16, marginBottom: 10 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  legendTxt: { color: COLORS.textSecondary, fontSize: 11 },
-  graphArea: { position: 'relative', backgroundColor: COLORS.background, borderRadius: RADIUS.sm },
-  xAxis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  axisTxt: { color: COLORS.textMuted, fontSize: 10 },
+  legendTxt: { ...TYPE.label, fontSize: 9, color: COLORS.textSecondary },
+  // Recessed plot area so the plotted lines read as sitting inside a chart.
+  graphArea: { position: 'relative', backgroundColor: COLORS.background, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.borderSoft },
+  xAxis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  axisTxt: { ...TYPE.numSm, fontSize: 10, color: COLORS.textMuted },
 });

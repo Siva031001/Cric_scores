@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { getMyTeams } from '../../utils/firebase';
 import { Team, Player } from '../../types/cricket';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 
@@ -55,35 +55,47 @@ export default function TeamDetailScreen({ route, navigation }: any) {
             </Text>
           )}
         </View>
-        <Text style={styles.teamName}>{team.name}</Text>
-        <Text style={styles.teamSub}>{players.length} Players</Text>
+        <Text style={styles.teamName} numberOfLines={2}>{team.name}</Text>
+        <View style={styles.teamSubPill}>
+          <Text style={styles.teamSub}>{players.length} Players</Text>
+        </View>
       </View>
 
       {/* Key Players */}
       <View style={styles.keyRow}>
         <View style={styles.keyBox}>
-          <AppIcon emoji="👑" size={24} color={COLORS.yellow} />
+          <View pointerEvents="none" style={styles.cardEdge} />
+          <View style={[styles.keyIconBox, { backgroundColor: COLORS.yellow + '1f' }]}>
+          <AppIcon emoji="👑" size={20} color={COLORS.yellow} />
+          </View>
           <Text style={styles.keyLabel}>Captain</Text>
-          <Text style={styles.keyValue}>{captain?.name ?? 'Not set'}</Text>
+          <Text style={styles.keyValue} numberOfLines={1}>{captain?.name ?? 'Not set'}</Text>
        </View>
         <View style={styles.keyBox}>
-        <AppIcon emoji="🧤" size={24} color={COLORS.blue} />
+        <View pointerEvents="none" style={styles.cardEdge} />
+        <View style={[styles.keyIconBox, { backgroundColor: COLORS.blue + '1f' }]}>
+        <AppIcon emoji="🧤" size={20} color={COLORS.blue} />
+        </View>
         <Text style={styles.keyLabel}>Wicket Keeper</Text>
-        <Text style={styles.keyValue}>{wk?.name ?? 'Not set'}</Text>
+        <Text style={styles.keyValue} numberOfLines={1}>{wk?.name ?? 'Not set'}</Text>
       </View>
       </View>
 
       {/* Player List */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Squad ({players.length})</Text>
+        <View style={styles.sectionHead}>
+          <View style={styles.sectionBar} />
+          <Text style={styles.sectionTitle}>Squad ({players.length})</Text>
+        </View>
         {players.map((player: Player, index: number) => (
           <View key={player.id} style={styles.playerRow}>
+            <View pointerEvents="none" style={styles.cardEdge} />
             <View style={styles.playerNum}>
               <Text style={styles.playerNumText}>{index + 1}</Text>
             </View>
             <View style={styles.playerInfo}>
               <View style={styles.playerNameRow}>
-                <Text style={styles.playerName}>{player.name}</Text>
+                <Text style={styles.playerName} numberOfLines={1}>{player.name}</Text>
                 {player.isCaptain && (
                   <Text style={styles.badge}>C</Text>
                 )}
@@ -91,7 +103,7 @@ export default function TeamDetailScreen({ route, navigation }: any) {
                   <Text style={[styles.badge, styles.wkBadge]}>WK</Text>
                 )}
               </View>
-              <Text style={styles.playerSub}>
+              <Text style={styles.playerSub} numberOfLines={1}>
                 {player.role ?? 'Batter'} •{' '}
                 {player.battingStyle ?? 'Right Hand'} bat
                 {player.bowlingStyle ? ` • ${player.bowlingStyle}` : ''}
@@ -112,57 +124,84 @@ const styles = StyleSheet.create({
     flex: 1, justifyContent: 'center',
     alignItems: 'center', backgroundColor: COLORS.background,
   },
-  notFound: { color: COLORS.text, fontSize: 16 },
-  teamHeader: { alignItems: 'center', paddingVertical: 25 },
+  notFound: { ...TYPE.title, color: COLORS.text },
+
+  // ── Crest hero ──
+  teamHeader: { alignItems: 'center', paddingVertical: SPACING.lg, paddingHorizontal: SPACING.lg },
   logoBox: {
-    width: 90, height: 90, borderRadius: 45,
-    backgroundColor: COLORS.primary, justifyContent: 'center',
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: COLORS.primarySoft, justifyContent: 'center',
     alignItems: 'center', overflow: 'hidden',
-    marginBottom: 12, borderWidth: 3, borderColor: COLORS.primary,
+    marginBottom: SPACING.md, borderWidth: 3, borderColor: COLORS.primary,
+    ...SHADOW.glow(COLORS.primary),
   },
   logoImg: { width: '100%', height: '100%' },
-  logoText: { color: '#fff', fontSize: 36, fontWeight: 'bold' },
-  teamName: { color: COLORS.text, fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
-  teamSub: { color: COLORS.textSecondary, fontSize: 14 },
+  logoText: { ...TYPE.display, fontSize: 38, color: COLORS.primaryLight },
+  teamName: { ...TYPE.h1, color: COLORS.text, marginBottom: SPACING.sm, textAlign: 'center' },
+  // The player count sits in a tinted pill so it reads as a stat, not a caption
+  // competing with the team name.
+  teamSubPill: {
+    paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: RADIUS.round,
+    backgroundColor: COLORS.card2,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
+  },
+  teamSub: { ...TYPE.caption, fontWeight: '700', color: COLORS.textSecondary },
+
+  // ── Key players ──
   keyRow: {
-    flexDirection: 'row', gap: 12,
-    paddingHorizontal: SPACING.lg, marginBottom: 20,
+    flexDirection: 'row', gap: SPACING.sm,
+    paddingHorizontal: SPACING.lg, marginBottom: SPACING.lg,
   },
   keyBox: {
     flex: 1, backgroundColor: COLORS.card,
-    borderRadius: RADIUS.md, padding: 14,
+    borderRadius: RADIUS.lg, padding: SPACING.md,
     alignItems: 'center', borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.borderSoft,
+    overflow: 'hidden',
+    ...SHADOW.sm,
+  },
+  cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  keyIconBox: {
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: SPACING.sm,
   },
   keyIcon: { fontSize: 24, marginBottom: 6 },
-  keyLabel: { color: COLORS.textSecondary, fontSize: 11, marginBottom: 4 },
-  keyValue: { color: COLORS.text, fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
+  keyLabel: { ...TYPE.label, fontSize: 10, color: COLORS.textMuted, marginBottom: 4 },
+  keyValue: { ...TYPE.title, color: COLORS.text, textAlign: 'center' },
+
+  // ── Squad ──
   section: { paddingHorizontal: SPACING.lg },
-  sectionTitle: {
-    color: COLORS.text, fontSize: 16,
-    fontWeight: 'bold', marginBottom: 12,
-  },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.md },
+  sectionBar: { width: 3, height: 18, borderRadius: 2, backgroundColor: COLORS.primary },
+  sectionTitle: { ...TYPE.h2, color: COLORS.text },
   playerRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.card, borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.card, borderRadius: RADIUS.md,
     padding: 12, marginBottom: 8, gap: 12,
-    borderWidth: 1, borderColor: COLORS.border,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
+    overflow: 'hidden',
+    ...SHADOW.sm,
   },
   playerNum: {
     width: 30, height: 30, borderRadius: 15,
     backgroundColor: COLORS.card2, justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.borderSoft,
   },
-  playerNumText: { color: COLORS.textSecondary, fontSize: 13 },
+  // Tabular so a two-digit shirt number does not shift the name column.
+  playerNumText: { ...TYPE.numSm, color: COLORS.textSecondary },
   playerInfo: { flex: 1 },
   playerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  playerName: { color: COLORS.text, fontSize: 15, fontWeight: 'bold' },
+  playerName: { ...TYPE.title, color: COLORS.text, flexShrink: 1 },
   badge: {
-    backgroundColor: COLORS.yellow, color: '#000',
-    fontSize: 10, fontWeight: 'bold',
+    ...TYPE.label, fontSize: 9,
+    backgroundColor: COLORS.yellow, color: '#1a1400',
     paddingHorizontal: 6, paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
   },
-  wkBadge: { backgroundColor: COLORS.blue, color: '#fff' },
-  playerSub: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
+  wkBadge: { backgroundColor: COLORS.blue, color: '#ffffff' },
+  playerSub: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 3 },
 });

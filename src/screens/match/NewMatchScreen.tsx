@@ -5,8 +5,11 @@ import {
 } from 'react-native';
 import { findTeamByName, getMyTeams } from '../../utils/firebase';
 import { Team } from '../../types/cricket';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
+import AppIcon from '../../components/AppIcon';
 
 export default function NewMatchScreen({ route, navigation }: any) {
   const [team1Name, setTeam1Name] = useState('');
@@ -120,12 +123,13 @@ export default function NewMatchScreen({ route, navigation }: any) {
       />
 
       {/* Teams Row */}
-      <View style={styles.teamsRow}>
+      <Card tone="base" elevation="md" padded={false} style={styles.teamsCard}>
+        <View style={styles.teamsRow}>
         {/* Team 1 */}
         <View style={styles.teamBox}>
           <Text style={styles.teamLabel}>Team 1</Text>
           <TouchableOpacity
-            style={styles.logoCircle}
+            style={[styles.logoCircle, team1Data?.logo ? styles.logoCircleFilled : null]}
             onPress={() => navigation.navigate('CreateTeam', {
               fromNewMatch: true, teamSlot: 1, prefillName: team1Name,
             })}>
@@ -147,17 +151,22 @@ export default function NewMatchScreen({ route, navigation }: any) {
           {searching1
             ? <ActivityIndicator size="small" color={COLORS.primary} />
             : team1Data
-              ? <Text style={styles.foundText}>✅ {team1Data.players.length} players</Text>
+              ? <View style={styles.foundRow}>
+                  <AppIcon emoji="✅" size={12} color={COLORS.success} />
+                  <Text style={styles.foundText}>{team1Data.players.length} players</Text>
+                </View>
               : null}
         </View>
 
-        <Text style={styles.vs}>VS</Text>
+        <View style={styles.vsBadge}>
+          <Text style={styles.vs}>VS</Text>
+        </View>
 
         {/* Team 2 */}
         <View style={styles.teamBox}>
           <Text style={styles.teamLabel}>Team 2</Text>
           <TouchableOpacity
-            style={styles.logoCircle}
+            style={[styles.logoCircle, team2Data?.logo ? styles.logoCircleFilled : null]}
             onPress={() => navigation.navigate('CreateTeam', {
               fromNewMatch: true, teamSlot: 2, prefillName: team2Name,
             })}>
@@ -179,18 +188,22 @@ export default function NewMatchScreen({ route, navigation }: any) {
           {searching2
             ? <ActivityIndicator size="small" color={COLORS.primary} />
             : team2Data
-              ? <Text style={styles.foundText}>✅ {team2Data.players.length} players</Text>
+              ? <View style={styles.foundRow}>
+                  <AppIcon emoji="✅" size={12} color={COLORS.success} />
+                  <Text style={styles.foundText}>{team2Data.players.length} players</Text>
+                </View>
               : null}
         </View>
-      </View>
+        </View>
+      </Card>
 
       {/* My Teams Quick Select */}
       {myTeams.length > 0 && (
-        <View style={styles.quickBox}>
+        <Card tone="base" elevation="md" style={styles.quickBox}>
           <Text style={styles.quickTitle}>Quick Select from My Teams</Text>
           {myTeams.map(team => (
             <View key={team.id} style={styles.quickRow}>
-              <Text style={styles.quickName}>{team.name}</Text>
+              <Text style={styles.quickName} numberOfLines={1}>{team.name}</Text>
               <TouchableOpacity
                 style={styles.quickBtn}
                 onPress={() => { setTeam1Name(team.name); setTeam1Data(team); }}>
@@ -199,15 +212,15 @@ export default function NewMatchScreen({ route, navigation }: any) {
               <TouchableOpacity
                 style={[styles.quickBtn, styles.quickBtn2]}
                 onPress={() => { setTeam2Name(team.name); setTeam2Data(team); }}>
-                <Text style={styles.quickBtnText}>Team 2</Text>
+                <Text style={[styles.quickBtnText, styles.quickBtnText2]}>Team 2</Text>
               </TouchableOpacity>
             </View>
           ))}
-        </View>
+        </Card>
       )}
 
       {/* Venue */}
-      <View style={styles.fieldBox}>
+      <Card tone="base" elevation="md" style={styles.fieldBox}>
         <Text style={styles.fieldLabel}>📍 Venue (Optional)</Text>
         <TextInput
           style={styles.fieldInput}
@@ -216,10 +229,10 @@ export default function NewMatchScreen({ route, navigation }: any) {
           value={venue}
           onChangeText={setVenue}
         />
-      </View>
+      </Card>
 
       {/* Overs */}
-      <View style={styles.fieldBox}>
+      <Card tone="base" elevation="md" style={styles.fieldBox}>
         <Text style={styles.fieldLabel}>🕐 Overs</Text>
         <View style={styles.oversRow}>
           {['5', '10', '15', '20', '50'].map(o => (
@@ -242,14 +255,14 @@ export default function NewMatchScreen({ route, navigation }: any) {
             maxLength={3}
           />
         </View>
-      </View>
-      
-      <View style={styles.fieldBox}>
+      </Card>
+
+      <Card tone="base" elevation="md" style={styles.fieldBox}>
         <Text style={styles.fieldLabel}>🏏 Ball Type</Text>
         {ballType === 'Turf' && (
-  <View style={{ marginTop: 12 }}>
+  <View style={styles.subGroup}>
     <Text style={styles.fieldLabel}>Players Per Side</Text>
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+    <View style={styles.subGroupRow}>
       {[4, 5, 6, 7, 8, 9, 10, 11].map((n) => (
         <TouchableOpacity
           key={n}
@@ -272,12 +285,18 @@ export default function NewMatchScreen({ route, navigation }: any) {
       </TouchableOpacity>
         ))}
          </View>
-        </View>
+        </Card>
 
       {/* Start Button */}
-      <TouchableOpacity style={styles.startBtn} onPress={handleStart}>
-        <Text style={styles.startBtnText}>🏏 Start Match</Text>
-      </TouchableOpacity>
+      <Button
+        label="Start Match"
+        onPress={handleStart}
+        variant="primary"
+        size="lg"
+        full
+        left={<AppIcon emoji="🏏" size={20} color={COLORS.background} />}
+        style={styles.startBtn}
+      />
 
       <View style={{ height: 50 }} />
     </ScrollView>
@@ -286,69 +305,87 @@ export default function NewMatchScreen({ route, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  // The two teams are the headline of this screen, so they sit on their own
+  // elevated card instead of floating on the background.
+  teamsCard: { marginHorizontal: SPACING.lg, marginTop: SPACING.sm, marginBottom: SPACING.md, paddingVertical: SPACING.lg, paddingHorizontal: SPACING.sm },
   teamsRow: {
     flexDirection: 'row', alignItems: 'flex-start',
-    justifyContent: 'space-around', padding: SPACING.lg,
+    justifyContent: 'space-around',
   },
-  teamBox: { flex: 1, alignItems: 'center', gap: 8 },
-  teamLabel: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold' },
+  teamBox: { flex: 1, alignItems: 'center', gap: SPACING.sm },
+  teamLabel: { ...TYPE.label, color: COLORS.textSecondary },
   logoCircle: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: COLORS.card, borderWidth: 2,
-    borderColor: COLORS.primary, borderStyle: 'dashed',
+    width: 76, height: 76, borderRadius: 38,
+    backgroundColor: COLORS.card2, borderWidth: 2,
+    borderColor: COLORS.border, borderStyle: 'dashed',
     justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
   },
+  // Once a logo is loaded the slot stops advertising itself as empty: solid
+  // brand ring, no dashes.
+  logoCircleFilled: { borderStyle: 'solid', borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
   logoImg: { width: '100%', height: '100%' },
-  logoPlus: { color: COLORS.primary, fontSize: 28, fontWeight: 'bold' },
+  logoPlus: { color: COLORS.primary, fontSize: 30, fontWeight: '700', marginTop: -2 },
   teamInput: {
-    color: COLORS.text, fontSize: 14, fontWeight: 'bold',
-    borderBottomWidth: 1, borderBottomColor: COLORS.primary,
-    paddingVertical: 5, width: '90%',
+    ...TYPE.bodyStrong, color: COLORS.text,
+    backgroundColor: COLORS.card2,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border,
+    paddingVertical: 10, paddingHorizontal: SPACING.sm, width: '94%',
   },
-  foundText: { color: COLORS.primary, fontSize: 11 },
-  vs: { color: COLORS.textSecondary, fontSize: 16, fontWeight: 'bold', paddingTop: 55 },
-  quickBox: {
-    backgroundColor: COLORS.card, margin: SPACING.lg,
-    borderRadius: RADIUS.md, padding: 14,
-    borderWidth: 1, borderColor: COLORS.border,
+  foundRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  foundText: { ...TYPE.caption, fontSize: 11, color: COLORS.success },
+  // A circular chip rather than floating text, and vertically centred on the
+  // logos instead of nudged down with a magic 55px.
+  vsBadge: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+    alignItems: 'center', justifyContent: 'center', marginTop: 40,
   },
-  quickTitle: { color: COLORS.textSecondary, fontSize: 12, marginBottom: 10 },
+  vs: { ...TYPE.label, fontSize: 11, color: COLORS.textSecondary },
+  quickBox: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md },
+  quickTitle: { ...TYPE.label, color: COLORS.textSecondary, marginBottom: SPACING.sm },
   quickRow: {
     flexDirection: 'row', alignItems: 'center',
-    gap: 8, marginBottom: 8,
+    gap: SPACING.sm, marginBottom: SPACING.sm,
   },
-  quickName: { color: COLORS.text, fontSize: 14, flex: 1, fontWeight: 'bold' },
+  quickName: { ...TYPE.bodyStrong, color: COLORS.text, flex: 1 },
   quickBtn: {
-    backgroundColor: COLORS.primary, paddingHorizontal: 12,
-    paddingVertical: 6, borderRadius: RADIUS.round,
+    backgroundColor: COLORS.primary, paddingHorizontal: 13,
+    paddingVertical: 7, borderRadius: RADIUS.round,
   },
-  quickBtn2: { backgroundColor: COLORS.blue },
-  quickBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  fieldBox: { paddingHorizontal: SPACING.lg, marginBottom: 15 },
-  fieldLabel: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold', marginBottom: 8 },
+  quickBtn2: { backgroundColor: COLORS.info },
+  quickBtnText: { ...TYPE.label, fontSize: 10, color: COLORS.background },
+  quickBtnText2: { color: COLORS.text },
+  fieldBox: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md },
+  fieldLabel: { ...TYPE.label, fontSize: 12, color: COLORS.textSecondary, marginBottom: SPACING.sm },
   fieldInput: {
-    backgroundColor: COLORS.card, color: COLORS.text,
-    padding: 13, borderRadius: RADIUS.md,
-    fontSize: 15, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.card2, color: COLORS.text,
+    paddingHorizontal: SPACING.md, paddingVertical: 15,
+    borderRadius: RADIUS.md,
+    ...TYPE.body, fontSize: 15, borderWidth: 1, borderColor: COLORS.border,
   },
+  // Players-per-side only exists for Turf, so it is set off as a nested
+  // sub-setting rather than looking like a peer of Ball Type.
+  subGroup: {
+    marginBottom: SPACING.md, paddingBottom: SPACING.md,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft,
+  },
+  subGroupRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   oversRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   oversBtn: {
-    paddingHorizontal: 16, paddingVertical: 10,
-    borderRadius: RADIUS.round, backgroundColor: COLORS.card,
+    minWidth: 46, paddingHorizontal: 16, paddingVertical: 11,
+    borderRadius: RADIUS.round, backgroundColor: COLORS.card2,
     borderWidth: 1, borderColor: COLORS.border,
+    alignItems: 'center', justifyContent: 'center',
   },
-  oversBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  oversBtnText: { color: COLORS.textSecondary, fontWeight: 'bold' },
-  oversBtnTextActive: { color: '#fff' },
+  oversBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  oversBtnText: { ...TYPE.num, color: COLORS.textSecondary },
+  oversBtnTextActive: { color: COLORS.background },
   oversInput: {
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderRadius: RADIUS.round, backgroundColor: COLORS.card,
+    paddingHorizontal: 14, paddingVertical: 11,
+    borderRadius: RADIUS.round, backgroundColor: COLORS.card2,
     borderWidth: 1, borderColor: COLORS.border,
-    color: COLORS.text, width: 70, textAlign: 'center',
+    ...TYPE.num, color: COLORS.text, width: 74, textAlign: 'center',
   },
-  startBtn: {
-    backgroundColor: COLORS.primary, margin: SPACING.lg,
-    padding: 16, borderRadius: RADIUS.md, alignItems: 'center',
-  },
-  startBtnText: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
+  // Height, radius, glow and label all come from <Button variant="primary">.
+  startBtn: { marginHorizontal: SPACING.lg, marginTop: SPACING.xs },
 });

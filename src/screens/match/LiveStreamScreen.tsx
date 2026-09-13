@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from "react-native";
-import { COLORS, RADIUS, SPACING } from "../../constants/theme";
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from "../../constants/theme";
 import Header from "../../components/Header";
+import AppIcon from "../../components/AppIcon";
+import Badge from "../../components/Badge";
 
 export default function LiveStreamScreen({ navigation }: any) {
   return (
@@ -9,9 +11,7 @@ export default function LiveStreamScreen({ navigation }: any) {
       <Header title="Live Streaming" onBack={() => navigation.goBack()} />
       <ScrollView style={s.scroll}>
         <View style={s.heroBox}>
-          <View style={s.heroBadge}>
-            <Text style={s.heroBadgeTxt}>LIVE</Text>
-          </View>
+          <Badge label="LIVE" tone="live" style={s.heroBadge} />
           <Text style={s.heroTitle}>Live Cricket Scoring</Text>
           <Text style={s.heroSub}>Start, share and follow live matches in real time</Text>
         </View>
@@ -25,7 +25,7 @@ export default function LiveStreamScreen({ navigation }: any) {
               <Text style={s.optTitle}>Go Live — Start Match</Text>
               <Text style={s.optSub}>Create a new match and score ball by ball. Others can follow live using your Match ID.</Text>
             </View>
-            <Text style={s.optArrow}>›</Text>
+            <AppIcon emoji="›" size={22} color={COLORS.textMuted} style={s.optArrow} />
           </TouchableOpacity>
 
           <TouchableOpacity style={s.optionCard} onPress={() => navigation.navigate("LiveView")}>
@@ -36,7 +36,7 @@ export default function LiveStreamScreen({ navigation }: any) {
               <Text style={s.optTitle}>Join by Match ID</Text>
               <Text style={s.optSub}>Enter a Match ID shared by scorer to follow live score updates.</Text>
             </View>
-            <Text style={s.optArrow}>›</Text>
+            <AppIcon emoji="›" size={22} color={COLORS.textMuted} style={s.optArrow} />
           </TouchableOpacity>
 
           <TouchableOpacity style={s.optionCard} onPress={() => Alert.alert("Share Match Score", "During a live match, tap the Share button on the Scoring screen to share the live score via WhatsApp, SMS or any app.")}>
@@ -47,19 +47,19 @@ export default function LiveStreamScreen({ navigation }: any) {
               <Text style={s.optTitle}>Share Live Score</Text>
               <Text style={s.optSub}>While scoring, tap Share to send live scores via WhatsApp or other apps.</Text>
             </View>
-            <Text style={s.optArrow}>›</Text>
+            <AppIcon emoji="›" size={22} color={COLORS.textMuted} style={s.optArrow} />
           </TouchableOpacity>
 
           {/* NEW: My Live Streams — organizer's stream history/status view */}
           <TouchableOpacity style={s.optionCard} onPress={() => navigation.navigate("MyLiveStreams")}>
             <View style={[s.optIcon, {backgroundColor: COLORS.purple + "33"}]}>
-              <Text style={[s.optIconTxt, {color: COLORS.purple}]}>📊</Text>
+              <AppIcon emoji="📊" size={22} color={COLORS.purple} />
             </View>
             <View style={s.optInfo}>
               <Text style={s.optTitle}>My Live Streams</Text>
               <Text style={s.optSub}>View active, scheduled, completed, and draft live streams.</Text>
             </View>
-            <Text style={s.optArrow}>›</Text>
+            <AppIcon emoji="›" size={22} color={COLORS.textMuted} style={s.optArrow} />
           </TouchableOpacity>
 
           {/* NEW: Streaming Plans — pricing page, Coming Soon */}
@@ -71,7 +71,7 @@ export default function LiveStreamScreen({ navigation }: any) {
               <Text style={s.optTitle}>Streaming Plans</Text>
               <Text style={s.optSub}>Unlock more live matches and premium score themes.</Text>
             </View>
-            <Text style={s.optArrow}>›</Text>
+            <AppIcon emoji="›" size={22} color={COLORS.textMuted} style={s.optArrow} />
           </TouchableOpacity>
         </View>
 
@@ -99,23 +99,39 @@ export default function LiveStreamScreen({ navigation }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { flex: 1 },
-  heroBox: { alignItems: "center", paddingVertical: 36, paddingHorizontal: SPACING.xl },
-  heroBadge: { backgroundColor: COLORS.red, paddingHorizontal: 20, paddingVertical: 8, borderRadius: RADIUS.round, marginBottom: 16 },
-  heroBadgeTxt: { color: "#fff", fontSize: 16, fontWeight: "900", letterSpacing: 3 },
-  heroTitle: { color: COLORS.text, fontSize: 22, fontWeight: "bold", marginBottom: 8, textAlign: "center" },
-  heroSub: { color: COLORS.textSecondary, fontSize: 13, textAlign: "center", lineHeight: 20 },
-  optionsBox: { paddingHorizontal: SPACING.lg, gap: 12 },
-  optionCard: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, borderWidth: 1, borderColor: COLORS.border, gap: 14 },
-  optIcon: { width: 52, height: 52, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  optIconTxt: { fontSize: 15, fontWeight: "900" },
+  heroBox: { alignItems: "center", paddingVertical: SPACING.xl, paddingHorizontal: SPACING.xl },
+  // The pulsing LIVE pill carries the "on air" idea; the old solid red block
+  // read as an error banner. COLORS.live is deliberately not COLORS.error.
+  heroBadge: { marginBottom: SPACING.md, paddingHorizontal: 14, paddingVertical: 6, ...SHADOW.glow(COLORS.live) },
+  heroTitle: { ...TYPE.h1, color: COLORS.text, marginBottom: SPACING.xs + 1, textAlign: "center" },
+  heroSub: { ...TYPE.body, color: COLORS.textSecondary, textAlign: "center", lineHeight: 20 },
+  optionsBox: { paddingHorizontal: SPACING.lg, gap: SPACING.sm + 2 },
+  optionCard: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: COLORS.card, borderRadius: RADIUS.lg,
+    padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft,
+    gap: 14, ...SHADOW.sm,
+  },
+  optIcon: { width: 48, height: 48, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  optIconTxt: { ...TYPE.label, fontSize: 14, letterSpacing: 0.5 },
   optInfo: { flex: 1 },
-  optTitle: { color: COLORS.text, fontSize: 15, fontWeight: "bold", marginBottom: 4 },
-  optSub: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 18 },
-  optArrow: { color: COLORS.textSecondary, fontSize: 24, fontWeight: "bold" },
-  howBox: { margin: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.border },
-  howTitle: { color: COLORS.primary, fontSize: 14, fontWeight: "bold", marginBottom: 14 },
-  howRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
-  howNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  howNumTxt: { color: "#fff", fontSize: 13, fontWeight: "bold" },
-  howTxt: { color: COLORS.textSecondary, fontSize: 13, flex: 1 },
+  optTitle: { ...TYPE.title, color: COLORS.text, marginBottom: 3 },
+  optSub: { ...TYPE.caption, color: COLORS.textSecondary, lineHeight: 18 },
+  optArrow: { flexShrink: 0 },
+  howBox: {
+    margin: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.lg,
+    padding: SPACING.lg, borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.sm,
+  },
+  howTitle: { ...TYPE.label, color: COLORS.primary, marginBottom: 14 },
+  howRow: { flexDirection: "row", alignItems: "center", gap: SPACING.sm + 2, marginBottom: SPACING.sm + 2 },
+  // Tinted step marker rather than a solid green dot: five solid green circles
+  // down the card pulled attention away from the steps themselves.
+  howNum: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: COLORS.primarySoft,
+    borderWidth: 1, borderColor: COLORS.primary + '66',
+    justifyContent: "center", alignItems: "center", flexShrink: 0,
+  },
+  howNumTxt: { ...TYPE.numSm, color: COLORS.primaryLight },
+  howTxt: { ...TYPE.body, color: COLORS.textSecondary, flex: 1, lineHeight: 19 },
 });

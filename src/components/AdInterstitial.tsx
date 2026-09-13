@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { COLORS, RADIUS, SPACING } from '../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE } from '../constants/theme';
 
 // TODO: Replace with real ad SDK's interstitial show() call once a provider
 // is chosen. Shown at natural break points only (match complete, AI summary
@@ -37,6 +37,6 @@ export default function AdInterstitial({ visible, onDismiss }: { visible: boolea
 const s = StyleSheet.create({
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
   box: { alignItems: 'center', padding: SPACING.xl },
-  text: { color: COLORS.text, fontSize: 16, fontWeight: 'bold', marginTop: 16 },
-  sub: { color: COLORS.textMuted, fontSize: 12, marginTop: 6 },
+  text: { ...TYPE.title, color: COLORS.text, marginTop: SPACING.lg },
+  sub: { ...TYPE.caption, color: COLORS.textMuted, marginTop: 6 },
 });

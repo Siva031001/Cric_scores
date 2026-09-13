@@ -3,9 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView,
 import { validateStreamSource } from '../../utils/liveStreamValidation';
 import { subscribeToNetworkHealth } from '../../utils/networkHealth';
 import { getOversString } from '../../utils/cricketLogic';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import ShareMatchSheet from '../../components/ShareMatchSheet';
+import Card from '../../components/Card';
+import Badge from '../../components/Badge';
+import AppIcon from '../../components/AppIcon';
 
 
 export default function StreamingDashboardScreen({ route, navigation }: any) {
@@ -139,21 +142,23 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
       <ScrollView style={s.scroll}>
 
         {/* Match Information */}
-        <View style={s.card}>
+        <Card style={s.card}>
           <Text style={s.cardTitle}>Match Information</Text>
           {match.tournamentId && <Text style={s.infoRow}>Tournament match</Text>}
           <Text style={s.infoRow}>{match.team1} vs {match.team2}</Text>
           {match.venue ? <Text style={s.infoRow}>Venue: {match.venue}</Text> : null}
           <Text style={s.infoRow}>Overs: {match.totalOvers}</Text>
           <Text style={s.infoRow}>Status: {match.status}</Text>
-        </View>
+        </Card>
 
         {/* Streaming Status */}
-        <View style={s.card}>
+        <Card style={s.card}>
           <View style={s.statusRow}>
-            <View style={[s.statusBadge, streamStatus === 'LIVE' && s.statusLive, streamStatus === 'PAUSED' && s.statusPaused]}>
-              <Text style={s.statusBadgeTxt}>{streamStatus}</Text>
-            </View>
+            <Badge
+              label={streamStatus}
+              tone={streamStatus === 'LIVE' ? 'live' : streamStatus === 'PAUSED' ? 'warning' : 'neutral'}
+              style={s.statusBadge}
+            />
             {match.isStreaming && <Text style={s.durationTxt}>{formatDuration(durationSec)}</Text>}
           </View>
           <View style={s.metricsRow}>
@@ -163,30 +168,33 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
             </View>
             <View style={s.metric}>
               <Text style={s.metricLabel}>Connection</Text>
-              <Text style={[s.metricValue, { color: netHealth === 'Poor' || netHealth === 'Disconnected' ? COLORS.red : COLORS.primary }]}>{netHealth}</Text>
+              <Text style={[s.metricValue, { color: netHealth === 'Poor' || netHealth === 'Disconnected' ? COLORS.error : COLORS.primaryLight }]}>{netHealth}</Text>
             </View>
           </View>
           <Text style={s.metricNote}>Viewer count and stream health require YouTube Data API integration — shown as placeholders until that's connected.</Text>
-        </View>
+        </Card>
 
         {/* Viewer Statistics */}
-        <View style={s.card}>
+        <Card style={s.card}>
           <Text style={s.cardTitle}>Viewer Statistics</Text>
           <Text style={s.metricNote}>Detailed viewer stats (peak viewers, average watch time, likes, comments, country/device breakdown) require YouTube Data API integration — a separate setup step (YouTube channel + API credentials). Placeholder shown until that's connected.</Text>
-        </View>
+        </Card>
 
         {/* Sponsor Banner (future monetization) */}
-        <View style={s.card}>
+        <Card style={s.card}>
           <Text style={s.cardTitle}>Sponsor Banner</Text>
           <Text style={s.metricNote}>Coming soon — local sponsors will be able to display a banner on this tournament's live stream and scorecard.</Text>
-        </View>
+        </Card>
 
         {/* YouTube Connection */}
-        <View style={s.card}>
+        <Card style={s.card}>
           <Text style={s.cardTitle}>Stream Source</Text>
           {match.streamUrl ? (
             <View>
-              <Text style={s.connectedLabel}>✓ Connected</Text>
+              <View style={s.connectedRow}>
+                <AppIcon emoji="✓" size={14} color={COLORS.primary} />
+                <Text style={s.connectedLabel}>Connected</Text>
+              </View>
               <Text style={s.connectedUrl} numberOfLines={1}>{match.streamUrl}</Text>
             </View>
           ) : (
@@ -205,21 +213,21 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
               </TouchableOpacity>
             </>
           )}
-        </View>
+        </Card>
 
         {match.streamUrl && (
   <TouchableOpacity
-    style={[s.btn, { backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, marginTop: 8 }]}
+    style={[s.btn, s.btnSecondary, s.btnSpaced]}
     onPress={() => navigation.navigate('ThemeSelector', { matchId, match, currentThemeId: match.streamThemeId ?? 'classic' })}
   >
-    <Text style={[s.btnTxt, { color: COLORS.text }]}>🎨 Change Overlay Theme</Text>
+    <Text style={[s.btnTxt, s.btnSecondaryTxt]}>🎨 Change Overlay Theme</Text>
   </TouchableOpacity>
 )}
 
         {/* Streaming Quality */}
-        <View style={s.card}>
+        <Card style={s.card}>
           <Text style={s.cardTitle}>Streaming Quality</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <View style={s.qualityGrid}>
             {[
               { key: '360p', label: '360p', dataPerHour: '~150 MB/hr' },
               { key: '480p', label: '480p', dataPerHour: '~300 MB/hr' },
@@ -232,21 +240,21 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
                 style={[s.qualityChip, match.streamQuality === q.key && s.qualityChipActive]}
                 onPress={() => updateMatch(matchId, { streamQuality: q.key })}
               >
-                <Text style={[s.qualityChipTxt, match.streamQuality === q.key && { color: '#fff' }]}>{q.label}</Text>
+                <Text style={[s.qualityChipTxt, match.streamQuality === q.key && { color: COLORS.primaryLight }]}>{q.label}</Text>
                 <Text style={s.qualityChipSub}>{q.dataPerHour}</Text>
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </Card>
 
         {/* Organizer: Edit Stream Details */}
-        <TouchableOpacity style={[s.btn, { backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border }]} onPress={() => setShowEditModal(true)}>
-          <Text style={[s.btnTxt, { color: COLORS.text }]}>✏️ Edit Stream Details</Text>
+        <TouchableOpacity style={[s.btn, s.btnSecondary, s.btnSpaced]} onPress={() => setShowEditModal(true)}>
+          <Text style={[s.btnTxt, s.btnSecondaryTxt]}>✏️ Edit Stream Details</Text>
         </TouchableOpacity>
 
         {/* Streaming Controls */}
         {isOrganizer ? (
-        <View style={s.card}>
+        <Card style={s.card}>
           <Text style={s.cardTitle}>Streaming Controls</Text>
           <View style={s.controlsGrid}>
             {!match.isStreaming && (
@@ -255,7 +263,7 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
               </TouchableOpacity>
             )}
             {match.isStreaming && !match.streamPaused && (
-              <TouchableOpacity style={[s.controlBtn, { backgroundColor: COLORS.orange }]} onPress={handlePauseLive}>
+              <TouchableOpacity style={[s.controlBtn, s.controlBtnWarning]} onPress={handlePauseLive}>
                 <Text style={s.controlBtnTxt}>⏸ Pause Live</Text>
               </TouchableOpacity>
             )}
@@ -265,7 +273,7 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
               </TouchableOpacity>
             )}
             {match.isStreaming && (
-              <TouchableOpacity style={[s.controlBtn, { backgroundColor: COLORS.red }]} onPress={handleEndLive}>
+              <TouchableOpacity style={[s.controlBtn, s.controlBtnDanger]} onPress={handleEndLive}>
                 <Text style={s.controlBtnTxt}>⏹ End Live</Text>
               </TouchableOpacity>
             )}
@@ -279,11 +287,11 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
               <Text style={s.controlBtnOutlineTxt}>🎬 Recording (Coming Soon)</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Card>
         ) : (
-          <View style={s.card}>
+          <Card style={s.card}>
             <Text style={s.metricNote}>Only the match organizer can control streaming. You have read-only access.</Text>
-          </View>
+          </Card>
         )}
 
         <TouchableOpacity style={s.scoringLink} onPress={() => navigation.navigate('Scoring', { matchId })}>
@@ -297,10 +305,10 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
             <View style={s.modalBox}>
               <Text style={s.cardTitle}>Edit Stream</Text>
               <TextInput style={s.input} placeholder="Stream title" value={editTitle} onChangeText={setEditTitle} placeholderTextColor={COLORS.textMuted} />
-              <TextInput style={[s.input, { height: 80 }]} placeholder="Description" value={editDesc} onChangeText={setEditDesc} multiline placeholderTextColor={COLORS.textMuted} />
-              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }} onPress={() => setCommentsEnabled(!commentsEnabled)}>
-                <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: COLORS.primary, backgroundColor: commentsEnabled ? COLORS.primary : 'transparent' }} />
-                <Text style={{ color: COLORS.text }}>Enable Comments</Text>
+              <TextInput style={[s.input, s.inputMultiline]} placeholder="Description" value={editDesc} onChangeText={setEditDesc} multiline placeholderTextColor={COLORS.textMuted} />
+              <TouchableOpacity style={s.checkRow} onPress={() => setCommentsEnabled(!commentsEnabled)}>
+                <View style={[s.checkbox, commentsEnabled && s.checkboxOn]} />
+                <Text style={s.checkLabel}>Enable Comments</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.btn} onPress={async () => {
                 await updateMatch(matchId, { streamTitle: editTitle, streamDescription: editDesc, commentsEnabled });
@@ -308,8 +316,8 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
               }}>
                 <Text style={s.btnTxt}>Save</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={{ padding: 12, alignItems: 'center' }} onPress={() => setShowEditModal(false)}>
-                <Text style={{ color: COLORS.textMuted }}>Cancel</Text>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setShowEditModal(false)}>
+                <Text style={s.modalCancelTxt}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -323,40 +331,83 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
-  loadingTxt: { color: COLORS.textSecondary },
+  loadingTxt: { ...TYPE.body, color: COLORS.textSecondary },
   scroll: { flex: 1, padding: SPACING.lg },
-  card: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
-  cardTitle: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold', marginBottom: 10, letterSpacing: 0.5 },
-  infoRow: { color: COLORS.text, fontSize: 13, marginBottom: 4 },
-  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  statusBadge: { backgroundColor: COLORS.card2, paddingHorizontal: 14, paddingVertical: 6, borderRadius: RADIUS.round },
-  statusLive: { backgroundColor: COLORS.red },
-  statusPaused: { backgroundColor: COLORS.orange },
-  statusBadgeTxt: { color: '#fff', fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
-  durationTxt: { color: COLORS.textSecondary, fontSize: 13, fontWeight: 'bold' },
-  metricsRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
-  metric: { flex: 1, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, padding: 12, alignItems: 'center' },
-  metricLabel: { color: COLORS.textMuted, fontSize: 10, marginBottom: 4 },
-  metricValue: { color: COLORS.text, fontSize: 18, fontWeight: 'bold' },
-  metricNote: { color: COLORS.textMuted, fontSize: 11, fontStyle: 'italic', marginTop: 4 },
-  connectedLabel: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold', marginBottom: 4 },
-  connectedUrl: { color: COLORS.textSecondary, fontSize: 12 },
-  input: { backgroundColor: COLORS.background, color: COLORS.text, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginBottom: 10, fontSize: 13 },
-  btn: { backgroundColor: COLORS.primary, padding: 13, borderRadius: RADIUS.md, alignItems: 'center' },
-  btnTxt: { color: '#fff', fontWeight: 'bold' },
-  controlsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  controlBtn: { flexBasis: '48%', flexGrow: 1, paddingVertical: 12, borderRadius: RADIUS.md, alignItems: 'center', backgroundColor: COLORS.card2 },
-  controlBtnPrimary: { backgroundColor: COLORS.primary },
+  // Card is the shared elevated surface, so only spacing lives here now.
+  card: { marginBottom: SPACING.sm + 2 },
+  cardTitle: { ...TYPE.label, color: COLORS.primary, marginBottom: SPACING.sm },
+  infoRow: { ...TYPE.body, color: COLORS.text, marginBottom: 3 },
+  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
+  // The pill itself comes from Badge; this only sizes it up, since on this
+  // screen the on-air state is the most important thing in the card.
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 6 },
+  // A running stream timer: tabular figures stop it shifting every second.
+  durationTxt: { ...TYPE.num, color: COLORS.text },
+  metricsRow: { flexDirection: 'row', gap: SPACING.sm + 2, marginBottom: SPACING.sm },
+  metric: {
+    flex: 1, backgroundColor: COLORS.card2, borderRadius: RADIUS.md,
+    paddingVertical: SPACING.md, paddingHorizontal: SPACING.sm,
+    alignItems: 'center', borderWidth: 1, borderColor: COLORS.borderSoft,
+  },
+  metricLabel: { ...TYPE.label, fontSize: 10, color: COLORS.textMuted, marginBottom: 5 },
+  metricValue: { ...TYPE.h2, color: COLORS.text, fontVariant: ['tabular-nums'] },
+  metricNote: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted, lineHeight: 16 },
+  connectedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.xs },
+  connectedLabel: { ...TYPE.label, color: COLORS.primary },
+  connectedUrl: { ...TYPE.caption, color: COLORS.textSecondary },
+  input: {
+    backgroundColor: COLORS.card2, color: COLORS.text,
+    paddingHorizontal: SPACING.md, paddingVertical: 12,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border,
+    marginBottom: SPACING.sm, ...TYPE.body,
+  },
+  inputMultiline: { height: 80, textAlignVertical: 'top', paddingTop: 12 },
+  btn: {
+    backgroundColor: COLORS.primary, height: 46, borderRadius: RADIUS.md,
+    alignItems: 'center', justifyContent: 'center',
+    ...SHADOW.glow(COLORS.primary),
+  },
+  btnTxt: { ...TYPE.button, color: COLORS.onPrimary },
+  // Secondary skin: a bordered raised surface with no glow, so it sits below
+  // the primary action in the hierarchy instead of beside it.
+  btnSecondary: { backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, shadowOpacity: 0, elevation: 0 },
+  btnSecondaryTxt: { color: COLORS.text },
+  btnSpaced: { marginBottom: SPACING.sm + 2 },
+  controlsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  controlBtn: {
+    flexBasis: '48%', flexGrow: 1, paddingVertical: 13,
+    borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.card2,
+  },
+  controlBtnPrimary: { backgroundColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  controlBtnWarning: { backgroundColor: COLORS.warning },
+  // End Live is genuinely destructive, so this one is COLORS.error rather than
+  // COLORS.live — live is reserved for the on-air state.
+  controlBtnDanger: { backgroundColor: COLORS.error },
   controlBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border },
-  controlBtnTxt: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
-  controlBtnOutlineTxt: { color: COLORS.text, fontWeight: 'bold', fontSize: 13 },
-  scoringLink: { alignItems: 'center', padding: 12 },
-  scoringLinkTxt: { color: COLORS.primary, fontWeight: 'bold' },
-  qualityChip: { backgroundColor: COLORS.card2, padding: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, minWidth: 90, alignItems: 'center' },
-  qualityChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  qualityChipTxt: { color: COLORS.text, fontWeight: 'bold', fontSize: 12 },
-  qualityChipSub: { color: COLORS.textMuted, fontSize: 9, marginTop: 2 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: SPACING.lg },
-  modalBox: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.lg },
+  controlBtnTxt: { ...TYPE.bodyStrong, fontSize: 13, color: '#fff' },
+  controlBtnOutlineTxt: { ...TYPE.bodyStrong, fontSize: 13, color: COLORS.text },
+  scoringLink: { alignItems: 'center', paddingVertical: SPACING.md },
+  scoringLinkTxt: { ...TYPE.button, color: COLORS.primary },
+  qualityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  qualityChip: {
+    backgroundColor: COLORS.card2, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border,
+    minWidth: 92, alignItems: 'center',
+  },
+  qualityChipActive: { backgroundColor: COLORS.primarySoft, borderColor: COLORS.primary },
+  qualityChipTxt: { ...TYPE.num, fontSize: 13, color: COLORS.text },
+  qualityChipSub: { ...TYPE.numSm, fontSize: 9, color: COLORS.textMuted, marginTop: 2 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm + 2 },
+  checkbox: { width: 20, height: 20, borderRadius: RADIUS.sm - 2, borderWidth: 2, borderColor: COLORS.primary, backgroundColor: 'transparent' },
+  checkboxOn: { backgroundColor: COLORS.primary },
+  checkLabel: { ...TYPE.body, color: COLORS.text },
+  modalOverlay: { flex: 1, backgroundColor: COLORS.scrim, justifyContent: 'center', padding: SPACING.lg },
+  // Sheets sit on the highest surface so they read as above the cards behind.
+  modalBox: {
+    backgroundColor: COLORS.surface3, borderRadius: RADIUS.lg, padding: SPACING.lg,
+    borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.lg,
+  },
+  modalCancel: { paddingVertical: SPACING.md, alignItems: 'center' },
+  modalCancelTxt: { ...TYPE.body, color: COLORS.textMuted },
 });
-  

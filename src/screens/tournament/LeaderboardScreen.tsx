@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
 import { subscribeToTournament, tieBreakersFor } from "../../utils/firebase";
 import { sortStandings } from "../../engine";
-import { COLORS, RADIUS, SPACING } from "../../constants/theme";
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from "../../constants/theme";
 import Header from "../../components/Header";
+import SectionHeader from "../../components/SectionHeader";
 import AppIcon from "../../components/AppIcon";
 
 export default function LeaderboardScreen({ route, navigation }: any) {
@@ -125,84 +126,59 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: COLORS.background },
 
+  // Column headers: uppercase micro-labels, the convention for a standings
+  // table, so they read as headers rather than data.
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.card2,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    marginTop: 8,
+    marginTop: SPACING.sm,
   },
-  hCell: {
-    flex: 1,
-    color: COLORS.primary,
-    fontSize: 11,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
+  hCell: { flex: 1, ...TYPE.label, fontSize: 9, color: COLORS.primaryLight, textAlign: "center" },
 
   row: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: SPACING.lg,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border + "55",
+    paddingVertical: 13,
+    // Hairline separators: a full 1px border on every row turned the table
+    // into a grid and competed with the figures.
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.borderSoft,
   },
-  rowFirst: {
-    backgroundColor: COLORS.yellow + "11",
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.yellow,
-  },
-  rowAlt: {
-    backgroundColor: COLORS.card + "88",
-  },
+  rowFirst: { backgroundColor: COLORS.yellow + "12", borderLeftWidth: 3, borderLeftColor: COLORS.yellow },
+  rowAlt: { backgroundColor: "rgba(255,255,255,0.02)" },
 
   rankCell: { flex: 0.6, textAlign: "center" },
   nameCell: { flex: 2.5, justifyContent: "center" },
   ptsCell: { flex: 1 },
 
-  cell: {
-    flex: 1,
-    color: COLORS.textSecondary,
-    fontSize: 13,
-    textAlign: "center",
-  },
-  rankFirst: {
-    fontSize: 18,
-  },
-  teamName: {
-    color: COLORS.text,
-    fontSize: 13,
-    fontWeight: "bold",
-  },
-  ptsVal: {
-    color: COLORS.primary,
-    fontWeight: "bold",
-    fontSize: 14,
-  },
+  // Tabular figures so every column lines up regardless of digit count.
+  cell: { flex: 1, ...TYPE.num, fontSize: 13, color: COLORS.textSecondary, textAlign: "center" },
+  rankFirst: { fontSize: 17, color: COLORS.yellow },
+  teamName: { ...TYPE.bodyStrong, fontSize: 13, color: COLORS.text },
+  // Points are what the table is sorted by, so they are the heaviest cell.
+  ptsVal: { ...TYPE.num, fontSize: 16, color: COLORS.primaryLight },
 
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: SPACING.xl,
-  },
-  emptyIcon: { fontSize: 52, marginBottom: 14 },
-  emptyTitle: { color: COLORS.text, fontSize: 18, fontWeight: "bold", marginBottom: 8 },
-  emptySub: { color: COLORS.textSecondary, fontSize: 13, textAlign: "center", lineHeight: 20 },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: SPACING.xl },
+  emptyIcon: { fontSize: 48, marginBottom: 14 },
+  emptyTitle: { ...TYPE.h2, color: COLORS.text, marginBottom: SPACING.sm },
+  emptySub: { ...TYPE.body, color: COLORS.textSecondary, textAlign: "center", lineHeight: 20, maxWidth: 300 },
 
   legend: {
     marginHorizontal: SPACING.lg,
-    marginTop: 16,
+    marginTop: SPACING.md,
     padding: 12,
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.borderSoft,
     gap: 4,
+    ...SHADOW.sm,
   },
-  legendTxt: { color: COLORS.textMuted, fontSize: 11, textAlign: "center" },
+  legendTxt: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted, textAlign: "center" },
 });

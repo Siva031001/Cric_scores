@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Share, Alert, Linking } from 'react-native';
-import { COLORS, RADIUS, SPACING } from '../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../constants/theme';
 
 // Base URL for the OBS/broadcast overlay web app (web/ in this repo, a
 // small Vite app deployed the same way admin/ already is). Replace once
@@ -83,13 +83,24 @@ export default function ShareMatchSheet({ visible, onClose, match, matchId }: an
 }
 
 const s = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: COLORS.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SPACING.lg },
-  title: { color: COLORS.text, fontSize: 16, fontWeight: 'bold', textAlign: 'center', marginBottom: 16 },
+  overlay: { flex: 1, backgroundColor: COLORS.scrim, justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: COLORS.surface3,
+    borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.lg, borderTopWidth: 1, borderColor: COLORS.border,
+    ...SHADOW.lg,
+  },
+  title: { ...TYPE.h2, color: COLORS.text, textAlign: 'center', marginBottom: SPACING.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', marginBottom: 12 },
-  item: { alignItems: 'center', width: '30%', marginBottom: 16 },
-  itemIcon: { fontSize: 28, marginBottom: 6 },
-  itemLabel: { color: COLORS.textSecondary, fontSize: 11, textAlign: 'center' },
-  cancelBtn: { padding: 12, alignItems: 'center' },
-  cancelTxt: { color: COLORS.textMuted },
+  // Each option is a tile rather than a loose icon+label pair, so the tap
+  // target is visible.
+  item: {
+    alignItems: 'center', width: '30%', marginBottom: 14,
+    paddingVertical: 14, borderRadius: RADIUS.md,
+    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.borderSoft,
+  },
+  itemIcon: { fontSize: 26, marginBottom: 6 },
+  itemLabel: { ...TYPE.caption, fontSize: 11, color: COLORS.textSecondary, textAlign: 'center' },
+  cancelBtn: { paddingVertical: 14, alignItems: 'center' },
+  cancelTxt: { ...TYPE.button, fontSize: 14, color: COLORS.textSecondary },
 });

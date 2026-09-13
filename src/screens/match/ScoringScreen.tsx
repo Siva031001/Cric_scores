@@ -15,7 +15,7 @@ import {
   createEmptyBatsmanStats,
   createEmptyBowlerStats,
 } from "../../utils/cricketLogic";
-import { COLORS, RADIUS, SPACING } from "../../constants/theme";
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from '../../components/AppIcon';
 import { useFocusEffect } from "@react-navigation/native";
@@ -1235,9 +1235,9 @@ useEffect(() => {
           <ScrollView style={{flex:1, backgroundColor: COLORS.background}} showsVerticalScrollIndicator={false}>
             <View style={{flexDirection:"row", margin:12, gap:6}}>
               {QUICK_RUNS.map(r => (
-                <TouchableOpacity key={r} style={{flex:1,height:56,backgroundColor:r===4?"#1a6fa8":r===6?"#c9a000":COLORS.card,borderRadius:RADIUS.md,justifyContent:"center",alignItems:"center",borderWidth:1,borderColor:COLORS.border}}
+                <TouchableOpacity key={r} style={[s.runBtn, {height:56}, r===4 && s.rb4, r===6 && s.rb6]}
                   onPress={() => handleRunTap(r)} disabled={!!(saving || matchCompleted)}>
-                  <Text style={{color:"#fff",fontSize:22,fontWeight:"bold"}}>{r}</Text>
+                  <Text style={[s.runBtnTxt, {fontSize:22}]}>{r}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1603,105 +1603,137 @@ useEffect(() => {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: COLORS.background },
-  err: { color: COLORS.text, fontSize: 16 },
+  err: { ...TYPE.title, color: COLORS.text },
+
+  // ── Header ──
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: SPACING.md, paddingTop: 50, paddingBottom: 12, backgroundColor: COLORS.background },
-  headerBack: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.card, justifyContent: "center", alignItems: "center" },
-  headerBackTxt: { color: COLORS.textSecondary, fontSize: 14, fontWeight: "bold" },
-  headerTitle: { flex: 1, color: COLORS.text, fontSize: 15, fontWeight: "bold", textAlign: "center" },
-  headerShare: { backgroundColor: COLORS.blue, paddingHorizontal: 14, paddingVertical: 6, borderRadius: RADIUS.round },
-  headerShareTxt: { color: "#fff", fontSize: 12, fontWeight: "bold" },
-  scoreboard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border },
+  headerBack: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, justifyContent: "center", alignItems: "center" },
+  headerBackTxt: { ...TYPE.bodyStrong, color: COLORS.textSecondary },
+  headerTitle: { flex: 1, ...TYPE.title, fontSize: 15, color: COLORS.text, textAlign: "center" },
+  headerShare: { backgroundColor: COLORS.blue, paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADIUS.round },
+  headerShareTxt: { ...TYPE.label, fontSize: 10, color: "#fff" },
+
+  // ── Scoreboard ──
+  // The dominant element on the screen. Deep surface + green top stripe so it
+  // reads as a broadcast scoreboard rather than another card.
+  scoreboard: {
+    backgroundColor: COLORS.card, marginHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg, padding: SPACING.md,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
+    borderTopWidth: 3, borderTopColor: COLORS.primary,
+    ...SHADOW.lg,
+  },
   sbTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  sbBatting: { color: COLORS.textSecondary, fontSize: 11, marginBottom: 4 },
+  sbBatting: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary, marginBottom: 4 },
   sbScoreRow: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
-  sbScore: { color: COLORS.text, fontSize: 52, fontWeight: "bold", lineHeight: 58 },
-  sbMeta: { paddingBottom: 8 },
-  sbOvers: { color: COLORS.primary, fontSize: 16, fontWeight: "bold" },
-  sbRR: { color: COLORS.textSecondary, fontSize: 12 },
-  sbTarget: { color: COLORS.red, fontSize: 12, marginTop: 4, fontWeight: "bold" },
-  ballsRow: { flexDirection: "row", gap: 5, marginTop: 8, flexWrap: "wrap" },
+  // Tabular figures matter here above everywhere else: without them the score
+  // shifts sideways every time a digit count changes, which is every few balls.
+  sbScore: { fontSize: 56, fontWeight: "800", lineHeight: 60, letterSpacing: -1.5, color: COLORS.text, fontVariant: ["tabular-nums"] },
+  sbMeta: { paddingBottom: 8, alignItems: "flex-start" },
+  sbOvers: { ...TYPE.num, fontSize: 17, color: COLORS.primaryLight },
+  sbRR: { ...TYPE.numSm, color: COLORS.textSecondary, marginTop: 2 },
+  sbTarget: { ...TYPE.numSm, color: COLORS.warning, marginTop: 5 },
+
+  // ── This over ──
+  ballsRow: { flexDirection: "row", gap: 5, marginTop: 12, flexWrap: "wrap" },
   ball: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.card2, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
-  bW: { backgroundColor: COLORS.red }, b4: { backgroundColor: COLORS.blue }, b6: { backgroundColor: COLORS.yellow },
-  bExtra: { backgroundColor: COLORS.orange }, bBye: { backgroundColor: COLORS.teal },
-  ballTxt: { color: COLORS.text, fontSize: 9, fontWeight: "bold" },
-  playersCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: 8, borderRadius: RADIUS.md, padding: 10, borderWidth: 1, borderColor: COLORS.border },
-  pRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 3 },
-  pLeft: { flexDirection: "row", alignItems: "center", gap: 4 },
-  strikerDot: { color: COLORS.yellow, fontSize: 18, fontWeight: "bold" },
-  striker: { color: COLORS.text, fontSize: 15, fontWeight: "bold" },
-  sStats: { color: COLORS.primary, fontSize: 14, fontWeight: "bold" },
-  nonStriker: { color: COLORS.textSecondary, fontSize: 13 },
-  nsStats: { color: COLORS.textSecondary, fontSize: 12 },
-  bowlerRow: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: 4, paddingTop: 6 },
-  bowler: { color: COLORS.textSecondary, fontSize: 12 },
-  bStats: { color: COLORS.textSecondary, fontSize: 12 },
-  extLine: { color: COLORS.textMuted, fontSize: 10, marginTop: 3 },
-  modeBanner: { flexDirection: "row", justifyContent: "space-between", backgroundColor: COLORS.blue + "33", marginHorizontal: SPACING.md, marginTop: 6, padding: 8, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.blue },
-  modeTxt: { color: COLORS.blue, fontSize: 13, fontWeight: "bold" },
-  modeCancel: { color: COLORS.red, fontWeight: "bold" },
-  freeHitBanner: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: COLORS.yellow + "33", marginHorizontal: SPACING.md, marginTop: 4, padding: 8, borderRadius: RADIUS.sm, borderWidth: 2, borderColor: COLORS.yellow },
-  freeHitTxt: { color: COLORS.yellow, fontSize: 14, fontWeight: "900", letterSpacing: 1 },
-  freeHitSub: { color: COLORS.yellow, fontSize: 10, flex: 1, textAlign: "right" },
-  completedBanner: { backgroundColor: COLORS.primary + "22", marginHorizontal: SPACING.md, marginTop: 6, padding: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.primary, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  completedBannerTxt: { color: COLORS.primary, fontSize: 12, fontWeight: "bold", flex: 1 },
-  completedBannerBtn: { color: "#fff", backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 4, borderRadius: RADIUS.round, fontSize: 12, fontWeight: "bold" },
-  runsArea: { flexDirection: "row", marginHorizontal: SPACING.md, marginTop: 10, gap: 6 },
-  runBtn: { flex: 1, height: 65, backgroundColor: COLORS.card, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
-  rb4: { backgroundColor: "#1a6fa8", borderColor: "#1a6fa8" },
-  rb6: { backgroundColor: "#c9a000", borderColor: "#c9a000" },
-  rbBye: { borderColor: COLORS.blue, borderWidth: 2 },
-  runBtnTxt: { color: COLORS.text, fontSize: 26, fontWeight: "bold" },
-  extrasArea: { flexDirection: "row", marginHorizontal: SPACING.md, marginTop: 8, gap: 6 },
-  xBtn: { flex: 1, height: 48, backgroundColor: COLORS.card2, borderRadius: RADIUS.sm, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
+  bW: { backgroundColor: COLORS.error, borderColor: COLORS.error }, b4: { backgroundColor: COLORS.blue, borderColor: COLORS.blue }, b6: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow },
+  bExtra: { backgroundColor: COLORS.orange, borderColor: COLORS.orange }, bBye: { backgroundColor: COLORS.teal, borderColor: COLORS.teal },
+  ballTxt: { ...TYPE.numSm, fontSize: 10, color: COLORS.text },
+
+  // ── Batters / bowler ──
+  playersCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.md, padding: 12, borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.sm },
+  pRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 4 },
+  pLeft: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
+  strikerDot: { color: COLORS.yellow, fontSize: 15, fontWeight: "800" },
+  striker: { ...TYPE.title, color: COLORS.text },
+  sStats: { ...TYPE.num, fontSize: 15, color: COLORS.primaryLight },
+  nonStriker: { ...TYPE.body, color: COLORS.textSecondary },
+  nsStats: { ...TYPE.numSm, color: COLORS.textSecondary },
+  bowlerRow: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft, marginTop: 6, paddingTop: 8 },
+  bowler: { ...TYPE.body, color: COLORS.textSecondary },
+  bStats: { ...TYPE.numSm, color: COLORS.textSecondary },
+  extLine: { ...TYPE.numSm, fontSize: 10, color: COLORS.textMuted, marginTop: 4 },
+
+  // ── Banners ──
+  modeBanner: { flexDirection: "row", justifyContent: "space-between", backgroundColor: COLORS.blue + "22", marginHorizontal: SPACING.md, marginTop: 6, padding: 10, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.blue },
+  modeTxt: { ...TYPE.bodyStrong, color: COLORS.blue },
+  modeCancel: { ...TYPE.bodyStrong, color: COLORS.error },
+  freeHitBanner: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: COLORS.yellow + "22", marginHorizontal: SPACING.md, marginTop: 5, padding: 10, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.yellow },
+  freeHitTxt: { ...TYPE.label, fontSize: 13, color: COLORS.yellow, letterSpacing: 1.2 },
+  freeHitSub: { ...TYPE.caption, fontSize: 10, color: COLORS.yellow, flex: 1, textAlign: "right" },
+  completedBanner: { backgroundColor: COLORS.primarySoft, marginHorizontal: SPACING.md, marginTop: 6, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.primary + "66", flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: SPACING.sm },
+  completedBannerTxt: { ...TYPE.caption, color: COLORS.primaryLight, flex: 1, lineHeight: 17 },
+  completedBannerBtn: { ...TYPE.label, fontSize: 10, color: COLORS.onPrimary, backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.round, overflow: "hidden" },
+
+  // ── Run buttons ──
+  // Tallest targets on the screen: these are hit hundreds of times per match.
+  // 4 and 6 keep their own colour so they are findable without reading.
+  runsArea: { flexDirection: "row", marginHorizontal: SPACING.md, marginTop: 12, gap: 6 },
+  runBtn: { flex: 1, height: 68, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border, ...SHADOW.sm },
+  rb4: { backgroundColor: COLORS.blue, borderColor: COLORS.blue },
+  rb6: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow },
+  rbBye: { borderColor: COLORS.teal, borderWidth: 1.5 },
+  runBtnTxt: { fontSize: 27, fontWeight: "800", color: COLORS.text, fontVariant: ["tabular-nums"] },
+
+  // ── Extras / wicket ──
+  extrasArea: { flexDirection: "row", marginHorizontal: SPACING.md, marginTop: SPACING.sm, gap: 6 },
+  xBtn: { flex: 1, height: 50, backgroundColor: COLORS.card2, borderRadius: RADIUS.sm, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
   xWD: { borderColor: COLORS.orange }, xNB: { borderColor: COLORS.purple },
   xActive: { backgroundColor: COLORS.blue, borderColor: COLORS.blue },
-  xOut: { backgroundColor: COLORS.red, borderColor: COLORS.red },
+  // OUT is the one destructive action in the grid — solid red, unmissable.
+  xOut: { backgroundColor: COLORS.error, borderColor: COLORS.error },
   xPTY: { borderColor: COLORS.yellow },
-  xTxt: { color: COLORS.text, fontSize: 13, fontWeight: "bold" },
-  bottomBar: { flexDirection: "row", marginHorizontal: SPACING.md, marginTop: 8, gap: 8 },
-  bbBtn: { flex: 1, padding: 12, backgroundColor: COLORS.card, borderRadius: RADIUS.md, alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
-  bbTxt: { color: COLORS.text, fontWeight: "bold", fontSize: 13 },
-  overlay: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.7)", padding: SPACING.md },
-  picker: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 2, borderColor: COLORS.primary },
-  pickerTtl: { color: COLORS.primary, fontSize: 14, fontWeight: "bold", marginBottom: 10 },
-  pickerRow: { padding: 12, borderRadius: RADIUS.sm, backgroundColor: COLORS.card2, marginBottom: 6, borderWidth: 1, borderColor: COLORS.border },
-  pickerName: { color: COLORS.text, fontSize: 15 },
+  xTxt: { ...TYPE.label, fontSize: 11, color: COLORS.text },
+
+  bottomBar: { flexDirection: "row", marginHorizontal: SPACING.md, marginTop: SPACING.sm, gap: 8 },
+  bbBtn: { flex: 1, paddingVertical: 13, backgroundColor: COLORS.card, borderRadius: RADIUS.md, alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
+  bbTxt: { ...TYPE.label, fontSize: 10, color: COLORS.text },
+
+  // ── Pickers / modals ──
+  overlay: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: COLORS.scrim, padding: SPACING.md },
+  picker: { backgroundColor: COLORS.surface3, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.primary + "66", ...SHADOW.lg },
+  pickerTtl: { ...TYPE.label, color: COLORS.primaryLight, marginBottom: SPACING.sm },
+  pickerRow: { padding: 14, borderRadius: RADIUS.md, backgroundColor: COLORS.card2, marginBottom: 6, borderWidth: 1, borderColor: COLORS.border },
+  pickerName: { ...TYPE.title, color: COLORS.text },
   mOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "flex-end" },
-  modal: { backgroundColor: COLORS.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SPACING.lg },
-  mTitle: { color: COLORS.text, fontSize: 18, fontWeight: "bold", marginBottom: 14, textAlign: "center" },
+  modal: { backgroundColor: COLORS.surface3, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SPACING.lg, borderTopWidth: 1, borderColor: COLORS.border, ...SHADOW.lg },
+  mTitle: { ...TYPE.h1, color: COLORS.text, marginBottom: SPACING.md, textAlign: "center" },
   wicketGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
-  wicketBtn: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border },
-  wicketBtnTxt: { color: COLORS.text, fontSize: 14, fontWeight: "bold" },
+  wicketBtn: { paddingHorizontal: 16, paddingVertical: 13, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border },
+  wicketBtnTxt: { ...TYPE.bodyStrong, color: COLORS.text },
   penRow: { flexDirection: "row", gap: 8, justifyContent: "center", marginBottom: 12 },
-  penBtn: { width: 52, height: 52, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
-  penBtnA: { backgroundColor: COLORS.primary },
-  penTxt: { color: COLORS.text, fontSize: 20, fontWeight: "bold" },
-  penInput: { backgroundColor: COLORS.background, color: COLORS.text, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, textAlign: "center", fontSize: 18, marginBottom: 12 },
-  endBtn: { backgroundColor: COLORS.card2, padding: 14, borderRadius: RADIUS.md, marginBottom: 8, borderWidth: 1, borderColor: COLORS.border },
-  endBtnTxt: { color: COLORS.text, fontSize: 15, fontWeight: "bold" },
-  innScore: { color: COLORS.primary, fontSize: 28, fontWeight: "bold", textAlign: "center", marginBottom: 4 },
-  innTarget: { color: COLORS.yellow, fontSize: 14, textAlign: "center", marginBottom: 14 },
-  cancelBtn: { backgroundColor: COLORS.card2, padding: 12, borderRadius: RADIUS.md, alignItems: "center", borderWidth: 1, borderColor: COLORS.border, marginTop: 6 },
-  cancelTxt: { color: COLORS.textSecondary, fontWeight: "bold" },
-  mBtns: { flexDirection: "row", gap: 10, marginTop: 4 },
-  confirmBtn: { backgroundColor: COLORS.primary, padding: 14, borderRadius: RADIUS.md, alignItems: "center", marginTop: 6 },
-  confirmTxt: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  penBtn: { width: 54, height: 54, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
+  penBtnA: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  penTxt: { fontSize: 20, fontWeight: "800", color: COLORS.text, fontVariant: ["tabular-nums"] },
+  penInput: { backgroundColor: COLORS.background, color: COLORS.text, padding: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, textAlign: "center", fontSize: 18, marginBottom: 12 },
+  endBtn: { backgroundColor: COLORS.card2, padding: 15, borderRadius: RADIUS.md, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.border },
+  endBtnTxt: { ...TYPE.button, color: COLORS.text },
+  innScore: { fontSize: 30, fontWeight: "800", color: COLORS.primaryLight, textAlign: "center", marginBottom: 4, fontVariant: ["tabular-nums"] },
+  innTarget: { ...TYPE.num, color: COLORS.yellow, textAlign: "center", marginBottom: SPACING.md },
+  cancelBtn: { backgroundColor: COLORS.card2, padding: 14, borderRadius: RADIUS.md, alignItems: "center", borderWidth: 1, borderColor: COLORS.border, marginTop: 6 },
+  cancelTxt: { ...TYPE.button, fontSize: 14, color: COLORS.textSecondary },
+  mBtns: { flexDirection: "row", gap: SPACING.sm, marginTop: 4 },
+  confirmBtn: { backgroundColor: COLORS.primary, padding: 15, borderRadius: RADIUS.md, alignItems: "center", marginTop: 6 },
+  confirmTxt: { ...TYPE.button, color: COLORS.onPrimary },
+
+  // ── Live / stream controls ──
   headerRight: { flexDirection: "row", alignItems: "center", gap: 6 },
-  liveToggle: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.card, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.round, borderWidth: 1, borderColor: COLORS.border, gap: 5 },
-  liveToggleOn: { backgroundColor: COLORS.red, borderColor: COLORS.red },
+  liveToggle: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.card2, paddingHorizontal: 11, paddingVertical: 6, borderRadius: RADIUS.round, borderWidth: 1, borderColor: COLORS.border, gap: 5 },
+  liveToggleOn: { backgroundColor: COLORS.live, borderColor: COLORS.live },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: COLORS.textMuted },
   liveDotOn: { backgroundColor: "#fff" },
-  liveToggleTxt: { color: COLORS.textSecondary, fontSize: 11, fontWeight: "bold" },
-  streamBar: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginBottom: 6, borderRadius: RADIUS.sm, padding: 8, gap: 8, borderWidth: 1, borderColor: COLORS.red + "55" },
-  addStreamBtn: { flex: 1, backgroundColor: COLORS.red + "22", padding: 8, borderRadius: RADIUS.sm, alignItems: "center", borderWidth: 1, borderColor: COLORS.red },
-  addStreamBtnTxt: { color: COLORS.red, fontSize: 12, fontWeight: "bold" },
+  liveToggleTxt: { ...TYPE.label, fontSize: 9, color: COLORS.textSecondary },
+  streamBar: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginBottom: 6, borderRadius: RADIUS.sm, padding: SPACING.sm, gap: SPACING.sm, borderWidth: 1, borderColor: COLORS.live + "55" },
+  addStreamBtn: { flex: 1, backgroundColor: COLORS.live + "1f", padding: 10, borderRadius: RADIUS.sm, alignItems: "center", borderWidth: 1, borderColor: COLORS.live },
+  addStreamBtnTxt: { ...TYPE.label, fontSize: 10, color: COLORS.live },
   streamActiveBar: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
-  streamDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.red },
-  streamActiveTxt: { color: COLORS.text, fontSize: 11, flex: 1 },
-  streamViewBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.round },
-  streamViewBtnTxt: { color: "#fff", fontSize: 11, fontWeight: "bold" },
-  streamStopBtn: { backgroundColor: COLORS.red, paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.round },
-  streamStopBtnTxt: { color: "#fff", fontSize: 11, fontWeight: "bold" },
-  shareMatchBtn: { backgroundColor: COLORS.blue, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.round },
-  shareMatchBtnTxt: { color: "#fff", fontSize: 11, fontWeight: "bold" },
+  streamDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.live },
+  streamActiveTxt: { ...TYPE.caption, fontSize: 11, color: COLORS.text, flex: 1 },
+  streamViewBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 11, paddingVertical: 5, borderRadius: RADIUS.round },
+  streamViewBtnTxt: { ...TYPE.label, fontSize: 9, color: COLORS.onPrimary },
+  streamStopBtn: { backgroundColor: COLORS.error, paddingHorizontal: 11, paddingVertical: 5, borderRadius: RADIUS.round },
+  streamStopBtnTxt: { ...TYPE.label, fontSize: 9, color: "#fff" },
+  shareMatchBtn: { backgroundColor: COLORS.blue, paddingHorizontal: 11, paddingVertical: 7, borderRadius: RADIUS.round },
+  shareMatchBtnTxt: { ...TYPE.label, fontSize: 9, color: "#fff" },
 });

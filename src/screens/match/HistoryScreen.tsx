@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { getMatchHistory } from '../../utils/firebase';
 import { Match } from '../../types/cricket';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import EmptyState from '../../components/EmptyState';
 import AppIcon from '../../components/AppIcon';
@@ -91,37 +91,39 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
+              activeOpacity={0.85}
               onPress={() => navigation.navigate('Scorecard', { matchId: item.id })}
             >
+              <View pointerEvents="none" style={styles.cardEdge} />
               <View style={styles.cardHeader}>
                 <Text style={styles.cardId}>#{item.id}</Text>
                 <View style={[
                   styles.statusBadge,
                   item.status === 'live' && styles.liveBadge,
                 ]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                         
+                  <View style={styles.badgeInner}>
+
                     <AppIcon emoji={item.status === 'completed' ? '✅' : '🔴'} size={10} color={item.status === 'completed' ? COLORS.primary : COLORS.red} />
-                          
+
                     <Text style={styles.statusText}>{item.status === 'completed' ? 'Done' : item.status === 'live' ? 'Live' : 'Paused'}</Text>
                   </View>
                 </View>
               </View>
 
-              <Text style={styles.teams}>
+              <Text style={styles.teams} numberOfLines={1}>
                 {item.team1} vs {item.team2}
               </Text>
 
               {item.venue ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                  <AppIcon emoji="📍" size={11} color={COLORS.textSecondary} />
-                  <Text style={[styles.venue, { marginBottom: 0 }]}>{item.venue}</Text>
+                <View style={styles.metaRow}>
+                  <AppIcon emoji="📍" size={11} color={COLORS.textMuted} />
+                  <Text style={[styles.venue, { marginBottom: 0 }]} numberOfLines={1}>{item.venue}</Text>
                 </View>
               ) : null}
-              
+
               {item.matchDate ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-                  <AppIcon emoji="📅" size={11} color={COLORS.textSecondary} />
+                <View style={styles.metaRow}>
+                  <AppIcon emoji="📅" size={11} color={COLORS.textMuted} />
                   <Text style={[styles.date, { marginBottom: 0 }]}>{item.matchDate}</Text>
                 </View>
               ) : null}
@@ -137,9 +139,9 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
               </View>
 
               {item.winner ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={styles.winnerRow}>
                   <AppIcon emoji="🏆" size={12} color={COLORS.yellow} />
-                  <Text style={styles.winner}>{item.winner}</Text>
+                  <Text style={styles.winner} numberOfLines={1}>{item.winner}</Text>
                 </View>
               ) : null}
             </TouchableOpacity>
@@ -156,52 +158,68 @@ const styles = StyleSheet.create({
     flex: 1, justifyContent: 'center',
     alignItems: 'center', backgroundColor: COLORS.background,
   },
+
+  // ── Search ──
   searchBox: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: COLORS.card, margin: SPACING.lg,
     borderRadius: RADIUS.round, paddingHorizontal: 14,
-    paddingVertical: 10, borderWidth: 1,
-    borderColor: COLORS.border, gap: 8,
+    paddingVertical: 12, borderWidth: 1,
+    borderColor: COLORS.border, gap: SPACING.sm,
+    ...SHADOW.sm,
   },
   searchIcon: { fontSize: 16 },
-  searchInput: { flex: 1, color: COLORS.text, fontSize: 14, padding: 0 },
+  searchInput: { flex: 1, ...TYPE.body, color: COLORS.text, padding: 0 },
   clearBtn: { color: COLORS.textSecondary, fontSize: 16 },
-  list: { paddingHorizontal: SPACING.lg, paddingBottom: 20, gap: 12 },
+
+  // ── Match cards ──
+  // Elevated, hairline-bordered surfaces with a lit top edge, matching Card and
+  // the Home screen. Previously flat rectangles with a heavy 1px border.
+  list: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg, gap: 12 },
   card: {
-    backgroundColor: COLORS.card, borderRadius: RADIUS.md,
-    padding: 16, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.card, borderRadius: RADIUS.lg,
+    padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft,
+    overflow: 'hidden', ...SHADOW.md,
   },
+  cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
   cardHeader: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 8,
+    alignItems: 'center', marginBottom: SPACING.sm,
   },
-  cardId: { color: COLORS.textSecondary, fontSize: 12 },
+  cardId: { ...TYPE.numSm, color: COLORS.textMuted },
   statusBadge: {
-    backgroundColor: COLORS.card2, paddingHorizontal: 10,
-    paddingVertical: 3, borderRadius: RADIUS.round,
+    backgroundColor: COLORS.card2, paddingHorizontal: 9,
+    paddingVertical: 4, borderRadius: RADIUS.round,
+    borderWidth: 1, borderColor: COLORS.borderSoft,
   },
-  liveBadge: { backgroundColor: COLORS.red + '33' },
-  statusText: { color: COLORS.text, fontSize: 11, fontWeight: 'bold' },
-  teams: {
-    color: COLORS.text, fontSize: 16,
-    fontWeight: 'bold', marginBottom: 4,
-  },
+  liveBadge: { backgroundColor: COLORS.live + '1f', borderColor: COLORS.live + '55' },
+  badgeInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statusText: { ...TYPE.label, fontSize: 10, color: COLORS.text },
+  teams: { ...TYPE.h2, fontSize: 17, color: COLORS.text, marginBottom: 5 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 },
   venue: {
-    color: COLORS.textSecondary, fontSize: 12,
-    marginBottom: 4,
+    ...TYPE.caption, color: COLORS.textSecondary,
+    marginBottom: 4, flex: 1,
   },
-  date: { color: COLORS.textSecondary, fontSize: 11, marginBottom: 6 },
+  date: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted, marginBottom: 6 },
+
+  // ── Score line ──
+  // Sunk into a raised inner panel so the two innings totals read as one
+  // paired figure, in tabular numerals so they align card to card.
   scoreRow: {
-    flexDirection: 'row', alignItems: 'center',
-    gap: 10, marginBottom: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: SPACING.md, marginTop: SPACING.sm, marginBottom: 6,
+    backgroundColor: COLORS.card2, borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md,
   },
-  score: { color: COLORS.primary, fontSize: 18, fontWeight: 'bold' },
-  scoreVs: { color: COLORS.textSecondary, fontSize: 12 },
-  winner: { color: COLORS.yellow, fontSize: 13, fontWeight: 'bold' },
+  score: { ...TYPE.displaySm, fontSize: 20, color: COLORS.primaryLight },
+  scoreVs: { ...TYPE.label, fontSize: 10, color: COLORS.textMuted },
+  winnerRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  winner: { ...TYPE.caption, fontWeight: '700', color: COLORS.yellow, flex: 1 },
   resultBox: {
-    backgroundColor: COLORS.yellow + '22', padding: 6,
+    backgroundColor: COLORS.yellow + '18', padding: 6,
     borderRadius: RADIUS.sm, marginTop: 4,
     borderWidth: 1, borderColor: COLORS.yellow + '55',
   },
-  resultText: { color: COLORS.yellow, fontSize: 13, fontWeight: 'bold' },
+  resultText: { ...TYPE.caption, fontWeight: '700', color: COLORS.yellow },
 });
