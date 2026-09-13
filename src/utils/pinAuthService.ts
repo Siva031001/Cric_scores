@@ -16,10 +16,12 @@
 import database from '@react-native-firebase/database';
 import auth from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { generateSalt, generateSessionId, hashPin, verifyPin, normalizePhone } from './pinAuth';
+import { generateSalt, generateSessionId, hashPin, verifyPin, normalizePhone, isValidPhoneFormat } from './pinAuth';
 
 const LOCAL_SESSION_KEY = 'cricketscorer_session_id';
 const LOCAL_PHONE_KEY = 'cricketscorer_phone';
+
+const PHONE_ERROR = 'Please enter a valid 10-digit mobile number.';
 
 // Checks if a phone number already has a PIN account set up.
 //
@@ -37,6 +39,9 @@ const LOCAL_PHONE_KEY = 'cricketscorer_phone';
 // in the other order is what caused the outage.
 export const checkPhoneExists = async (phone: string): Promise<boolean> => {
   const key = normalizePhone(phone);
+  // Guard before building the ref: an empty key would make this
+  // `pinAuth/` — a read of the whole node, not one record.
+  if (!isValidPhoneFormat(key)) return false;
   const snap = await database().ref(`pinAuth/${key}`).once('value');
   return snap.exists();
 };
@@ -45,6 +50,7 @@ export const checkPhoneExists = async (phone: string): Promise<boolean> => {
 // confirming checkPhoneExists() returned false.
 export const createPinAccount = async (phone: string, pin: string): Promise<string> => {
   const key = normalizePhone(phone);
+  if (!isValidPhoneFormat(key)) throw new Error(PHONE_ERROR);
 
   // Do NOT sign out here — the client just completed an OTP verification
   // (confirmation.confirm in LoginScreen), leaving a phone-verified Firebase
@@ -110,6 +116,7 @@ await database().ref(`pinAuth/${key}`).set({
 // locally-stored session ID will no longer match.
 export const loginWithPin = async (phone: string, pin: string): Promise<{ success: boolean; error?: string }> => {
   const key = normalizePhone(phone);
+  if (!isValidPhoneFormat(key)) return { success: false, error: PHONE_ERROR };
   const snap = await database().ref(`pinAuth/${key}`).once('value');
   const record = snap.val();
 
@@ -211,6 +218,7 @@ export const changePin = async (phone: string, oldPin: string, newPin: string): 
 // -- Forgot Password / PIN Reset via Firebase Phone Auth OTP -------------
 export const startForgotPasswordOtp = async (phone: string) => {
   const key = normalizePhone(phone);
+  if (!isValidPhoneFormat(key)) return { success: false, error: PHONE_ERROR };
   const exists = await checkPhoneExists(key);
   if (!exists) {
     return { success: false, error: 'No account found for this number.' };
@@ -300,6 +308,7 @@ export const verifyForgotPasswordOtp = async (confirmation: any, code: string) =
 
 export const resetPinWithPhoneAuth = async (phone: string, newPin: string): Promise<{ success: boolean; error?: string }> => {
   const key = normalizePhone(phone);
+  if (!isValidPhoneFormat(key)) return { success: false, error: PHONE_ERROR };
   const exists = await checkPhoneExists(key);
   if (!exists) return { success: false, error: 'Account not found.' };
 

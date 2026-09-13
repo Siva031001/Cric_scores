@@ -31,3 +31,13 @@ export const isValidPinFormat = (pin: string): boolean => {
 export const normalizePhone = (phone: string): string => {
   return phone.replace(/\D/g, '');
 };
+
+// A normalised phone number must be exactly 10 digits. Previously this was
+// only checked in the two login/forgot-password screens' "send OTP" handlers,
+// so any other entry point could pass a short or empty number straight
+// through to the server (which rejected it with a confusing
+// 'Invalid phone number: received "89"'), or — worse, when empty — build the
+// ref `pinAuth/` and read the ENTIRE pinAuth node instead of one record.
+export const isValidPhoneFormat = (phone: string): boolean => {
+  return /^\d{10}$/.test(normalizePhone(phone));
+};

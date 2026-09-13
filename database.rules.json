@@ -1,0 +1,63 @@
+{
+  "rules": {
+    "pinAuth": {
+      "$phone": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "matches": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "players": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["accountId", "phoneNumber"]
+    },
+    "tournaments": {
+      ".read": "auth != null",
+      ".indexOn": ["createdAt"],
+      "$tournamentId": {
+        ".write": "auth != null",
+        "name": { ".write": "auth != null && (!root.child('tournaments').child($tournamentId).exists() || root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid)" },
+        "organisationName": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "venue": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "startDate": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "endDate": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "matches": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "pools": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "knockoutFixtures": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "knockoutStartStage": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "includeThirdPlaceMatch": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "scorers": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "teamLockMode": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" },
+        "teamsLocked": { ".write": "auth != null && root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid" }
+      }
+    },
+    "otpLimits": {
+      "$phone": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "otpAttempts": {
+      "$phone": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "playerMatchIndex": {
+      "$globalPlayerId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Image, StatusBar, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory } from '../../utils/firebase';
@@ -20,8 +20,26 @@ export default function HomeScreen({ navigation }: any) {
   const [publicTournaments, setPublicTournaments] = useState<any[]>([]);
   const [tournamentFilter, setTournamentFilter] = useState<'all'|'live'|'upcoming'|'completed'|'mine'>('all');
 
+  // getPublicTournaments() reads the WHOLE tournaments node (there is no
+  // .indexOn for its orderByChild('createdAt'), so Firebase downloads every
+  // tournament — each with its teams, rosters, pools, fixtures and matches
+  // — and filters client-side). That is far too expensive to re-run on every
+  // focus, which is what a bare useFocusEffect did: navigating anywhere and
+  // coming back re-downloaded the entire collection, and Home took tens of
+  // seconds to settle. Refresh on focus is still useful so a newly created
+  // tournament appears, so keep it but throttle it.
+  const tournamentsFetchedAtRef = useRef(0);
+  const TOURNAMENTS_TTL_MS = 60 * 1000;
   useFocusEffect(useCallback(() => {
-    getPublicTournaments().then(setPublicTournaments).catch(() => setPublicTournaments([]));
+    if (Date.now() - tournamentsFetchedAtRef.current < TOURNAMENTS_TTL_MS) return;
+    tournamentsFetchedAtRef.current = Date.now();
+    getPublicTournaments()
+      .then(setPublicTournaments)
+      .catch(() => {
+        // Allow an immediate retry on the next focus rather than caching the failure.
+        tournamentsFetchedAtRef.current = 0;
+        setPublicTournaments([]);
+      });
   }, []));
 
   const loadData = useCallback(async () => {
