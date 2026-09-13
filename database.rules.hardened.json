@@ -1,0 +1,83 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "pinAuth": {
+      "$phone": {
+        ".read": "auth != null && auth.uid === 'phone_' + $phone",
+        ".write": "auth != null && auth.uid === 'phone_' + $phone",
+        "pinFailedAttempts": {
+          ".write": false
+        },
+        "pinLockedUntil": {
+          ".write": false
+        },
+        "uid": {
+          ".write": false
+        },
+        "phoneNumber": {
+          ".write": false
+        }
+      }
+    },
+    "otpLimits": {
+      "$phone": {
+        ".read": "auth != null && auth.uid === 'phone_' + $phone",
+        ".write": false
+      }
+    },
+    "otpAttempts": {
+      "$phone": {
+        ".read": "auth != null && auth.uid === 'phone_' + $phone",
+        ".write": false
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "matches": {
+      ".read": false,
+      ".write": false,
+      "$matchId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() ? newData.child('scorerId').val() === auth.uid : data.child('scorerId').val() === auth.uid)"
+      }
+    },
+    "players": {
+      ".read": false,
+      ".write": false,
+      ".indexOn": [
+        "accountId",
+        "phoneNumber"
+      ],
+      "$playerId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('createdBy').val() === auth.uid || data.child('accountId').val() === auth.uid)"
+      }
+    },
+    "playerMatchIndex": {
+      "$globalPlayerId": {
+        ".read": "auth != null",
+        "$matchId": {
+          ".write": "auth != null && root.child('matches').child($matchId).child('scorerId').val() === auth.uid"
+        }
+      }
+    },
+    "tournaments": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "createdAt"
+      ],
+      "$tournamentId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() ? newData.child('createdBy').val() === auth.uid : data.child('createdBy').val() === auth.uid)",
+        "matches": {
+          ".write": "auth != null && (root.child('tournaments').child($tournamentId).child('createdBy').val() === auth.uid || root.child('tournaments').child($tournamentId).child('scorers').child(auth.uid).exists())"
+        }
+      }
+    }
+  }
+}

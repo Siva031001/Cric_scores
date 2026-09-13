@@ -7,7 +7,9 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "test:rules": "firebase emulators:exec --only database,auth --project demo-crikruns 'node scripts/rules-test.mjs'",
+    "test:rules:hardened": "firebase emulators:exec --only database,auth --project demo-crikruns --config firebase.hardened.json 'MODE=hardened node scripts/rules-test.mjs'"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
