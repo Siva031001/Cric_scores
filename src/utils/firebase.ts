@@ -395,7 +395,7 @@ export const subscribeToTournament = (id, callback) => {
 // PLAYER MASTER — registered vs guest player identity system
 // ───────────────────────────────────────────────────────────
 
-export const createPlayerMaster = async (name, type, phoneNumber = null) => {
+export const createPlayerMaster = async (name, type, phoneNumber: string | null = null) => {
   const user = getCurrentUser();
   if (!user) throw new Error('Not authenticated');
   const playerId = 'P' + Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -454,7 +454,7 @@ export const retroactivelyLinkGuestPlayers = async (phoneNumber: string): Promis
   await database().ref('players').update(updates);
 };
 
-export const ensureMyPlayerLinked = async (displayName, phoneNumber = null) => {
+export const ensureMyPlayerLinked = async (displayName, phoneNumber: string | null = null) => {
   const existing = await getMyLinkedPlayerId();
   if (existing) {
     // Backfill phoneNumber if it wasn't stored when this record was first

@@ -662,6 +662,7 @@ useEffect(() => {
     } else {
       const s1 = opener1Id;
       const s2 = opener2Id;
+      if (s1 == null || s2 == null) return; // both openers are chosen in the steps before this one
       setShowOpenerSelect(false);
       openerSelectionDoneRef.current = true;
       const tgt = (inningsData?.runs ?? 0) + 1;

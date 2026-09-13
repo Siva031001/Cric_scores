@@ -1,5 +1,10 @@
 const {setGlobalOptions} = require("firebase-functions");
 const functions = require("firebase-functions");
+// firebase-functions v6+ dropped .runWith() from the default (v2) export —
+// it only exists on the explicit v1 namespace now. Everything else in this
+// file uses functions.https.onCall() directly, which still works fine on
+// the default export, so only the one runWith() call site below needs this.
+const functionsV1 = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {GoogleGenerativeAI} = require("@google/generative-ai");
@@ -187,7 +192,7 @@ const buildMatchSummaryPrompt = (match) => {
   ].filter(Boolean).join('\n');
 };
 
-exports.generateMatchSummary = functions.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(async (data, context) => {
+exports.generateMatchSummary = functionsV1.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(async (data, context) => {
   const matchId = data?.matchId ?? data?.data?.matchId ?? '';
   const match = data?.match ?? data?.data?.match;
   if (!matchId || !match) {

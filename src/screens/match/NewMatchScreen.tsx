@@ -248,7 +248,7 @@ export default function NewMatchScreen({ route, navigation }: any) {
         <Text style={styles.fieldLabel}>🏏 Ball Type</Text>
         {ballType === 'Turf' && (
   <View style={{ marginTop: 12 }}>
-    <Text style={styles.label}>Players Per Side</Text>
+    <Text style={styles.fieldLabel}>Players Per Side</Text>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
       {[4, 5, 6, 7, 8, 9, 10, 11].map((n) => (
         <TouchableOpacity
