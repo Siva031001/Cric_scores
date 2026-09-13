@@ -21,16 +21,24 @@ import { generateSalt, generateSessionId, hashPin, verifyPin, normalizePhone } f
 const LOCAL_SESSION_KEY = 'cricketscorer_session_id';
 const LOCAL_PHONE_KEY = 'cricketscorer_phone';
 
-// Checks if a phone number already has a PIN account set up. Goes through
-// the checkPhoneExistsSafe Cloud Function (returns only a boolean) rather
-// than reading pinAuth/{phone} directly — that record also carries salt
-// and pinHash, which an unauthenticated caller has no reason to receive
-// just to answer "does this phone have an account yet".
+// Checks if a phone number already has a PIN account set up.
+//
+// This reads pinAuth/{phone} directly. A checkPhoneExistsSafe Cloud Function
+// exists (and still works) that returns only a boolean, to avoid handing an
+// unauthenticated caller the salt/pinHash just to answer "does this number
+// have an account yet". It is deliberately NOT used here: the database rules
+// currently grant `pinAuth/$phone` a public `.read`, so that record is
+// readable by this path anyway and the function buys no real protection —
+// while it does make login hard-depend on a deployed function plus its
+// public-invoker IAM binding, which is what broke login once already.
+//
+// To actually gain that protection, tighten the pinAuth rules first, THEN
+// switch this back to the callable. Doing it in that order matters; doing it
+// in the other order is what caused the outage.
 export const checkPhoneExists = async (phone: string): Promise<boolean> => {
   const key = normalizePhone(phone);
-  const functionsMod = require('@react-native-firebase/functions').default;
-  const { data } = await functionsMod().httpsCallable('checkPhoneExistsSafe')({ phone: key });
-  return !!data?.exists;
+  const snap = await database().ref(`pinAuth/${key}`).once('value');
+  return snap.exists();
 };
 
 // Creates a new PIN account for a phone number. Call only after
