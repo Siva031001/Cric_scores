@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, StatusBar } from "react-native";
-import { checkPhoneExists, createPinAccount, loginWithPin, resetAuthTimings, getAuthTimings } from "../../utils/pinAuthService";
+import { checkPhoneExists, createPinAccount, loginWithPin } from "../../utils/pinAuthService";
 import { startForgotPasswordOtp, verifyForgotPasswordOtp, checkOtpRateLimit, recordOtpSent } from "../../utils/pinAuthService";
 import AppIcon from "../../components/AppIcon";
 import { isValidPinFormat } from "../../utils/pinAuth";
@@ -25,38 +25,21 @@ export default function LoginScreen({ navigation }: any) {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  // ── TEMPORARY DIAGNOSTIC — remove once the slowness is pinned down ──
-  // Times each step of the number-entry flow and shows the breakdown, so we
-  // can see WHICH call is slow instead of guessing. Every step below is a
-  // separate network round trip; only signInWithPhoneNumber sends an SMS
-  // (and on Android also runs Play Integrity / reCAPTCHA device checks,
-  // which is the step most likely to take many seconds).
-  const timings: string[] = [];
-  const timed = async <T,>(label: string, fn: () => Promise<T>): Promise<T> => {
-    const t0 = Date.now();
-    try {
-      return await fn();
-    } finally {
-      timings.push(`${label}: ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-    }
-  };
-
   const checkNumber = async () => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length !== 10) {
       Alert.alert("Invalid Number", "Please enter a valid 10-digit mobile number.");
       return;
     }
-    const tStart = Date.now();
     try {
       setLoading(true);
-      const exists = await timed("1 checkPhoneExists", () => checkPhoneExists(digits));
+      const exists = await checkPhoneExists(digits);
       if (exists) {
         setMode("login-pin");
         setPin("");
       } else {
         // New number — verify ownership via OTP before allowing PIN setup.
-        const rateCheck = await timed("2 checkOtpRateLimit", () => checkOtpRateLimit(digits));
+        const rateCheck = await checkOtpRateLimit(digits);
         if (!rateCheck.allowed) {
           if (rateCheck.secondsUntilResend) {
             Alert.alert("Please Wait", `You can request another OTP in ${rateCheck.secondsUntilResend}s.`);
@@ -70,8 +53,8 @@ export default function LoginScreen({ navigation }: any) {
         // for registration by calling signInWithPhoneNumber directly instead,
         // but still go through the same OTP rate limit gate above/below.
         const authMod = require('@react-native-firebase/auth').default;
-        const conf = await timed("3 sendOtp(SMS)", () => authMod().signInWithPhoneNumber('+91' + digits));
-        await timed("4 recordOtpSent", () => recordOtpSent(digits));
+        const conf = await authMod().signInWithPhoneNumber('+91' + digits);
+        await recordOtpSent(digits);
         setConfirmation(conf);
         setMode("verify-otp");
         setResendCooldown(30);
@@ -80,10 +63,6 @@ export default function LoginScreen({ navigation }: any) {
       Alert.alert("Error", error?.message ?? "Unknown error");
     } finally {
       setLoading(false);
-      Alert.alert(
-        "TIMING (temporary)",
-        timings.join("\n") + `\n\nTOTAL: ${((Date.now() - tStart) / 1000).toFixed(1)}s`
-      );
     }
   };
 
@@ -147,22 +126,15 @@ export default function LoginScreen({ navigation }: any) {
       setConfirmPinValue("");
       return;
     }
-    const tStart = Date.now();
-    resetAuthTimings();
-    let failed: string | null = null;
     try {
       setLoading(true);
       const digits = phone.replace(/\D/g, "");
       await createPinAccount(digits, firstPin);
+      navigation.replace("Home");
     } catch (error: any) {
-      failed = error?.message ?? "Could not create account.";
+      Alert.alert("Error", error?.message ?? "Could not create account.");
     } finally {
       setLoading(false);
-      Alert.alert(
-        "TIMING — create account (temporary)",
-        getAuthTimings().join("\n") + `\n\nTOTAL: ${((Date.now() - tStart) / 1000).toFixed(1)}s`,
-        [{ text: "OK", onPress: () => { if (failed) Alert.alert("Error", failed); else navigation.replace("Home"); } }]
-      );
     }
   };
 
@@ -171,26 +143,20 @@ export default function LoginScreen({ navigation }: any) {
       Alert.alert("Invalid PIN", "PIN must be 4 to 6 digits.");
       return;
     }
-    const tStart = Date.now();
-    resetAuthTimings();
-    let outcome: { ok: boolean; msg?: string } = { ok: false, msg: "Unknown error" };
     try {
       setLoading(true);
       const digits = phone.replace(/\D/g, "");
       const result = await loginWithPin(digits, pin);
-      outcome = result.success ? { ok: true } : { ok: false, msg: result.error ?? "Incorrect PIN." };
+      if (!result.success) {
+        Alert.alert("Login Failed", result.error ?? "Incorrect PIN.");
+        setPin("");
+        return;
+      }
+      navigation.replace("Home");
     } catch (error: any) {
-      outcome = { ok: false, msg: error?.message ?? "Unknown error" };
+      Alert.alert("Error", error?.message ?? "Unknown error");
     } finally {
       setLoading(false);
-      Alert.alert(
-        "TIMING — login (temporary)",
-        getAuthTimings().join("\n") + `\n\nTOTAL: ${((Date.now() - tStart) / 1000).toFixed(1)}s`,
-        [{ text: "OK", onPress: () => {
-          if (outcome.ok) navigation.replace("Home");
-          else { Alert.alert("Login Failed", outcome.msg ?? ""); setPin(""); }
-        } }]
-      );
     }
   };
 
