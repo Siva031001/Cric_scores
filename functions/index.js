@@ -1,10 +1,5 @@
 const {setGlobalOptions} = require("firebase-functions");
 const functions = require("firebase-functions");
-// firebase-functions v6+ dropped .runWith() from the default (v2) export —
-// it only exists on the explicit v1 namespace now. Everything else in this
-// file uses functions.https.onCall() directly, which still works fine on
-// the default export, so only the one runWith() call site below needs this.
-const functionsV1 = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {GoogleGenerativeAI} = require("@google/generative-ai");
@@ -33,14 +28,13 @@ const PIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 //   - createPinAccount / resetPinWithPhoneAuth (OTP-verified path): the
 //     client sends just { phone } and must arrive here with the
 //     phone-verified Firebase Auth session from signInWithPhoneNumber/
-//     confirm() still intact. Firebase sets context.auth.token.phone_number
+//     confirm() still intact. Firebase sets request.auth.token.phone_number
 //     automatically for phone-auth sign-ins, so we check that instead.
-exports.mintPhoneSessionToken = functions.https.onCall(async (data, context) => {
-  // Defensive: some client/server callable-protocol version mismatches wrap
-  // the actual payload one level deeper as data.data — handle both shapes.
-  const rawPhone = data?.phone ?? data?.data?.phone ?? '';
+exports.mintPhoneSessionToken = functions.https.onCall(async (request) => {
+  const data = request.data ?? {};
+  const rawPhone = data.phone ?? '';
   const phone = String(rawPhone).replace(/\D/g, '');
-  const pin = data?.pin ?? data?.data?.pin;
+  const pin = data.pin;
 
   if (!/^\d{10}$/.test(phone)) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number: received "' + rawPhone + '"');
@@ -101,7 +95,7 @@ exports.mintPhoneSessionToken = functions.https.onCall(async (data, context) => 
     }
   } else {
     const expectedPhoneNumber = '+91' + phone;
-    if (!context.auth || context.auth.token.phone_number !== expectedPhoneNumber) {
+    if (!request.auth || request.auth.token.phone_number !== expectedPhoneNumber) {
       throw new functions.https.HttpsError('permission-denied', 'Phone verification required.');
     }
   }
@@ -115,8 +109,8 @@ exports.mintPhoneSessionToken = functions.https.onCall(async (data, context) => 
 // before allowing a phone-number CHANGE. Called from the (future) "change
 // phone number" flow — rejects if pinAuth/{newPhone} already exists for
 // someone else, satisfying "cannot switch to another user's number."
-exports.verifyPhoneNotClaimed = functions.https.onCall(async (data, context) => {
-  const rawNewPhone = data?.newPhone ?? data?.data?.newPhone ?? '';
+exports.verifyPhoneNotClaimed = functions.https.onCall(async (request) => {
+  const rawNewPhone = request.data?.newPhone ?? '';
   const newPhone = String(rawNewPhone).replace(/\D/g, '');
   if (!/^\d{10}$/.test(newPhone)) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number');
@@ -134,8 +128,8 @@ exports.verifyPhoneNotClaimed = functions.https.onCall(async (data, context) => 
 // directly (an unauthenticated client can still read that record today for
 // other reasons, but callers that only need existence should not have to
 // fetch the hash at all) — this gives them a path that never does.
-exports.checkPhoneExistsSafe = functions.https.onCall(async (data, context) => {
-  const rawPhone = data?.phone ?? data?.data?.phone ?? '';
+exports.checkPhoneExistsSafe = functions.https.onCall(async (request) => {
+  const rawPhone = request.data?.phone ?? '';
   const phone = String(rawPhone).replace(/\D/g, '');
   if (!/^\d{10}$/.test(phone)) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number');
@@ -192,9 +186,13 @@ const buildMatchSummaryPrompt = (match) => {
   ].filter(Boolean).join('\n');
 };
 
-exports.generateMatchSummary = functionsV1.runWith({ secrets: ["GEMINI_API_KEY"] }).https.onCall(async (data, context) => {
-  const matchId = data?.matchId ?? data?.data?.matchId ?? '';
-  const match = data?.match ?? data?.data?.match;
+// v2 declares secrets as an options object on onCall itself. The v1
+// .runWith({secrets}) form would deploy this as a 1st-gen function, which
+// cannot run the Node version this codebase targets.
+exports.generateMatchSummary = functions.https.onCall({ secrets: ["GEMINI_API_KEY"] }, async (request) => {
+  const data = request.data ?? {};
+  const matchId = data.matchId ?? '';
+  const match = data.match;
   if (!matchId || !match) {
     throw new functions.https.HttpsError('invalid-argument', 'matchId and match are required.');
   }
