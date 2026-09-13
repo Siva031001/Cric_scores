@@ -1,0 +1,79 @@
+
+> CricketScorer@0.0.1 test:rules
+> firebase emulators:exec --only database,auth --project demo-crikruns 'node scripts/rules-test.mjs'
+
+⚠  Unable to fetch the CLI MOTD and remote config. This is not a fatal error, but may indicate an issue with your network connection.
+i  emulators: Starting emulators: auth, database
+i  emulators: Detected demo project ID "demo-crikruns", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail.
+i  database: Database Emulator logging to database-debug.log
+i  Running script: node scripts/rules-test.mjs
+
+Rules suite — MODE=current, project=demo-crikruns
+
+pinAuth — the PIN credential record
+  !! HOLE   read a PIN record (salt + pinHash) with no auth — SUCCEEDED (HTTP 200)
+  !! HOLE   overwrite a PIN hash with no auth (account takeover) — SUCCEEDED (HTTP 200)
+  !! HOLE   reset the brute-force lockout counter with no auth — SUCCEEDED (HTTP 200)
+  !! HOLE   force-logout another user by rewriting activeSessionId — SUCCEEDED (HTTP 200)
+  !! HOLE   delete an account record with no auth — SUCCEEDED (HTTP 200)
+
+pinAuth — the owner must still be able to work
+  ok        owner reads their own PIN record
+  ok        owner rotates their own session id (login does this)
+
+matches
+  !! HOLE   delete the ENTIRE matches collection in one request — SUCCEEDED (HTTP 200)
+  !! HOLE   tamper with another scorer's live match — SUCCEEDED (HTTP 200)
+  ok        scorer reads their own match
+  ok        scorer updates their own match
+
+players
+  !! HOLE   delete the ENTIRE players collection in one request — SUCCEEDED (HTTP 200)
+  !! HOLE   re-point another player's record at yourself (steals their stats) — SUCCEEDED (HTTP 200)
+  ok        any signed-in user reads a player record (squads and stats need this)
+
+tournaments — RTDB rules cascade DOWN, so per-field createdBy rules never run
+  !! HOLE   rename another organiser's tournament — SUCCEEDED (HTTP 200)
+  !! HOLE   delete another organiser's tournament — SUCCEEDED (HTTP 200)
+  ok        organiser edits their own tournament
+  ok        any signed-in user reads a tournament (viewers need this)
+  BLOCKED   read all tournaments with no auth
+
+users — the one rule that was already correct
+  BLOCKED   read another user's profile
+  ok        owner reads their own profile
+
+otpLimits — SMS abuse guard
+  !! HOLE   wipe the OTP rate-limit record (unlimited SMS at your cost) — SUCCEEDED (HTTP 200)
+
+app flows the hardened rules would break — fix these in code FIRST
+  ok        App.tsx startup gate reads pinAuth while signed OUT
+  ok        checkPhoneExists / loginWithPin read pinAuth pre-auth
+
+================================================================
+12 checks behaved as intended.
+
+12 SECURITY HOLE(S) — these attacks SUCCEEDED against the current rules:
+  !! read a PIN record (salt + pinHash) with no auth (HTTP 200)
+  !! overwrite a PIN hash with no auth (account takeover) (HTTP 200)
+  !! reset the brute-force lockout counter with no auth (HTTP 200)
+  !! force-logout another user by rewriting activeSessionId (HTTP 200)
+  !! delete an account record with no auth (HTTP 200)
+  !! delete the ENTIRE matches collection in one request (HTTP 200)
+  !! tamper with another scorer's live match (HTTP 200)
+  !! delete the ENTIRE players collection in one request (HTTP 200)
+  !! re-point another player's record at yourself (steals their stats) (HTTP 200)
+  !! rename another organiser's tournament (HTTP 200)
+  !! delete another organiser's tournament (HTTP 200)
+  !! wipe the OTP rate-limit record (unlimited SMS at your cost) (HTTP 200)
+================================================================
+
+These are LIVE in production right now. Run `npm run test:rules:hardened`
+to see them closed, and which app flows must change first.
+✔  Script exited successfully (code 0)
+i  emulators: Shutting down emulators.
+i  database: Stopping Database Emulator
+i  auth: Stopping Authentication Emulator
+i  hub: Stopping emulator hub
+i  logging: Stopping Logging Emulator
+exit=0

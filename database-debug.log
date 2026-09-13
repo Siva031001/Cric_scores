@@ -1,0 +1,12 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by akka.util.Unsafe (file:/Users/raja.t/.cache/firebase/emulators/firebase-database-emulator-v4.11.2.jar)
+WARNING: Please consider reporting this to the maintainers of class akka.util.Unsafe
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+16:51:20.249 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO akka.event.slf4j.Slf4jLogger - Slf4jLogger started
+16:51:20.324 [main] INFO com.firebase.server.forge.App$ - Listening at 127.0.0.1:9000
+16:51:23.250 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO com.firebase.core.namespace.NamespaceActor - demo-crikruns-default-rtdb successfully activated FBKV (SurveyIdle(0)) wait: 59ms, init: 0ms
+16:51:23.296 [NamespaceSystem-blocking-namespace-operation-dispatcher-6] INFO com.firebase.core.namespace.StateManager - Namespace demo-crikruns-default-rtdb status Active to Active
+16:51:24.408 [Thread-0] INFO com.firebase.server.forge.App$ - Attempting graceful shutdown.
+16:51:24.415 [NamespaceSystem-akka.actor.default-dispatcher-7] INFO com.firebase.core.namespace.Terminator$Terminator - 1 actors left to terminate: demo-crikruns-default-rtdb
+16:51:24.419 [NamespaceSystem-akka.actor.default-dispatcher-4] INFO com.firebase.core.namespace.NamespaceActor - stopped namespace actor for demo-crikruns-default-rtdb
+16:51:24.421 [Thread-0] INFO com.firebase.server.forge.App$ - Graceful shutdown complete.
