@@ -124,30 +124,35 @@ export const loginWithPin = async (phone: string, pin: string): Promise<{ succes
     return { success: false, error: 'No account found for this number. Please set up a PIN first.' };
   }
 
-  // The PIN check itself now happens server-side, in mintPhoneSessionToken —
-  // a client-side "trust me, I checked" claim proves nothing, since there is
-  // no OTP/Firebase-Auth session in this flow to prove it another way. The
-  // function also enforces the attempt lockout, since it's the real
-  // enforcement point.
+  // ⚠ The PIN is verified HERE, on the device — see the SECURITY DEBT note on
+  // mintPhoneSessionToken in functions/index.js. This is main's original
+  // behaviour, restored because the server-side check broke login and was
+  // buying nothing while `pinAuth` stays publicly writable. Both sides must be
+  // changed back together; see the ordered steps in that note.
+  if (!verifyPin(pin, record.salt, record.pinHash)) {
+    return { success: false, error: 'Incorrect PIN. Please try again.' };
+  }
+
   if (auth().currentUser) {
-  await auth().signOut();
-}
-const functionsMod = require('@react-native-firebase/functions').default;
-let tokenData;
-try {
-  const result = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key, pin });
-  tokenData = result.data;
-} catch (e: any) {
-  const code = e?.code ?? '';
-  if (code.includes('not-found')) {
-    return { success: false, error: 'No account found for this number. Please set up a PIN first.' };
+    await auth().signOut();
   }
-  if (code.includes('resource-exhausted')) {
-    return { success: false, error: e?.message ?? 'Too many incorrect attempts. Please try again later.' };
+  const functionsMod = require('@react-native-firebase/functions').default;
+  let tokenData;
+  try {
+    const result = await functionsMod().httpsCallable('mintPhoneSessionToken')({ phone: key });
+    tokenData = result.data;
+  } catch (e: any) {
+    // The PIN was already confirmed correct above, so ANY failure here is a
+    // server/network problem. Never report it as a wrong PIN: doing that told
+    // every user their PIN was broken during what were actually outages, and
+    // made the two impossible to tell apart.
+    const code = e?.code ?? '';
+    return {
+      success: false,
+      error: `Could not sign in — this is a server problem, not your PIN.\n\n[${code || 'unknown'}] ${e?.message ?? ''}`.trim(),
+    };
   }
-  return { success: false, error: 'Incorrect PIN. Please try again.' };
-}
-await auth().signInWithCustomToken(tokenData.token);
+  await auth().signInWithCustomToken(tokenData.token);
 
   const newSessionId = generateSessionId();
   await database().ref(`pinAuth/${key}`).update({

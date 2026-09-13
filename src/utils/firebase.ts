@@ -412,9 +412,28 @@ export const createPlayerMaster = async (name, type, phoneNumber: string | null 
   return playerId;
 };
 
+// Result cache for getMyLinkedPlayerId, keyed by uid.
+//
+// This lookup is a query on `players` with no `.indexOn` for `accountId` in
+// the database rules, so Firebase cannot search server-side — it ships the
+// ENTIRE players collection to the device and filters here. It is called by
+// getMatchHistory, ensureMyPlayerLinked, getMatchHistoryTiered and
+// isMyAssignedTeam, i.e. on nearly every screen, so the same full download
+// was repeating many times per session and made the whole app crawl.
+//
+// The mapping uid -> linked playerId only changes when an account is linked
+// or deleted, so caching it for the process lifetime is safe. Both of those
+// paths call clearLinkedPlayerCache() below.
+let _linkedPlayerCache: { uid: string; playerId: string | null } | null = null;
+
+export const clearLinkedPlayerCache = () => { _linkedPlayerCache = null; };
+
 export const getMyLinkedPlayerId = async (): Promise<string | null> => {
   const user = getCurrentUser();
   if (!user) return null;
+  if (_linkedPlayerCache && _linkedPlayerCache.uid === user.uid) {
+    return _linkedPlayerCache.playerId;
+  }
   const snap = await database().ref('players').orderByChild('accountId').equalTo(user.uid).once('value');
   let foundId: string | null = null;
   let count = 0;
@@ -424,6 +443,7 @@ export const getMyLinkedPlayerId = async (): Promise<string | null> => {
     return undefined;
   });
   if (count > 1) console.warn(`[Data Integrity] Multiple players linked to accountId ${user.uid}; using first match`);
+  _linkedPlayerCache = { uid: user.uid, playerId: foundId };
   return foundId;
 };
 
@@ -452,6 +472,9 @@ export const retroactivelyLinkGuestPlayers = async (phoneNumber: string): Promis
   updates[mostRecent.id + '/playerType'] = 'REGISTERED';
   updates[mostRecent.id + '/linkedAt'] = Date.now();
   await database().ref('players').update(updates);
+  // This just linked a player to the current uid, so any cached
+  // "no linked player" answer is now stale.
+  clearLinkedPlayerCache();
 };
 
 export const ensureMyPlayerLinked = async (displayName, phoneNumber: string | null = null) => {
@@ -496,6 +519,7 @@ export const linkPlayerToAccount = async (playerId, phoneNumber = null) => {
     phoneNumber: phoneNumber ?? existing.phoneNumber ?? null,
     linkedAt: Date.now(),
   });
+  clearLinkedPlayerCache();
 };
 
 export const getMatchesForPlayer = async (globalPlayerId: string): Promise<Match[]> => {

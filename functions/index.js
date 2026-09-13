@@ -1,103 +1,46 @@
 const {setGlobalOptions} = require("firebase-functions");
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-const crypto = require("crypto");
 const {GoogleGenerativeAI} = require("@google/generative-ai");
 admin.initializeApp();
 
 // For cost control, caps concurrent container scaling per function.
 setGlobalOptions({ maxInstances: 10 });
 
-// Mirrors the otpAttempts lockout shape used for Forgot-Password OTP in
-// pinAuthService.ts, but for PIN-login brute-force attempts. Stored on the
-// account record itself (pinAuth/{phone}) since that's the record being
-// guarded, and tracking it server-side means a fresh app install/reinstall
-// can't reset the counter.
-const MAX_PIN_ATTEMPTS = 5;
-const PIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
-
 // Mints an auth token bound to a STABLE uid derived from the phone number,
 // not a random anonymous uid. Same phone -> same uid -> same custom token
-// subject, on every device. Two callers, two different proofs required:
-//   - loginWithPin (no Firebase Auth session exists — pure PIN check): the
-//     client sends { phone, pin }. The PIN is verified HERE, server-side,
-//     against pinAuth/{phone} via the admin SDK (which bypasses client
-//     security rules), with failed-attempt lockout enforced here too since
-//     this is the real enforcement point — a client-side "trust me, I
-//     checked" claim proves nothing.
-//   - createPinAccount / resetPinWithPhoneAuth (OTP-verified path): the
-//     client sends just { phone } and must arrive here with the
-//     phone-verified Firebase Auth session from signInWithPhoneNumber/
-//     confirm() still intact. Firebase sets request.auth.token.phone_number
-//     automatically for phone-auth sign-ins, so we check that instead.
+// subject, on every device.
+//
+// ⚠ SECURITY DEBT — DELIBERATE, TEMPORARY REVERT TO THE PRE-v3 BEHAVIOUR.
+//
+// This function performs NO proof-of-identity check: it will mint a token for
+// ANY 10-digit number a caller asks for. The PIN is verified client-side in
+// loginWithPin (src/utils/pinAuthService.ts) and that verdict is trusted here.
+// A crafted client can therefore impersonate any user.
+//
+// It briefly did the right thing — verified the PIN hash here with the admin
+// SDK, required a phone-verified request.auth session for the OTP paths, and
+// enforced a 5-attempt / 15-minute lockout via a transaction. That was
+// reverted because it broke login in production and, critically, it was
+// buying nothing: the database rules grant `pinAuth/$phone` a public
+// `.write`, so an attacker can simply overwrite `pinHash` with their own and
+// then log in through the front door. The server-side check only raises the
+// bar once those rules are locked down.
+//
+// TO RESTORE (do these together, in this order, or login breaks again):
+//   1. Tighten the pinAuth rules so only the owning uid can read/write the
+//      record, and make pinFailedAttempts / pinLockedUntil client-unwritable
+//      (otherwise the lockout counter is reset with one request).
+//   2. Re-add the PIN check + request.auth check + lockout transaction here.
+//   3. Switch loginWithPin back to sending { phone, pin } and stop verifying
+//      the PIN on the device.
+// Reverting only part of this is what caused the outage.
 exports.mintPhoneSessionToken = functions.https.onCall(async (request) => {
-  const data = request.data ?? {};
-  const rawPhone = data.phone ?? '';
+  const rawPhone = request.data?.phone ?? '';
   const phone = String(rawPhone).replace(/\D/g, '');
-  const pin = data.pin;
 
   if (!/^\d{10}$/.test(phone)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number: received "' + rawPhone + '"');
-  }
-
-  if (pin !== undefined && pin !== null) {
-    const ref = admin.database().ref('pinAuth/' + phone);
-    const initialSnap = await ref.once('value');
-    const initialRecord = initialSnap.val();
-    if (!initialRecord) {
-      throw new functions.https.HttpsError('not-found', 'No account found for this number. Please set up a PIN first.');
-    }
-
-    const now = Date.now();
-    // Same algorithm as hashPin in src/utils/pinAuth.ts (SHA256 of pin+salt
-    // as a hex string) — Node's crypto module produces an identical digest
-    // to CryptoJS's SHA256(...).toString() here. salt/pinHash themselves
-    // aren't part of the race below (only the attempt counter is), so
-    // computing this against the initial read is fine.
-    const computedHash = crypto.createHash('sha256').update(String(pin) + initialRecord.salt).digest('hex');
-    const isCorrect = computedHash === initialRecord.pinHash;
-
-    // Atomically check-and-update the lockout counters. A plain
-    // read-then-write here is exactly the race a concurrent brute-force
-    // attack exploits: every parallel guess reads the same stale count
-    // before any of them writes back, so the counter never actually
-    // accumulates past what a single request would produce.
-    // ref.transaction() re-runs this callback against the latest value
-    // whenever another write raced it, closing that gap — and checking
-    // pinLockedUntil INSIDE it (not from the stale initial read) means a
-    // lockout applied by a concurrent request is never missed either.
-    let lockedOut = false;
-    await ref.transaction((current) => {
-      if (!current) return current; // record vanished mid-flight — nothing to do
-      if (current.pinLockedUntil && now < current.pinLockedUntil) {
-        lockedOut = true;
-        return current;
-      }
-      lockedOut = false;
-      if (isCorrect) {
-        if (current.pinFailedAttempts || current.pinLockedUntil) {
-          return { ...current, pinFailedAttempts: 0, pinLockedUntil: null };
-        }
-        return current;
-      }
-      const newCount = (current.pinFailedAttempts ?? 0) + 1;
-      if (newCount >= MAX_PIN_ATTEMPTS) {
-        return { ...current, pinFailedAttempts: 0, pinLockedUntil: now + PIN_LOCKOUT_MS };
-      }
-      return { ...current, pinFailedAttempts: newCount };
-    });
-
-    if (lockedOut) {
-      throw new functions.https.HttpsError('resource-exhausted', 'Too many incorrect attempts. Please try again later.');
-    }
-    if (!isCorrect) {
-      throw new functions.https.HttpsError('permission-denied', 'Incorrect PIN. Please try again.');
-    }
-  } else {
-    const expectedPhoneNumber = '+91' + phone;
-    if (!request.auth || request.auth.token.phone_number !== expectedPhoneNumber) {
-      throw new functions.https.HttpsError('permission-denied', 'Phone verification required.');
-    }
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid phone number');
   }
 
   const stableUid = 'phone_' + phone;

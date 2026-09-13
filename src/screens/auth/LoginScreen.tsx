@@ -25,21 +25,38 @@ export default function LoginScreen({ navigation }: any) {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
+  // ── TEMPORARY DIAGNOSTIC — remove once the slowness is pinned down ──
+  // Times each step of the number-entry flow and shows the breakdown, so we
+  // can see WHICH call is slow instead of guessing. Every step below is a
+  // separate network round trip; only signInWithPhoneNumber sends an SMS
+  // (and on Android also runs Play Integrity / reCAPTCHA device checks,
+  // which is the step most likely to take many seconds).
+  const timings: string[] = [];
+  const timed = async <T,>(label: string, fn: () => Promise<T>): Promise<T> => {
+    const t0 = Date.now();
+    try {
+      return await fn();
+    } finally {
+      timings.push(`${label}: ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    }
+  };
+
   const checkNumber = async () => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length !== 10) {
       Alert.alert("Invalid Number", "Please enter a valid 10-digit mobile number.");
       return;
     }
+    const tStart = Date.now();
     try {
       setLoading(true);
-      const exists = await checkPhoneExists(digits);
+      const exists = await timed("1 checkPhoneExists", () => checkPhoneExists(digits));
       if (exists) {
         setMode("login-pin");
         setPin("");
       } else {
         // New number — verify ownership via OTP before allowing PIN setup.
-        const rateCheck = await checkOtpRateLimit(digits);
+        const rateCheck = await timed("2 checkOtpRateLimit", () => checkOtpRateLimit(digits));
         if (!rateCheck.allowed) {
           if (rateCheck.secondsUntilResend) {
             Alert.alert("Please Wait", `You can request another OTP in ${rateCheck.secondsUntilResend}s.`);
@@ -53,8 +70,8 @@ export default function LoginScreen({ navigation }: any) {
         // for registration by calling signInWithPhoneNumber directly instead,
         // but still go through the same OTP rate limit gate above/below.
         const authMod = require('@react-native-firebase/auth').default;
-        const conf = await authMod().signInWithPhoneNumber('+91' + digits);
-        await recordOtpSent(digits);
+        const conf = await timed("3 sendOtp(SMS)", () => authMod().signInWithPhoneNumber('+91' + digits));
+        await timed("4 recordOtpSent", () => recordOtpSent(digits));
         setConfirmation(conf);
         setMode("verify-otp");
         setResendCooldown(30);
@@ -63,6 +80,10 @@ export default function LoginScreen({ navigation }: any) {
       Alert.alert("Error", error?.message ?? "Unknown error");
     } finally {
       setLoading(false);
+      Alert.alert(
+        "TIMING (temporary)",
+        timings.join("\n") + `\n\nTOTAL: ${((Date.now() - tStart) / 1000).toFixed(1)}s`
+      );
     }
   };
 
