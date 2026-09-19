@@ -79,7 +79,6 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
             <View style={st.tossResult}>
               <Text style={st.tossResultText}>
                 {tossWinner} won toss and chose to {tossChoice}.
-                {"\n"}{tossChoice === "Bat" ? tossWinner : (tossWinner === team1 ? team2 : team1)} will bat first.
               </Text>
             </View>
           )}

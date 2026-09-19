@@ -149,12 +149,6 @@ export const createMatch = async (matchData: any): Promise<string> => {
   const user = getCurrentUser();
   if (!user) throw new Error('Not authenticated');
   const matchId = await generateUniqueId('matches', () => Math.random().toString(36).substring(2, 8).toUpperCase());
-  await database().ref(`matches/${matchId}`).set({
-    ...matchData, id: matchId, scorerId: user.uid, createdAt: Date.now(),
-    tournamentId: matchData.tournamentId ?? null,
-    tournamentMatchId: matchData.tournamentMatchId ?? null,
-  });
-  await database().ref(`users/${user.uid}/matches/${matchId}`).set(true);
 
   const allPlayers = [...(matchData.team1Players ?? []), ...(matchData.team2Players ?? [])];
   const playerIndexUpdates: Record<string, boolean> = {};
@@ -163,9 +157,18 @@ export const createMatch = async (matchData: any): Promise<string> => {
       playerIndexUpdates[`playerMatchIndex/${p.globalPlayerId}/${matchId}`] = true;
     }
   });
-  if (Object.keys(playerIndexUpdates).length > 0) {
-    await database().ref().update(playerIndexUpdates);
-  }
+
+  // Three independent writes, keyed by the same freshly-generated matchId —
+  // no reason to do them one at a time.
+  await Promise.all([
+    database().ref(`matches/${matchId}`).set({
+      ...matchData, id: matchId, scorerId: user.uid, createdAt: Date.now(),
+      tournamentId: matchData.tournamentId ?? null,
+      tournamentMatchId: matchData.tournamentMatchId ?? null,
+    }),
+    database().ref(`users/${user.uid}/matches/${matchId}`).set(true),
+    Object.keys(playerIndexUpdates).length > 0 ? database().ref().update(playerIndexUpdates) : Promise.resolve(),
+  ]);
 
   return matchId;
 };
@@ -908,6 +911,21 @@ export const generateMatchSummary = async (matchId, match) => {
     console.error('AI summary generation failed:', e);
     return null;
   }
+};
+
+// ───────────────────────────────────────────────────────────
+// SCORECARD PDF — routed through the generateScorecardPdf Cloud Function
+// (functions/index.js), which lays the same batting/bowling/extras/result
+// sections out with pdfkit and returns a signed Storage URL. Throws on
+// failure rather than swallowing it, since callers (the Share button) need
+// to tell the user it didn't work rather than silently sharing nothing.
+// ───────────────────────────────────────────────────────────
+
+export const generateScorecardPdf = async (matchId: string, match: any): Promise<string> => {
+  const functionsMod = require('@react-native-firebase/functions').default;
+  const { data } = await functionsMod().httpsCallable('generateScorecardPdf')({ matchId, match });
+  if (!data?.url) throw new Error('No PDF URL returned');
+  return data.url as string;
 };
 
 // ───────────────────────────────────────────────────────────

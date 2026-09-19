@@ -97,6 +97,15 @@ export interface WicketAction {
   /** Runs completed before the dismissal (run-outs). Ignored if illegalDelivery is set — see below. */
   runsCompleted?: number;
   /**
+   * Run-out/obstructing-the-field only: the END the wicket was actually
+   * broken at, independent of which named batter that turns out to be — a
+   * mix-up can dismiss either batter at either end regardless of runs
+   * completed. Defaults to the end implied by playerOutId + runsCompleted
+   * parity (the pre-existing behaviour) when not supplied, so ordinary run
+   * outs need no extra input.
+   */
+  endOut?: CreaseSlot;
+  /**
    * Set when the wicket happened on a wide or no-ball — a stumping or run
    * out (or obstructing the field / hit the ball twice) remains lawful on
    * either; other dismissals are not, since the delivery itself was
@@ -606,6 +615,13 @@ export const deriveEvent = (
         );
       }
 
+      // Which end the wicket fell at, independent of runsCompleted: a
+      // mix-up can dismiss either batter at either end regardless of how
+      // many runs were completed. Falls back to the pre-existing
+      // identity+parity inference when the caller doesn't supply it
+      // directly (ordinary, non-mix-up run outs, and every other dismissal
+      // type, which always takes the striker's end since only the striker
+      // can be out by them).
       let illegalTotal = 0;
       let wideExtra = 0;
       let noBallExtra = 0;
@@ -618,6 +634,10 @@ export const deriveEvent = (
       const beyondPenalty = illegal
         ? illegalTotal - (illegal.type === 'WIDE' ? rules.widePenaltyRuns : rules.noBallPenaltyRuns)
         : 0;
+      const runOutCrossed = (illegal ? beyondPenalty : runsCompleted) % 2 !== 0;
+      const identityIsStriker = playerOutId === state.strikerId;
+      const inferredEndOut: CreaseSlot = identityIsStriker === !runOutCrossed ? 'striker' : 'nonStriker';
+      const endOut: CreaseSlot = action.endOut ?? inferredEndOut;
 
       const event: BallEvent = {
         ...ballShell,
@@ -650,6 +670,7 @@ export const deriveEvent = (
           fielderName: action.fielderName ?? null,
           creditBowler: BOWLER_CREDITED.has(dismissal),
           countsAsWicket: true,
+          endOut,
         },
       };
       return event;

@@ -342,33 +342,37 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   onRight={() => setShowInfoModal(true)}
 />
 {canManage && (
-  <TouchableOpacity
-    onPress={() => {
-      setShowInviteModal(false);
-      setShowPoolModal(false);
-      setPoolMatchModal(null);
-      setShowBracketSetup(false);
-      setEditingFixture(null);
-      setShowDeleteConfirm(false);
-      setShowInfoModal(false);
-      setRenamingPool(null);
+  // A normal flow row below the header instead of buttons absolutely
+  // positioned over it — those used to sit in the exact same band as the
+  // (centered, full-width) title text and clipped it on longer tournament
+  // names.
+  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 16, paddingHorizontal: SPACING.md, paddingTop: 4 }}>
+    <TouchableOpacity
+      onPress={() => {
+        setShowInviteModal(false);
+        setShowPoolModal(false);
+        setPoolMatchModal(null);
+        setShowBracketSetup(false);
+        setEditingFixture(null);
+        setShowDeleteConfirm(false);
+        setShowInfoModal(false);
+        setRenamingPool(null);
 
-      setEditName(tournament.name ?? '');
-      setEditOrg(tournament.organisationName ?? '');
-      setEditVenue(tournament.venue ?? '');
-      setEditStartDate(tournament.startDate ?? '');
-      setEditEndDate(tournament.endDate ?? '');
-      setShowEditTournament(true);
-    }}
-    style={{ position: 'absolute', top: 50, right: 130, padding: 8, zIndex: 10 }}
-  >
-    <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: 'bold' }}>Edit</Text>
-  </TouchableOpacity>
-)}
-{canManage && (
-  <TouchableOpacity onPress={() => setShowDeleteConfirm(true)} style={{ position: 'absolute', top: 50, right: 70, padding: 8, zIndex: 10 }}>
-    <Text style={{ color: COLORS.red, fontSize: 12, fontWeight: 'bold' }}>Delete</Text>
-  </TouchableOpacity>
+        setEditName(tournament.name ?? '');
+        setEditOrg(tournament.organisationName ?? '');
+        setEditVenue(tournament.venue ?? '');
+        setEditStartDate(tournament.startDate ?? '');
+        setEditEndDate(tournament.endDate ?? '');
+        setShowEditTournament(true);
+      }}
+      style={{ padding: 8 }}
+    >
+      <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: 'bold' }}>Edit</Text>
+    </TouchableOpacity>
+    <TouchableOpacity onPress={() => setShowDeleteConfirm(true)} style={{ padding: 8 }}>
+      <Text style={{ color: COLORS.red, fontSize: 12, fontWeight: 'bold' }}>Delete</Text>
+    </TouchableOpacity>
+  </View>
 )}
       {tournament.bannerUrl ? (
         <Image source={{ uri: tournament.bannerUrl }} style={styles.banner} resizeMode="cover" />
@@ -1169,6 +1173,50 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
         </View>
       </Modal>
 
+      <Modal visible={!!editingFixture} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Edit Fixture</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editHomeTeam}
+              onChangeText={setEditHomeTeam}
+              placeholder="Home team"
+              placeholderTextColor={COLORS.textMuted}
+              autoFocus
+            />
+            <TextInput
+              style={[styles.modalInput, { marginTop: 10 }]}
+              value={editAwayTeam}
+              onChangeText={setEditAwayTeam}
+              placeholder="Away team"
+              placeholderTextColor={COLORS.textMuted}
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditingFixture(null)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalAddBtn}
+                onPress={async () => {
+                  if (!editHomeTeam.trim() || !editAwayTeam.trim()) {
+                    Alert.alert("Error", "Enter both team names");
+                    return;
+                  }
+                  try {
+                    await editKnockoutFixtureTeams(tournamentId, editingFixture.id, editHomeTeam.trim(), editAwayTeam.trim());
+                    setEditingFixture(null);
+                  } catch (e: any) {
+                    Alert.alert("Error", e?.message ?? "Could not update the fixture");
+                  }
+                }}
+              >
+                <Text style={styles.modalAddText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={!!renamingPool} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>

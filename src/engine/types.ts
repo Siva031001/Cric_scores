@@ -125,6 +125,14 @@ export interface WicketInfo {
   creditBowler: boolean;
   /** False for Retired Hurt. Everything else is a wicket down. */
   countsAsWicket: boolean;
+  /**
+   * The pre-ball-named end ("striker's end" / "non-striker's end", i.e. the
+   * end associated with whoever held that role at the START of this ball)
+   * where the wicket was actually broken — set for every countsAsWicket
+   * dismissal, not just run-outs, so the reducer has one uniform way to
+   * decide the incoming batter's slot regardless of dismissal type.
+   */
+  endOut?: CreaseSlot;
 }
 
 export interface BallEvent extends BaseEvent {

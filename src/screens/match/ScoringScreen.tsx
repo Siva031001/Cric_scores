@@ -108,6 +108,8 @@ export default function ScoringScreen({ route, navigation }: any) {
   const [showRunOutPicker, setShowRunOutPicker] = useState(false);
   const [showRunOutFielder, setShowRunOutFielder] = useState(false);
   const [runOutWhoSelected, setRunOutWhoSelected] = useState<"striker"|"nonStriker"|null>(null);
+  const [showRunOutEnd, setShowRunOutEnd] = useState(false);
+  const [runOutEndSelected, setRunOutEndSelected] = useState<"striker"|"nonStriker"|null>(null);
   const [showRunOutRuns, setShowRunOutRuns] = useState(false);
   const [runOutRuns, setRunOutRuns] = useState(0);
   const [showOpenerSelect, setShowOpenerSelect] = useState(false);
@@ -207,6 +209,17 @@ export default function ScoringScreen({ route, navigation }: any) {
     setLoading(false);
     if (data?.isLive !== undefined) setIsLive(data.isLive);
     if (data?.streamUrl) { setStreamUrl(data.streamUrl); setIsStreaming(data.isStreaming ?? false); }
+
+    // Lets App.tsx send the scorer straight back into THIS match after an
+    // app kill/relaunch, instead of leaving them to hunt for "Continue" on
+    // Home — the score itself is always safe (persisted per ball), but a
+    // cold start otherwise reads as if the match had vanished.
+    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    if (data?.status === "live" || data?.status === "paused") {
+      AsyncStorage.setItem("cricketscorer_last_scoring_match", matchId).catch(() => {});
+    } else {
+      AsyncStorage.removeItem("cricketscorer_last_scoring_match").catch(() => {});
+    }
   }, (error: any) => {
     console.error('Match subscription error:', error);
     setLoading(false);
@@ -562,6 +575,12 @@ useEffect(() => {
   const handleRunOutWho = (who: "striker" | "nonStriker") => {
     setRunOutWhoSelected(who);
     setShowRunOutPicker(false);
+    setShowRunOutEnd(true);
+  };
+
+  const handleRunOutEndSelect = (end: "striker" | "nonStriker") => {
+    setRunOutEndSelected(end);
+    setShowRunOutEnd(false);
     setShowRunOutRuns(true);
   };
 
@@ -579,10 +598,12 @@ useEffect(() => {
       type: "WICKET",
       dismissal: "RUN_OUT",
       playerOutId: outId,
+      endOut: runOutEndSelected ?? undefined,
       fielderName,
       runsCompleted: runOutRuns,
     });
     setRunOutWhoSelected(null);
+    setRunOutEndSelected(null);
     setRunOutRuns(0);
   };
 
@@ -819,7 +840,10 @@ useEffect(() => {
         <TouchableOpacity style={s.headerBack} onPress={() => setShowEndConfirm(true)}>
           <Text style={s.headerBackTxt}>X</Text>
         </TouchableOpacity>
-        <Text style={s.headerTitle}>{match.team1} vs {match.team2}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={s.headerTitle}>{match.team1} vs {match.team2}</Text>
+          <Text style={s.headerMatchId}>Match ID: {matchId}</Text>
+        </View>
         <View style={s.headerRight}>
           <TouchableOpacity style={[s.liveToggle, !!isLive && s.liveToggleOn]} onPress={toggleLive}>
             <View style={[s.liveDot, !!isLive && s.liveDotOn]} />
@@ -1399,7 +1423,7 @@ useEffect(() => {
               <Text style={s.endBtnTxt}>{n} run{n === 1 ? '' : 's'}</Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity style={s.cancelBtn} onPress={() => { setShowRunOutRuns(false); setRunOutWhoSelected(null); }}>
+          <TouchableOpacity style={s.cancelBtn} onPress={() => { setShowRunOutRuns(false); setRunOutWhoSelected(null); setRunOutEndSelected(null); }}>
             <Text style={s.cancelTxt}>Cancel</Text>
           </TouchableOpacity>
         </View></View>
@@ -1407,17 +1431,31 @@ useEffect(() => {
 
       <Modal visible={showRunOutPicker} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>
-          <Text style={s.mTitle}>Run Out — Which End?</Text>
-          <Text style={{color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 16}}>Pick the end where the stumps were broken — not who "was" striker before the run.</Text>
+          <Text style={s.mTitle}>Run Out — Who is Out?</Text>
+          <Text style={{color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 16}}>Select the dismissed batter by name.</Text>
           <TouchableOpacity style={[s.endBtn, {borderColor: COLORS.yellow, marginBottom: 12}]} onPress={() => handleRunOutWho("striker")}>
-            <Text style={{color: COLORS.yellow, fontSize: 16, fontWeight: "bold", textAlign: "center"}}>Striker's End</Text>
-            <Text style={{color: COLORS.textMuted, fontSize: 12, textAlign: "center"}}>{getName(batP, inn?.strikerId)}</Text>
+            <Text style={{color: COLORS.yellow, fontSize: 16, fontWeight: "bold", textAlign: "center"}}>{getName(batP, inn?.strikerId)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.endBtn, {borderColor: COLORS.blue}]} onPress={() => handleRunOutWho("nonStriker")}>
-            <Text style={{color: COLORS.blue, fontSize: 16, fontWeight: "bold", textAlign: "center"}}>Non-Striker's End</Text>
-            <Text style={{color: COLORS.textMuted, fontSize: 12, textAlign: "center"}}>{getName(batP, inn?.nonStrikerId)}</Text>
+            <Text style={{color: COLORS.blue, fontSize: 16, fontWeight: "bold", textAlign: "center"}}>{getName(batP, inn?.nonStrikerId)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.cancelBtn, {marginTop: 12}]} onPress={() => setShowRunOutPicker(false)}>
+            <Text style={s.cancelTxt}>Cancel</Text>
+          </TouchableOpacity>
+        </View></View>
+      </Modal>
+
+      <Modal visible={showRunOutEnd} transparent animationType="slide">
+        <View style={s.mOverlay}><View style={s.modal}>
+          <Text style={s.mTitle}>Run Out — Which End?</Text>
+          <Text style={{color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 16}}>A mix-up can dismiss either batter at either end — pick the end where the stumps were actually broken, not just where that batter started.</Text>
+          <TouchableOpacity style={[s.endBtn, {borderColor: COLORS.yellow, marginBottom: 12}]} onPress={() => handleRunOutEndSelect("striker")}>
+            <Text style={{color: COLORS.yellow, fontSize: 16, fontWeight: "bold", textAlign: "center"}}>Striker's End</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.endBtn, {borderColor: COLORS.blue}]} onPress={() => handleRunOutEndSelect("nonStriker")}>
+            <Text style={{color: COLORS.blue, fontSize: 16, fontWeight: "bold", textAlign: "center"}}>Non-Striker's End</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.cancelBtn, {marginTop: 12}]} onPress={() => { setShowRunOutEnd(false); setRunOutWhoSelected(null); }}>
             <Text style={s.cancelTxt}>Cancel</Text>
           </TouchableOpacity>
         </View></View>
@@ -1686,6 +1724,7 @@ const s = StyleSheet.create({
   headerBack: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, justifyContent: "center", alignItems: "center" },
   headerBackTxt: { ...TYPE.bodyStrong, color: COLORS.textSecondary },
   headerTitle: { flex: 1, ...TYPE.title, fontSize: 15, color: COLORS.text, textAlign: "center" },
+  headerMatchId: { fontSize: 10, color: COLORS.textMuted, textAlign: "center", marginTop: 1 },
   headerShare: { backgroundColor: COLORS.blue, paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADIUS.round },
   headerShareTxt: { ...TYPE.label, fontSize: 10, color: "#fff" },
 

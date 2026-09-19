@@ -463,6 +463,8 @@ export const buildInningsWrite = (state: InningsState, setup?: InningsSetup) => 
   penaltyRunsAgainst: state.penaltyRunsAgainst,
   awaitingBatsmanSlot: state.awaitingBatsmanSlot,
   awaitingBowler: state.awaitingBowler,
+  battingOrder: state.battingOrder,
+  bowlingOrder: state.bowlingOrder,
   ...(setup
     ? {
         openingStrikerId: setup.strikerId,

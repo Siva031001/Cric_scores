@@ -87,6 +87,7 @@ function SplashScreen() {
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [resumeMatchId, setResumeMatchId] = useState<string | null>(null);
 
   useEffect(() => {
   const timer = setTimeout(async () => {
@@ -99,7 +100,26 @@ export default function App() {
       const database = require("@react-native-firebase/database").default;
       const snap = await database().ref(`pinAuth/${localPhone}/activeSessionId`).once("value");
       const remoteSessionId = snap.val();
-      setUser(remoteSessionId === localSessionId ? { valid: true } : null);
+      const isValid = remoteSessionId === localSessionId;
+      setUser(isValid ? { valid: true } : null);
+
+      // A scorer who was mid-match when the app was killed/relaunched
+      // should land straight back on that match instead of Home — the
+      // scoring data itself always survives (persisted per-ball), but
+      // having to hunt for "Continue" after a cold start reads as if the
+      // match were lost. Only resumes if the match is still actually live.
+      if (isValid) {
+        const lastMatchId = await AsyncStorage.getItem("cricketscorer_last_scoring_match");
+        if (lastMatchId) {
+          const matchSnap = await database().ref(`matches/${lastMatchId}`).once("value");
+          const m = matchSnap.val();
+          if (m && (m.status === "live" || m.status === "paused")) {
+            setResumeMatchId(lastMatchId);
+          } else {
+            await AsyncStorage.removeItem("cricketscorer_last_scoring_match");
+          }
+        }
+      }
     } else {
       setUser(null);
     }
@@ -107,6 +127,18 @@ export default function App() {
   }, 2000);
   return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!resumeMatchId || loading) return;
+    const tryNavigate = () => {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate("Scoring" as never, { matchId: resumeMatchId } as never);
+      } else {
+        setTimeout(tryNavigate, 100);
+      }
+    };
+    tryNavigate();
+  }, [resumeMatchId, loading]);
 
   useEffect(() => {
   const AsyncStorage = require("@react-native-async-storage/async-storage").default;

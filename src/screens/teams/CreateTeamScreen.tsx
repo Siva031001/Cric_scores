@@ -262,42 +262,45 @@ const confirmNamePrompt = useCallback(() => {
     if (!filled.map((p: any) => p.id).includes(wicketKeeperId)) { Alert.alert('Error', 'Wicket Keeper must have a name'); return; }
     setSaving(true);
     try {
-      // Upload a freshly picked local logo (file://... URI) to Storage so the
-      // DB stores a stable https:// URL instead of a device-local file path.
-      // Editing an existing team reuses that team's own path so a re-upload
-      // OVERWRITES the old file instead of leaking a new orphaned blob every
-      // time the logo changes (a brand-new team has no id yet to key off of,
-      // so its first upload still gets a fresh generated name).
-      let uploadedLogo = logo;
-      if (logo && !/^https?:\/\//.test(logo)) {
-        const uploadPath = existingTeam?.id
-          ? `team_logos/${existingTeam.id}.jpg`
-          : `team_logos/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-        uploadedLogo = await uploadLocalImageToStorage(logo, uploadPath);
-      }
+      // Logo upload has no data dependency on the player-creation below, so
+      // run them concurrently instead of blocking one on the other.
+      const uploadPromise: Promise<string | null> =
+        logo && !/^https?:\/\//.test(logo)
+          ? uploadLocalImageToStorage(
+              logo,
+              existingTeam?.id
+                ? `team_logos/${existingTeam.id}.jpg`
+                : `team_logos/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
+            )
+          : Promise.resolve(logo);
+
       // Resolve a globalPlayerId for every filled player slot.
       // 'registered' slot = the current logged-in account, linked via ensureMyPlayerLinked.
       // 'guest' slots only get a NEW player master record if they don't already have
       // a globalPlayerId (so editing an existing team never creates duplicates).
-      const finalPlayers: any[] = [];
-      for (const p of filled) {
+      // Independent per player, so resolved concurrently rather than one at a time —
+      // with an 11+ player roster that was previously 11+ sequential round trips.
+      const finalPlayersPromise = Promise.all(filled.map(async (p: any) => {
         const formattedName = formatPlayerName(p.name);
         let globalPlayerId = p.globalPlayerId ?? null;
-          if (p.playerType === 'registered' && globalPlayerId) {
+        if (p.playerType === 'registered' && globalPlayerId) {
           // Already linked via phone lookup — nothing further to create.
-          } else if (p.phoneNumber) {
-            globalPlayerId = await createGuestPlayerByPhone(p.phoneNumber, formattedName);
-          } else if (!globalPlayerId) {
-         // No phone entered at all — fallback so match creation never blocks.
+        } else if (p.phoneNumber) {
+          globalPlayerId = await createGuestPlayerByPhone(p.phoneNumber, formattedName);
+        } else if (!globalPlayerId) {
+          // No phone entered at all — fallback so match creation never blocks.
           globalPlayerId = await createPlayerMaster(formattedName, 'guest');
         }
-          finalPlayers.push({
-            id: p.id, name: formattedName, role: p.role ?? 'Batter',
-            battingStyle: p.battingStyle ?? 'Right Hand', bowlingStyle: p.bowlingStyle ?? '',
-            isCaptain: p.id === captainId, isWicketKeeper: p.id === wicketKeeperId,
-            playerType: p.playerType ?? 'guest', phoneNumber: p.phoneNumber ?? null, globalPlayerId,
-        });
-      }
+        return {
+          id: p.id, name: formattedName, role: p.role ?? 'Batter',
+          battingStyle: p.battingStyle ?? 'Right Hand', bowlingStyle: p.bowlingStyle ?? '',
+          isCaptain: p.id === captainId, isWicketKeeper: p.id === wicketKeeperId,
+          playerType: p.playerType ?? 'guest', phoneNumber: p.phoneNumber ?? null, globalPlayerId,
+        };
+      }));
+
+      const [uploadedLogo, finalPlayers] = await Promise.all([uploadPromise, finalPlayersPromise]);
+
       const formattedTeamName = formatTeamName(name);
       if (captainInviteMode) {
         const { submitCaptainTeam, areTeamsLockedNow } = require('../../utils/firebase');

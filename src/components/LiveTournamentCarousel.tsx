@@ -67,7 +67,18 @@ export default function LiveTournamentCarousel({ tournaments, onPress }: { tourn
                 however bright it is. */}
             <View pointerEvents="none" style={s.scrim} />
 
-            {status === 'live' && <View style={s.badgeSlot}><Badge label="Live" tone="live" /></View>}
+            {/* All three statuses share the same top-right slot now — Live
+                used to be the only one placed here (Upcoming/Completed sat
+                inline below instead), which looked inconsistent and, on a
+                busy poster, made the badge read as overlapping whatever
+                artwork was directly behind it. The slot's own backdrop
+                keeps it legible regardless of what's in the image there. */}
+            <View style={s.badgeSlot}>
+              <Badge
+                label={status === 'live' ? 'Live' : status === 'completed' ? 'Completed' : 'Upcoming'}
+                tone={status === 'live' ? 'live' : status === 'completed' ? 'success' : 'info'}
+              />
+            </View>
 
             <View style={s.info}>
               <Text style={s.name} numberOfLines={1}>{t.name}</Text>
@@ -75,13 +86,6 @@ export default function LiveTournamentCarousel({ tournaments, onPress }: { tourn
               <View style={s.metaRow}>
                 <View style={s.tag}><Text style={s.tagTxt}>{t.tournamentFormat || 'League'}</Text></View>
                 <View style={s.tag}><Text style={s.tagTxt}>{(t.teams ?? []).length} teams</Text></View>
-                {status !== 'live' && (
-                  <Badge
-                    label={status === 'completed' ? 'Completed' : 'Upcoming'}
-                    tone={status === 'completed' ? 'success' : 'info'}
-                    style={s.pushRight}
-                  />
-                )}
               </View>
             </View>
           </TouchableOpacity>
@@ -111,12 +115,18 @@ const s = StyleSheet.create({
   bannerAccent2: { position: 'absolute', left: -40, bottom: -50, width: 160, height: 160, borderRadius: 80, opacity: 0.3 },
   bannerInitial: { fontSize: 64, fontWeight: '800', color: 'rgba(255,255,255,0.28)' },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(6,6,14,0.45)' },
-  badgeSlot: { position: 'absolute', top: SPACING.sm, right: SPACING.sm },
+  badgeSlot: {
+    position: 'absolute',
+    top: SPACING.sm,
+    right: SPACING.sm,
+    backgroundColor: 'rgba(6,6,14,0.55)',
+    borderRadius: RADIUS.round,
+    padding: 2,
+  },
   info: { padding: SPACING.md, gap: 3 },
   name: { ...TYPE.h2, color: '#fff' },
   meta: { ...TYPE.caption, color: 'rgba(255,255,255,0.72)', marginBottom: 4 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   tag: { backgroundColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.round },
   tagTxt: { ...TYPE.label, fontSize: 9, color: '#fff' },
-  pushRight: { marginLeft: 'auto' },
 });

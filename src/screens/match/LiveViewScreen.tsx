@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { subscribeToMatch } from '../../utils/firebase';
@@ -8,9 +8,11 @@ import Header from '../../components/Header';
 import LiveScoreOverlay from '../../components/LiveScoreOverlay';
 import Badge from '../../components/Badge';
 import AppIcon from '../../components/AppIcon';
-import { getBallByBall, getCurrentPartnership, getWormData, getWinProbability } from '../../utils/matchAnalytics';
+import { getCurrentPartnership, getWormData, getWinProbability } from '../../utils/matchAnalytics';
 import WormGraph from '../../components/WormGraph';
 import OverSummaryModal from '../../components/OverSummaryModal';
+import UmpireEventPopup, { UmpireEventKind } from '../../components/UmpireEventPopup';
+import { isLegacyWicket } from '../../engine/legacy';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -21,6 +23,29 @@ export default function LiveViewScreen({ navigation }: any) {
   const [videoVisible, setVideoVisible] = useState(true);
   const [viewTab, setViewTab] = useState<'live'|'analytics'>('live');
   const [showOverSummary, setShowOverSummary] = useState(false);
+  const [umpireEvent, setUmpireEvent] = useState<UmpireEventKind | null>(null);
+  const lastBallCountRef = useRef<number>(-1);
+
+  // Same "only fire on a genuinely new ball" guard as the Scorer's version —
+  // -1 skips whatever's already in history on first load, and a ball count
+  // that goes DOWN (an edit/undo on the scorer's side) just re-syncs quietly.
+  useEffect(() => {
+    if (!match) return;
+    const inn = match.currentInnings === 1 ? match.innings1 : match.innings2;
+    const balls = (inn?.ballHistory ?? []).filter((b: any) => b?.type !== 'NEW_BATSMAN');
+    const count = balls.length;
+    if (lastBallCountRef.current !== -1 && count > lastBallCountRef.current) {
+      const result: string = balls[balls.length - 1]?.result ?? '';
+      let kind: UmpireEventKind | null = null;
+      if (isLegacyWicket(result)) kind = 'WICKET';
+      else if (result === '4') kind = 'FOUR';
+      else if (result === '6') kind = 'SIX';
+      else if (result.startsWith('WD')) kind = 'WIDE';
+      else if (result.startsWith('NB')) kind = 'NOBALL';
+      if (kind) setUmpireEvent(kind);
+    }
+    lastBallCountRef.current = count;
+  }, [match]);
 
   const joinMatch = () => {
     const trimmed = matchId.trim();
@@ -96,6 +121,7 @@ export default function LiveViewScreen({ navigation }: any) {
 
   return (
     <View style={s.container}>
+      <UmpireEventPopup event={umpireEvent} onHide={() => setUmpireEvent(null)} />
       {/* Custom header with LIVE badge */}
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={() => { setWatching(false); setMatch(null); }}>
@@ -298,24 +324,12 @@ export default function LiveViewScreen({ navigation }: any) {
 
         {viewTab === 'live' && (() => {
           const partnership = getCurrentPartnership(inn, match);
-          const ballByBall = getBallByBall(inn, 12);
           return (
             <>
               {/* Current Partnership */}
               <View style={s.analyticsCard}>
                 <Text style={s.analyticsTitle}>Current Partnership</Text>
                 <Text style={s.partnershipTxt}>{partnership.runs} runs ({partnership.balls} balls)</Text>
-              </View>
-
-              {/* Ball-by-Ball feed */}
-              <View style={s.analyticsCard}>
-                <Text style={s.analyticsTitle}>Ball-by-Ball</Text>
-                {ballByBall.map((b: any, i: number) => (
-                  <View key={i} style={s.bbRow}>
-                    <Text style={s.bbOver}>{b.over}.{b.ball ?? ''}</Text>
-                    <Text style={s.bbResult}>{b.result}</Text>
-                  </View>
-                ))}
               </View>
             </>
           );

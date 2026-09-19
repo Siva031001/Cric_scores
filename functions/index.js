@@ -2,6 +2,7 @@ const {setGlobalOptions} = require("firebase-functions");
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const {GoogleGenerativeAI} = require("@google/generative-ai");
+const PDFDocument = require("pdfkit");
 admin.initializeApp();
 
 // For cost control, caps concurrent container scaling per function.
@@ -156,4 +157,218 @@ exports.generateMatchSummary = functions.https.onCall({ secrets: ["GEMINI_API_KE
 
   await admin.database().ref('matches/' + matchId).update({ summaryText, summaryGeneratedAt: Date.now() });
   return { summaryText };
+});
+// ───────────────────────────────────────────────────────────
+// SCORECARD PDF
+// ───────────────────────────────────────────────────────────
+// Mirrors the layout of ScorecardScreen.tsx (batting table, extras, bowling
+// table, per innings, result + Man of the Match) so a shared PDF reads as
+// the same document, not a generic export. pdfkit draws directly onto the
+// PDF canvas (no headless-browser dependency), which keeps this function
+// small and fast to cold-start.
+
+const PDF_STAT_KEY = (id) => 'p' + id;
+
+const PDF_FORMAT_DISMISSAL = (bs, bowlingPlayers) => {
+  if (!bs.isOut) return 'not out';
+  const bowlerName = bowlingPlayers?.find((p) => p.id === bs.bowlerId)?.name;
+  const fielder = bs.fielderName && bs.fielderName !== 'Skip' ? bs.fielderName : null;
+  switch (bs.dismissalType) {
+    case 'CAUGHT':
+    case 'CAUGHT_AND_BOWLED': return (fielder ? 'c ' + fielder + ' ' : 'c & ') + 'b ' + (bowlerName ?? '?');
+    case 'BOWLED': return 'b ' + (bowlerName ?? '?');
+    case 'LBW': return 'lbw b ' + (bowlerName ?? '?');
+    case 'HIT_WICKET': return 'hit wkt b ' + (bowlerName ?? '?');
+    case 'RUN_OUT': return 'Run Out' + (fielder ? ' (' + fielder + ')' : '');
+    case 'STUMPED': return 'st ' + (fielder ?? '?') + ' b ' + (bowlerName ?? '?');
+    case 'RETIRED_OUT': return 'retired';
+    default: return bs.dismissalType ?? 'out';
+  }
+};
+
+const PDF_COLORS = {
+  primary: '#16a34a',
+  primaryDark: '#0f5c28',
+  text: '#111827',
+  muted: '#6b7280',
+  border: '#e5e7eb',
+  band: '#eefaf1',
+};
+
+/** A simple ruled table: header row + data rows, columns given as {label, width, align}. */
+function pdfTable(doc, x, y, columns, rows, opts = {}) {
+  const rowHeight = opts.rowHeight ?? 16;
+  let curY = y;
+  doc.rect(x, curY, columns.reduce((s, c) => s + c.width, 0), rowHeight).fill(PDF_COLORS.band);
+  doc.fillColor(PDF_COLORS.muted).fontSize(8).font('Helvetica-Bold');
+  let curX = x;
+  columns.forEach((c) => {
+    doc.text(c.label, curX + 4, curY + 4, { width: c.width - 8, align: c.align ?? 'left' });
+    curX += c.width;
+  });
+  curY += rowHeight;
+  doc.font('Helvetica').fontSize(9).fillColor(PDF_COLORS.text);
+  rows.forEach((row) => {
+    curX = x;
+    const lineHeight = row.sub ? rowHeight + 8 : rowHeight;
+    columns.forEach((c, i) => {
+      doc.fontSize(9).fillColor(PDF_COLORS.text)
+        .text(String(row.cells[i] ?? ''), curX + 4, curY + 4, { width: c.width - 8, align: c.align ?? 'left' });
+      curX += c.width;
+    });
+    if (row.sub) {
+      doc.fontSize(7.5).fillColor(PDF_COLORS.muted).text(row.sub, x + 4, curY + 16, { width: columns[0].width - 8 });
+    }
+    doc.moveTo(x, curY + lineHeight).lineTo(x + columns.reduce((s, c) => s + c.width, 0), curY + lineHeight)
+      .strokeColor(PDF_COLORS.border).lineWidth(0.5).stroke();
+    curY += lineHeight;
+  });
+  return curY;
+}
+
+function pdfInnings(doc, y, teamName, inn, battingPlayers, bowlingPlayers) {
+  const pageWidth = doc.page.width - 80;
+  let curY = y;
+
+  doc.fontSize(13).fillColor(PDF_COLORS.primaryDark).font('Helvetica-Bold')
+    .text(`${teamName} — ${inn?.runs ?? 0}/${inn?.wickets ?? 0} (${inn?.overs ?? 0}.${inn?.balls ?? 0} ov)`, 40, curY);
+  curY += 22;
+
+  const battedOrIn = [];
+  const yetToBat = [];
+  (battingPlayers ?? []).forEach((p) => {
+    const bs = inn?.batsmanStats?.[PDF_STAT_KEY(p.id)];
+    if (bs && (bs.balls > 0 || bs.isOut)) battedOrIn.push({ p, bs });
+    else if (inn && (p.id === inn.strikerId || p.id === inn.nonStrikerId)) {
+      battedOrIn.push({ p, bs: bs ?? { runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false } });
+    } else yetToBat.push(p);
+  });
+
+  const battingCols = [
+    { label: 'BATTER', width: pageWidth * 0.36 },
+    { label: 'R', width: pageWidth * 0.12, align: 'right' },
+    { label: 'B', width: pageWidth * 0.12, align: 'right' },
+    { label: '4s', width: pageWidth * 0.12, align: 'right' },
+    { label: '6s', width: pageWidth * 0.12, align: 'right' },
+    { label: 'SR', width: pageWidth * 0.16, align: 'right' },
+  ];
+  const battingRows = battedOrIn.map(({ p, bs }) => ({
+    cells: [
+      p.name + (p.isCaptain ? ' (C)' : '') + (p.isWicketKeeper ? ' (WK)' : ''),
+      bs.runs, bs.balls, bs.fours ?? 0, bs.sixes ?? 0,
+      bs.balls > 0 ? ((bs.runs / bs.balls) * 100).toFixed(0) : '0',
+    ],
+    sub: PDF_FORMAT_DISMISSAL(bs, bowlingPlayers),
+  }));
+  curY = pdfTable(doc, 40, curY, battingCols, battingRows, { rowHeight: 16 });
+
+  if (yetToBat.length > 0) {
+    curY += 4;
+    doc.fontSize(8).fillColor(PDF_COLORS.muted).font('Helvetica-Oblique')
+      .text('Yet to bat: ' + yetToBat.map((p) => p.name).join(', '), 40, curY, { width: pageWidth });
+    curY += 14;
+  }
+
+  const ext = inn?.extras ?? {};
+  const totalExtras = (ext.wides ?? 0) + (ext.noBalls ?? 0) + (ext.byes ?? 0) + (ext.legByes ?? 0) + (ext.penalty ?? 0);
+  curY += 6;
+  doc.fontSize(9).fillColor(PDF_COLORS.text).font('Helvetica-Bold')
+    .text(`Extras: ${totalExtras}`, 40, curY, { continued: true }).font('Helvetica').fillColor(PDF_COLORS.muted)
+    .text(`  (W:${ext.wides ?? 0} NB:${ext.noBalls ?? 0} B:${ext.byes ?? 0} LB:${ext.legByes ?? 0} PTY:${ext.penalty ?? 0})`);
+  curY += 20;
+
+  const bowlerRows = Object.values(inn?.bowlerStats ?? {}).filter(
+    (bw) => bw && ((bw.overs ?? 0) > 0 || (bw.balls ?? 0) > 0 || (bw.wides ?? 0) > 0 || (bw.noBalls ?? 0) > 0)
+  );
+  const bowlingCols = [
+    { label: 'BOWLER', width: pageWidth * 0.4 },
+    { label: 'O', width: pageWidth * 0.15, align: 'right' },
+    { label: 'R', width: pageWidth * 0.15, align: 'right' },
+    { label: 'W', width: pageWidth * 0.15, align: 'right' },
+    { label: 'ECO', width: pageWidth * 0.15, align: 'right' },
+  ];
+  const bowlingTableRows = bowlerRows.map((bw) => {
+    const name = bowlingPlayers?.find((p) => p.id === bw.playerId)?.name ?? `Player ${(bw.playerId ?? 0) + 1}`;
+    const total = (bw.overs ?? 0) + (bw.balls ?? 0) / 6;
+    const eco = total > 0 ? (bw.runs / total).toFixed(1) : '0.0';
+    return { cells: [name, `${bw.overs ?? 0}.${bw.balls ?? 0}`, bw.runs ?? 0, bw.wickets ?? 0, eco] };
+  });
+  curY = pdfTable(doc, 40, curY, bowlingCols, bowlingTableRows, { rowHeight: 16 });
+
+  return curY + 16;
+}
+
+exports.generateScorecardPdf = functions.https.onCall(async (request) => {
+  const data = request.data ?? {};
+  const matchId = data.matchId ?? '';
+  const match = data.match;
+  if (!matchId || !match) {
+    throw new functions.https.HttpsError('invalid-argument', 'matchId and match are required.');
+  }
+
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  const chunks = [];
+  doc.on('data', (c) => chunks.push(c));
+  const done = new Promise((resolve, reject) => {
+    doc.on('end', resolve);
+    doc.on('error', reject);
+  });
+
+  // ── Branded header band ──
+  doc.rect(0, 0, doc.page.width, 60).fill(PDF_COLORS.primary);
+  doc.fillColor('#ffffff').fontSize(18).font('Helvetica-Bold').text('🏏 CricketScorer', 40, 20);
+  doc.fontSize(9).font('Helvetica').text('Official Scorecard', 40, 42);
+
+  let y = 80;
+  doc.fillColor(PDF_COLORS.text).fontSize(16).font('Helvetica-Bold')
+    .text(`${match.team1} vs ${match.team2}`, 40, y, { width: doc.page.width - 80, align: 'center' });
+  y += 24;
+  doc.fontSize(9).fillColor(PDF_COLORS.muted).font('Helvetica')
+    .text([match.venue, match.matchDate, `Match ID: ${matchId}`].filter(Boolean).join('   •   '),
+      40, y, { width: doc.page.width - 80, align: 'center' });
+  y += 22;
+
+  if (match.winner) {
+    doc.rect(40, y, doc.page.width - 80, 26).fill(PDF_COLORS.band);
+    doc.fillColor(PDF_COLORS.primaryDark).fontSize(11).font('Helvetica-Bold')
+      .text(match.winner, 40, y + 7, { width: doc.page.width - 80, align: 'center' });
+    y += 36;
+  } else {
+    y += 10;
+  }
+
+  if (match.innings1) {
+    y = pdfInnings(doc, y, match.team1, match.innings1, match.team1Players, match.team2Players);
+  }
+  if (match.innings2) {
+    if (y > doc.page.height - 200) { doc.addPage(); y = 40; }
+    y = pdfInnings(doc, y, match.team2, match.innings2, match.team2Players, match.team1Players);
+  }
+
+  if (match.manOfMatch) {
+    if (y > doc.page.height - 100) { doc.addPage(); y = 40; }
+    doc.rect(40, y, doc.page.width - 80, 50).fill(PDF_COLORS.band);
+    doc.fillColor(PDF_COLORS.primaryDark).fontSize(10).font('Helvetica-Bold')
+      .text('MAN OF THE MATCH', 50, y + 8);
+    doc.fontSize(11).fillColor(PDF_COLORS.text)
+      .text(`${match.manOfMatch.name} (${match.manOfMatch.teamName})`, 50, y + 22);
+    y += 60;
+  }
+
+  doc.fontSize(7).fillColor(PDF_COLORS.muted)
+    .text(`Generated by CricketScorer on ${new Date().toLocaleString()}`, 40, doc.page.height - 40, {
+      width: doc.page.width - 80, align: 'center',
+    });
+
+  doc.end();
+  await done;
+  const buffer = Buffer.concat(chunks);
+
+  const bucket = admin.storage().bucket();
+  const filePath = `scorecard_pdfs/${matchId}.pdf`;
+  const file = bucket.file(filePath);
+  await file.save(buffer, { contentType: 'application/pdf' });
+  const [url] = await file.getSignedURL({ action: 'read', expires: Date.now() + 7 * 24 * 60 * 60 * 1000 });
+
+  return { url };
 });

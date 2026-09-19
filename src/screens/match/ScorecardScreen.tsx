@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Share, Alert, Modal } from "react-native";
-import { subscribeToMatch, updateMatch, calculateManOfMatch, calculateManOfMatchCandidates, saveManOfMatch, generateMatchSummary, canManageMatch } from "../../utils/firebase";
+import { subscribeToMatch, updateMatch, calculateManOfMatch, calculateManOfMatchCandidates, saveManOfMatch, generateMatchSummary, canManageMatch, generateScorecardPdf } from "../../utils/firebase";
 import { AdBanner, AdRewardedGate } from "../../components/AdPlaceholder";
 import { getOversString, getRunRate, statKey } from "../../utils/cricketLogic";
 import { COLORS, RADIUS, SPACING, SHADOW, TYPE } from "../../constants/theme";
@@ -146,9 +146,24 @@ const goBackSafe = () => {
     return lines.join("\n");
   };
 
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
   const handleShare = async () => {
     if (!match) return;
-    await Share.share({ message: buildFullScorecardText() });
+    setGeneratingPdf(true);
+    try {
+      const url = await generateScorecardPdf(matchId, match);
+      await Share.share({
+        message: `Scorecard: ${match.team1} vs ${match.team2}\n${url}`,
+        url, // iOS attaches the PDF itself when the target supports it; Android falls back to the link in `message`.
+      });
+    } catch (e: any) {
+      console.error('PDF share failed, falling back to text:', e);
+      Alert.alert('Could not generate PDF', 'Sharing the scorecard as text instead.');
+      await Share.share({ message: buildFullScorecardText() });
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
@@ -489,11 +504,15 @@ const goBackSafe = () => {
         )}
 
         {/* Share Button */}
-        <TouchableOpacity style={s.shareBtn} onPress={async () => {
+        <TouchableOpacity style={[s.shareBtn, generatingPdf && { opacity: 0.6 }]} disabled={generatingPdf} onPress={async () => {
           await handleShare();
           setShowShareInterstitial(true);
         }}>
-          <Text style={s.shareBtnTxt}>Share Scorecard</Text>
+          {generatingPdf ? (
+            <ActivityIndicator size="small" color={COLORS.text} />
+          ) : (
+            <Text style={s.shareBtnTxt}>Share Scorecard (PDF)</Text>
+          )}
         </TouchableOpacity>
 
         {/* Action Buttons — scoring re-entry is for the assigned scorer/organizer only */}

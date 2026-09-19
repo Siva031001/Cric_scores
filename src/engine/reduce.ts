@@ -477,11 +477,30 @@ export const reduceInningsVerbose = (
     // ── Strike rotation ──
     // Driven by runs the batters physically completed. A boundary four is
     // 4 runs but no crossings, which is why crossingRuns is stored on the
-    // event rather than re-derived from the total.
-    if (e.crossingRuns % 2 !== 0) swapEnds();
+    // event rather than re-derived from the total. A wicket is handled
+    // separately below by elimination (endOut + survivor), NOT by this
+    // parity swap — runsCompleted/crossingRuns on a wicket ball only says
+    // how many runs to SCORE, and does not reliably say where either
+    // batter ends up in a mix-up.
+    if (!e.wicket?.countsAsWicket && e.crossingRuns % 2 !== 0) swapEnds();
+
+    // ── Vacant crease ──
+    // Exactly one of the two batters is out, so by elimination the survivor
+    // always ends up at the OTHER end from wherever the wicket fell —
+    // regardless of runs completed. This is what makes a mix-up (dismissed
+    // batter's identity not matching the "expected" end for the runs
+    // completed) resolve correctly instead of just assuming normal running.
+    let vacantSlot: CreaseSlot | null = null;
+    if (e.wicket?.countsAsWicket) {
+      const survivorId = e.wicket.playerOutId === e.strikerId ? e.nonStrikerId : e.strikerId;
+      vacantSlot = e.wicket.endOut ?? (e.wicket.playerOutId === e.strikerId ? 'striker' : 'nonStriker');
+      if (vacantSlot === 'striker') state.nonStrikerId = survivorId;
+      else state.strikerId = survivorId;
+    }
 
     if (overCompleted) {
       swapEnds();
+      if (vacantSlot) vacantSlot = vacantSlot === 'striker' ? 'nonStriker' : 'striker';
       if (overRunsConceded === 0) {
         ensureBowl(overBowlerId).maidens += 1;
       }
@@ -491,13 +510,7 @@ export const reduceInningsVerbose = (
       state.awaitingBowler = true;
     }
 
-    // ── Vacant crease ──
-    // Computed after rotation so the correct end is flagged, which is what
-    // makes a non-striker run-out put the incoming batter in the right slot.
-    if (e.wicket?.countsAsWicket) {
-      state.awaitingBatsmanSlot =
-        state.nonStrikerId === e.wicket.playerOutId ? 'nonStriker' : 'striker';
-    }
+    if (vacantSlot) state.awaitingBatsmanSlot = vacantSlot;
 
     // ── Free hit ──
     // Set by a no-ball, consumed by the next LEGAL delivery. A wide does

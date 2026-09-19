@@ -94,7 +94,12 @@ export default function HomeScreen({ navigation }: any) {
       if (team.name?.toLowerCase().includes(q)) results.push({ type: 'team', data: team });
     });
     matches.forEach((match: any) => {
-      if (match.team1?.toLowerCase().includes(q) || match.team2?.toLowerCase().includes(q) || (match.venue ?? '').toLowerCase().includes(q))
+      if (
+        match.team1?.toLowerCase().includes(q) ||
+        match.team2?.toLowerCase().includes(q) ||
+        (match.venue ?? '').toLowerCase().includes(q) ||
+        (match.id ?? '').toLowerCase().includes(q)
+      )
         results.push({ type: 'match', data: match });
     });
     // Tournaments are included here too, since the search results view
@@ -175,9 +180,17 @@ export default function HomeScreen({ navigation }: any) {
                   <AppIcon emoji={item.type === 'team' ? '👥' : item.type === 'tournament' ? '🏆' : '🏏'} size={22} color={COLORS.text} />
                   <View style={{ flex: 1 }}>
                     <Text style={st.searchResultTitle}>{item.type === 'team' ? item.data.name : item.type === 'tournament' ? item.data.name : item.data.team1 + ' vs ' + item.data.team2}</Text>
-                    <Text style={st.searchResultSub}>{item.type === 'team' ? (item.data.players?.length ?? 0) + ' players' : item.type === 'tournament' ? (item.data.venue ?? 'Tournament') : item.data.venue ?? 'Match'}</Text>
+                    <Text style={st.searchResultSub}>
+                      {item.type === 'team'
+                        ? (item.data.players?.length ?? 0) + ' players'
+                        : item.type === 'tournament'
+                          ? (item.data.venue ?? 'Tournament')
+                          : `#${item.data.id} · ${item.data.venue ?? 'Match'}`}
+                    </Text>
                   </View>
-                  <Text style={st.searchResultType}>{item.type === 'team' ? 'Team' : item.type === 'tournament' ? 'Tournament' : 'Match'}</Text>
+                  <Text style={[st.searchResultType, item.type === 'match' && (item.data.status === 'live' || item.data.status === 'paused') && { color: COLORS.live }]}>
+                    {item.type === 'team' ? 'Team' : item.type === 'tournament' ? 'Tournament' : (item.data.status === 'live' ? 'LIVE' : item.data.status === 'paused' ? 'Paused' : 'Match')}
+                  </Text>
                 </TouchableOpacity>
               )} />
           )}
@@ -190,7 +203,6 @@ export default function HomeScreen({ navigation }: any) {
             <View style={st.liveSection}>
               <View style={st.liveHeaderRow}>
                 <Badge label="Live" tone="live" />
-                <Text style={st.liveSectionTitle}>Live Matches</Text>
               </View>
               {liveMatches.map((m: any) => (
                 <TouchableOpacity key={m.id} style={st.liveCard} onPress={() => openLiveMatch(m)}>
