@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native';import { getMatchHistory, canManageMatch } from '../../utils/firebase';
 import { getPartnerships } from '../../utils/matchAnalytics';
 import { AdBanner, AdRewardedGate } from '../../components/AdPlaceholder';
-import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW, GRADIENTS } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 
@@ -223,8 +223,12 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   });
   const topPartnerships = [...allPartnerships].sort((a, b) => b.runs - a.runs).slice(0, 5);
 
-  const StatRow = ({ label, value, highlight }: any) => (
-    <View style={s.statRow}>
+  const StatRow = ({ label, value, highlight, index }: any) => (
+    <View style={[
+      s.statRow,
+      typeof index === 'number' && index % 2 === 1 && s.statRowAlt,
+      highlight && s.statRowHighlight,
+    ]}>
       <Text style={s.statLbl}>{label}</Text>
       <Text style={[s.statVal, highlight && { color: COLORS.primaryLight }]}>{value ?? '-'}</Text>
     </View>
@@ -293,8 +297,13 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
 
   const SectionHeader = ({ title, subtitle }: any) => (
     <View style={s.sectionHeader}>
-      <Text style={s.sectionHeaderTitle}>{title}</Text>
-      {subtitle ? <Text style={s.sectionHeaderSub}>{subtitle}</Text> : null}
+      {/* Colour bar anchor, matching the shared SectionHeader component's
+          left accent — purely decorative, no change to title/subtitle. */}
+      <View pointerEvents="none" style={s.sectionHeaderBar} />
+      <View style={s.sectionHeaderTextCol}>
+        <Text style={s.sectionHeaderTitle}>{title}</Text>
+        {subtitle ? <Text style={s.sectionHeaderSub}>{subtitle}</Text> : null}
+      </View>
     </View>
   );
 
@@ -398,6 +407,8 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
             {formResults.length > 0 && (
               <View style={s.formCard}>
                 <View style={s.cardEdge} pointerEvents="none" />
+                <View pointerEvents="none" style={[s.cardBlobA, { backgroundColor: GRADIENTS.violet[0] }]} />
+                <View pointerEvents="none" style={[s.cardBlobB, { backgroundColor: GRADIENTS.violet[1] }]} />
                 <Text style={s.formLabel}>RECENT FORM</Text>
                 <View style={s.formRow}>
                   {formResults.map((r: any, i: number) => (
@@ -417,6 +428,8 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
             {topPartnerships.length > 0 && (
               <View style={s.partnershipsBox}>
                 <View style={s.cardEdge} pointerEvents="none" />
+                <View pointerEvents="none" style={[s.cardBlobA, { backgroundColor: GRADIENTS.gold[0] }]} />
+                <View pointerEvents="none" style={[s.cardBlobB, { backgroundColor: GRADIENTS.gold[1] }]} />
                 <SectionHeader title="Best Partnerships" subtitle="Highest run-scoring pairs" />
                 {topPartnerships.map((p: any, i: number) => (
                   <View key={i} style={[s.partnershipRow, i === topPartnerships.length - 1 && { borderBottomWidth: 0 }]}>
@@ -450,7 +463,12 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
               <View style={s.matchList}>
                 <SectionHeader title={filter === 'all' ? 'All Matches' : (COUNTERS.find(c => c.f === filter)?.l ?? '') + ' Matches'} subtitle={filteredMatches.length + ' match' + (filteredMatches.length !== 1 ? 'es' : '')} />
                 {filteredMatches.map((m: any, i: number) => (
-                  <TouchableOpacity key={m.id ?? i} style={s.matchCard} activeOpacity={0.85}
+                  <TouchableOpacity key={m.id ?? i} style={[
+                      s.matchCard,
+                      m.status === 'live' && { borderLeftWidth: 3, borderLeftColor: COLORS.live },
+                      m.status === 'paused' && { borderLeftWidth: 3, borderLeftColor: COLORS.warning },
+                      m.status === 'completed' && { borderLeftWidth: 3, borderLeftColor: COLORS.success },
+                    ]} activeOpacity={0.85}
                     onPress={async () => {
                       if (m.status !== 'live') { navigation.navigate('Scorecard', { matchId: m.id }); return; }
                       const allowed = await canManageMatch(m);
@@ -537,7 +555,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
       <View key={id} style={[s.pCard, { width: 220, marginHorizontal: 0 }]}>
         <View style={s.cardEdge} pointerEvents="none" />
         <View style={s.pCardHead}>
-          <View style={s.pAvatar}>
+          <View style={[s.pAvatar, SHADOW.glow(COLORS.primary)]}>
             <Text style={s.pAvatarTxt}>{(bs.name ?? 'P').charAt(0).toUpperCase()}</Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -546,14 +564,15 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
           </View>
         </View>
         <View style={s.pHighlight}>
+          <View pointerEvents="none" style={[s.pHighlightTint, { backgroundColor: COLORS.primary }]} />
           <Text style={s.pHNum}>{bs.runs}</Text>
           <Text style={s.pHLbl}>RUNS</Text>
         </View>
         <View style={s.statGrid}>
-          <StatRow label="SR" value={sr} highlight />
-          <StatRow label="Avg" value={avg} highlight />
-          <StatRow label="HS" value={hs} />
-          <StatRow label="4s/6s" value={bs.fours + '/' + bs.sixes} />
+          <StatRow label="SR" value={sr} highlight index={0} />
+          <StatRow label="Avg" value={avg} highlight index={1} />
+          <StatRow label="HS" value={hs} index={2} />
+          <StatRow label="4s/6s" value={bs.fours + '/' + bs.sixes} index={3} />
         </View>
       </View>
     );
@@ -593,7 +612,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                     <View key={id} style={s.pCard}>
                       <View style={s.cardEdge} pointerEvents="none" />
                       <View style={s.pCardHead}>
-                        <View style={[s.pAvatar, { backgroundColor: COLORS.red }]}>
+                        <View style={[s.pAvatar, { backgroundColor: COLORS.red }, SHADOW.glow(COLORS.red)]}>
                           <Text style={s.pAvatarTxt}>{(bw.name ?? 'P').charAt(0).toUpperCase()}</Text>
                         </View>
                         <View style={{ flex: 1 }}>
@@ -601,19 +620,20 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                           <Text style={s.pSub}>{bw.innings} innings bowled</Text>
                         </View>
                         <View style={[s.pHighlight, { backgroundColor: COLORS.red + '1a', borderColor: COLORS.red }]}>
+                          <View pointerEvents="none" style={[s.pHighlightTint, { backgroundColor: COLORS.red }]} />
                           <Text style={[s.pHNum, { color: COLORS.red }]}>{bw.wickets ?? 0}</Text>
                           <Text style={s.pHLbl}>WKTS</Text>
                         </View>
                       </View>
                       <View style={s.statGrid}>
-                        <StatRow label="Overs"           value={(bw.overs ?? 0) + '.' + (bw.balls ?? 0)} />
-                        <StatRow label="Runs Conceded"   value={bw.runs ?? 0} />
-                        <StatRow label="Economy"         value={eco}    highlight={bolSort === 'eco'} />
-                        <StatRow label="Bowling SR"      value={bowlSR} highlight />
-                        <StatRow label="Average"         value={bowlAvg} highlight={bolSort === 'bowlAvg'} />
-                        <StatRow label="Wides"           value={bw.wides ?? 0} />
-                        <StatRow label="No Balls"        value={bw.noBalls ?? 0} />
-                        <StatRow label="Best Bowling"    value={bbf ? bbf.w + '/' + bbf.r : '-'} highlight />
+                        <StatRow label="Overs"           value={(bw.overs ?? 0) + '.' + (bw.balls ?? 0)} index={0} />
+                        <StatRow label="Runs Conceded"   value={bw.runs ?? 0} index={1} />
+                        <StatRow label="Economy"         value={eco}    highlight={bolSort === 'eco'} index={2} />
+                        <StatRow label="Bowling SR"      value={bowlSR} highlight index={3} />
+                        <StatRow label="Average"         value={bowlAvg} highlight={bolSort === 'bowlAvg'} index={4} />
+                        <StatRow label="Wides"           value={bw.wides ?? 0} index={5} />
+                        <StatRow label="No Balls"        value={bw.noBalls ?? 0} index={6} />
+                        <StatRow label="Best Bowling"    value={bbf ? bbf.w + '/' + bbf.r : '-'} highlight index={7} />
                       </View>
                     </View>
                   );
@@ -633,7 +653,9 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                 { icon: '🥅', label: 'Stumpings', value: fieldTotals.stumpings, color: COLORS.purple },
                 { icon: '📋', label: 'Matches',   value: ballFilteredMatches.length, color: COLORS.primary },
               ].map((f, i) => (
-                <View key={i} style={[s.fieldingBox, { borderColor: f.color + '55' }]}>
+                <View key={i} style={[s.fieldingBox, { borderColor: f.color + '55' }, SHADOW.glow(f.color)]}>
+                  <View pointerEvents="none" style={s.cardEdge} />
+                  <View pointerEvents="none" style={[s.fieldingTint, { backgroundColor: f.color }]} />
                   <View style={[s.fieldingIcon, { backgroundColor: f.color + '22' }]}>
                     <AppIcon emoji={f.icon} size={20} color={f.color} />
                   </View>
@@ -662,21 +684,22 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                     <View key={f.name ?? i} style={s.pCard}>
                       <View style={s.cardEdge} pointerEvents="none" />
                       <View style={s.pCardHead}>
-                        <View style={[s.pAvatar, { backgroundColor: COLORS.teal }]}>
+                        <View style={[s.pAvatar, { backgroundColor: COLORS.teal }, SHADOW.glow(COLORS.teal)]}>
                           <Text style={s.pAvatarTxt}>{(f.name ?? 'F').charAt(0).toUpperCase()}</Text>
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={s.pName}>{f.name}</Text>
                         </View>
                         <View style={[s.pHighlight, { backgroundColor: COLORS.teal + '1a', borderColor: COLORS.teal }]}>
+                          <View pointerEvents="none" style={[s.pHighlightTint, { backgroundColor: COLORS.teal }]} />
                           <Text style={[s.pHNum, { color: COLORS.teal }]}>{total}</Text>
                           <Text style={s.pHLbl}>TOTAL</Text>
                         </View>
                       </View>
                       <View style={s.statGrid}>
-                        <StatRow label="Catches"   value={f.catches   ?? 0} highlight={f.catches   > 0} />
-                        <StatRow label="Run Outs"  value={f.runOuts   ?? 0} highlight={f.runOuts   > 0} />
-                        <StatRow label="Stumpings" value={f.stumpings ?? 0} highlight={f.stumpings > 0} />
+                        <StatRow label="Catches"   value={f.catches   ?? 0} highlight={f.catches   > 0} index={0} />
+                        <StatRow label="Run Outs"  value={f.runOuts   ?? 0} highlight={f.runOuts   > 0} index={1} />
+                        <StatRow label="Stumpings" value={f.stumpings ?? 0} highlight={f.stumpings > 0} index={2} />
                       </View>
                     </View>
                   );
@@ -741,6 +764,11 @@ const s = StyleSheet.create({
   // near-black background this is what makes a surface read as raised —
   // cheaper and less muddy than a heavier border.
   cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  // Soft two-tone blob pair, built from plain overlapping tinted Views (no
+  // gradient library) — decorates a card's top-right corner. Requires the
+  // card to already have overflow:'hidden', which every card using this does.
+  cardBlobA: { position: 'absolute', top: -30, right: -24, width: 100, height: 100, borderRadius: 50, opacity: 0.12 },
+  cardBlobB: { position: 'absolute', top: 6, right: -46, width: 76, height: 76, borderRadius: 38, opacity: 0.10 },
   adBar: { paddingHorizontal: SPACING.lg, paddingVertical: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft },
 
   // ── Filter block ──
@@ -776,12 +804,14 @@ const s = StyleSheet.create({
 
   scroll: { flex: 1 },
 
-  sectionHeader: { paddingHorizontal: SPACING.lg, marginTop: SPACING.lg, marginBottom: SPACING.sm },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingHorizontal: SPACING.lg, marginTop: SPACING.lg, marginBottom: SPACING.sm },
+  sectionHeaderBar: { width: 3, height: 18, borderRadius: 2, backgroundColor: COLORS.primary },
+  sectionHeaderTextCol: { flex: 1 },
   sectionHeaderTitle: { ...TYPE.h2, fontSize: 17, color: COLORS.text },
   sectionHeaderSub: { ...TYPE.caption, color: COLORS.textMuted, marginTop: 2 },
 
   // ── Recent form strip ──
-  formCard: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  formCard: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.xl, padding: 14, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
   formLabel: { ...TYPE.label, color: COLORS.textMuted, marginBottom: SPACING.sm },
   formRow: { flexDirection: 'row', gap: 9 },
   formPill: { width: 34, height: 34, borderRadius: 17, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.borderSoft, justifyContent: 'center', alignItems: 'center', ...SHADOW.sm },
@@ -791,7 +821,7 @@ const s = StyleSheet.create({
   // ── Best partnerships ──
   // Rank medallion left, the pair's names at readable body weight, and runs as
   // the heaviest figure on the row since that is what the list is sorted by.
-  partnershipsBox: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.lg, paddingHorizontal: 14, paddingBottom: 6, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  partnershipsBox: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg, backgroundColor: COLORS.card, borderRadius: RADIUS.xl, paddingHorizontal: 14, paddingBottom: 6, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
   partnershipRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
   partnershipRank: { width: 26, height: 26, borderRadius: 13, backgroundColor: COLORS.primarySoft, borderWidth: 1, borderColor: COLORS.primary + '44', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   partnershipRankGold: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow, ...SHADOW.glow(COLORS.yellow) },
@@ -803,7 +833,7 @@ const s = StyleSheet.create({
 
   // ── Match cards ──
   matchList: { paddingBottom: SPACING.sm },
-  matchCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, marginHorizontal: SPACING.lg, marginBottom: 12, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  matchCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.xl, padding: 16, marginHorizontal: SPACING.lg, marginBottom: 12, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
   mCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
   mDate: { ...TYPE.numSm, fontSize: 11, color: COLORS.textMuted },
   // Status badges use the app-wide semantics: live is COLORS.live (never red,
@@ -847,7 +877,7 @@ const s = StyleSheet.create({
   sortChipTxtActive: { color: COLORS.onPrimary },
 
   // ── Player stat cards ──
-  pCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.md, marginHorizontal: SPACING.lg, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  pCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.xl, padding: SPACING.md, marginHorizontal: SPACING.lg, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
   pCardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SPACING.sm, paddingBottom: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
   pAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', ...SHADOW.sm },
   pAvatarTxt: { ...TYPE.title, color: '#fff' },
@@ -855,7 +885,10 @@ const s = StyleSheet.create({
   pSub: { ...TYPE.caption, fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
   // The headline figure (runs / wickets / total) is the biggest thing in the
   // card, in tabular figures so it never shifts width.
-  pHighlight: { backgroundColor: COLORS.primarySoft, borderRadius: RADIUS.md, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary + '55', minWidth: 62 },
+  pHighlight: { backgroundColor: COLORS.primarySoft, borderRadius: RADIUS.md, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary + '55', minWidth: 62, overflow: 'hidden' },
+  // Soft tint circle behind the headline figure, same technique as the shared
+  // StatCard component's `color` tint — decorative only.
+  pHighlightTint: { position: 'absolute', top: -22, right: -22, width: 64, height: 64, borderRadius: 32, opacity: 0.16 },
   pHNum: { ...TYPE.displaySm, fontSize: 26, color: COLORS.primary },
   pHLbl: { ...TYPE.label, fontSize: 9, color: COLORS.textMuted, marginTop: 1 },
 
@@ -867,12 +900,20 @@ const s = StyleSheet.create({
   // values form a clean right-hand column instead of ragged text.
   statGrid: { gap: 0 },
   statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  // Zebra tint and a soft highlight tint — background-only, so a dense stat
+  // list reads as scannable rows without touching row height or column
+  // alignment.
+  statRowAlt: { backgroundColor: COLORS.card2 },
+  statRowHighlight: { backgroundColor: COLORS.primarySoft },
   statLbl: { ...TYPE.colLabel, color: COLORS.textMuted },
   statVal: { ...TYPE.num, color: COLORS.text, textAlign: 'right' },
 
   // ── Fielding summary grid ──
   fieldSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: SPACING.lg, marginBottom: 4 },
-  fieldingBox: { width: '46%', backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, alignItems: 'center', borderWidth: 1, overflow: 'hidden', ...SHADOW.sm },
+  fieldingBox: { width: '46%', backgroundColor: COLORS.card, borderRadius: RADIUS.xl, padding: 16, alignItems: 'center', borderWidth: 1, overflow: 'hidden', ...SHADOW.sm },
+  // Soft tint circle behind the icon, same technique as StatCard's `color`
+  // tint — decorative only, the icon/value/label are unchanged.
+  fieldingTint: { position: 'absolute', top: -26, right: -26, width: 84, height: 84, borderRadius: 42, opacity: 0.16 },
   fieldingIcon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 9 },
   fieldingIconTxt: { fontSize: 20 },
   fieldingVal: { ...TYPE.displaySm, fontSize: 26 },

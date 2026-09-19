@@ -2,76 +2,103 @@
 // Single source of truth for colour, spacing, radius, typography, elevation
 // and motion.
 //
-// EVERY key that existed before is still here with a compatible value, because
-// 42 files import from this module. Values were re-tuned, not renamed or
-// removed — renaming a token would be a silent visual break somewhere far away.
+// EVERY key that existed before is still here with a compatible type, because
+// 40+ files import from this module. Values were re-tuned (and a few purely
+// additive tokens introduced), not renamed or removed — renaming a token
+// would be a silent visual break somewhere far away.
 //
-// The palette stays dark. That is right for a live-sports product, matches the
-// broadcast overlay, and avoids introducing a theme system the app does not
-// have (and was explicitly not asked for).
+// ── The "Floodlights" palette ──
+// The old palette was a single green accent on a near-black background —
+// correct, but monochrome. This pass keeps the dark base (still right for a
+// live-sports product, still matches the broadcast overlay, still avoids a
+// theme system the app doesn't have) and replaces the accent system with a
+// vivid, multi-hue set inspired by stadium floodlights and scoreboard LEDs:
+// an electric violet brand colour, plus punchy coral/amber/cyan/teal
+// semantic colours used far more liberally than before. `primary` still
+// keeps its role as the single accent for the app's main actions; `success`,
+// `live` etc. remain distinct tokens so recolouring `primary` cannot change
+// what "won" or "on air" means anywhere.
 //
-// Why the app looked plain, and what changed:
-//   1. No elevation existed anywhere in the codebase — every card was flat.
-//      SHADOW now provides a graded scale.
-//   2. No typography scale existed; each screen picked sizes ad hoc, so a
-//      score read at nearly the same weight as its label. TYPE fixes the
-//      hierarchy, with tabular numerals so live digits don't jitter.
-//   3. One flat card colour on a near-black background gave no depth.
-//      There are now layered surfaces.
+// Carried over from the previous pass:
+//   1. Elevation (SHADOW) — every card is layered, not flat.
+//   2. A typography scale with tabular numerals on every numeric style, so
+//      live digits don't jitter as they update.
+//   3. Layered surfaces (background/card/card2/surface3) for real depth.
 
 export const COLORS = {
   // ── Brand ──
-  // A deeper, richer pitch green. `primary` keeps its role as the single
-  // accent for actions and emphasis.
-  primary: '#22c55e',
-  primaryDark: '#16a34a',
-  primaryLight: '#4ade80',
+  // Electric violet: energetic, unmistakably different from the semantic
+  // colours below, and — unlike the old green — passes contrast with a
+  // plain white ink, so onPrimary can be a real colour instead of a
+  // near-black workaround.
+  primary: '#7C5CFF',
+  primaryDark: '#5B3DF0',
+  primaryLight: '#B9A8FF',
   /** Very low-opacity primary, for tinted surfaces and selected chips. */
-  primarySoft: 'rgba(34,197,94,0.14)',
+  primarySoft: 'rgba(124,92,255,0.16)',
 
   // ── Surfaces, darkest to lightest ──
-  background: '#0a0a14',
+  // Same structure and near-black depth as before, with a faint violet
+  // undertone (instead of flat neutral) so the new brand colour feels native
+  // to the surfaces it sits on rather than dropped on top of them.
+  background: '#0a0a16',
   /** Default card surface. */
-  card: '#14141f',
+  card: '#161425',
   /** Raised surface: nested cards, chips, inputs on a card. */
-  card2: '#1c1c2b',
+  card2: '#1f1c33',
   /** Highest surface: modals, sheets, menus. */
-  surface3: '#24243a',
-  border: '#2b2b42',
+  surface3: '#292440',
+  border: '#332d54',
   /** Hairline separators inside a card, where `border` is too heavy. */
-  borderSoft: 'rgba(255,255,255,0.06)',
+  borderSoft: 'rgba(255,255,255,0.07)',
 
   // ── Text ──
   text: '#ffffff',
-  textSecondary: '#a3a3c2',
-  textMuted: '#6b6b8a',
+  textSecondary: '#ada8c9',
+  textMuted: '#726d94',
 
   // ── Semantic ──
-  red: '#ef4444',
-  orange: '#f97316',
-  yellow: '#eab308',
-  blue: '#3b82f6',
-  purple: '#a855f7',
-  teal: '#14b8a6',
+  // Brighter and warmer across the board — these now carry a lot of the
+  // "colourful" identity of the app (menu icons, stat highlights, chips),
+  // not just rare status flags.
+  red: '#FF4D6D',
+  orange: '#FF8A3D',
+  yellow: '#FFC94A',
+  blue: '#3AA0FF',
+  purple: '#B14CFF',
+  teal: '#00D9B5',
   /** Live / on-air. Deliberately distinct from `red` so a live badge never
    *  reads as an error. */
-  live: '#ff2d55',
-  success: '#22c55e',
-  warning: '#f59e0b',
-  error: '#ef4444',
-  info: '#3b82f6',
+  live: '#FF2D6B',
+  success: '#2ED66B',
+  warning: '#FFB020',
+  error: '#FF4D6D',
+  info: '#3AA0FF',
 
   // ── Ink on coloured fills ──
-  // A filled primary button needs dark text, not white: white on this green
-  // fails contrast. These are deliberately near-black rather than pure black so
-  // the fill still reads as coloured underneath.
-  onPrimary: '#04140a',
+  // A filled primary button now takes plain white — the new violet is dark
+  // enough for white text to read cleanly, unlike the old bright green,
+  // which needed near-black ink instead. Kept as its own token (not just
+  // `text`) so a future accent swap only has to satisfy contrast here.
+  onPrimary: '#ffffff',
   onAccent: '#1a1400',
 
   // ── Overlays ──
-  scrim: 'rgba(0,0,0,0.72)',
+  scrim: 'rgba(6,4,16,0.78)',
   /** Hairline highlight along a card's top edge — cheap, convincing depth. */
-  edgeHighlight: 'rgba(255,255,255,0.07)',
+  edgeHighlight: 'rgba(255,255,255,0.08)',
+};
+
+// Two-tone pairs for decorative gradient-ish surfaces (poster banners, hero
+// headers, empty-state blobs) built from plain overlapping tinted Views —
+// no gradient library dependency. Purely additive; nothing existing
+// referenced these before, so nothing existing can regress from adding them.
+export const GRADIENTS: Record<string, [string, string]> = {
+  violet: ['#7C5CFF', '#B14CFF'],
+  sunset: ['#FF8A3D', '#FF4D6D'],
+  ocean: ['#3AA0FF', '#00D9B5'],
+  gold: ['#FFC94A', '#FF8A3D'],
+  berry: ['#FF2D6B', '#B14CFF'],
 };
 
 export const SPACING = {

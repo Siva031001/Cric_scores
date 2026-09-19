@@ -48,6 +48,13 @@ export default function LiveViewScreen({ navigation }: any) {
       <View style={s.container}>
         <Header title="Join Live Match" onBack={() => navigation.goBack()} />
         <View style={s.joinBox}>
+          {/* Soft colour blobs behind the join card — same plain-tinted-View
+              technique used elsewhere in the app (no gradient library),
+              purely decorative and clipped so it never intercepts touches. */}
+          <View pointerEvents="none" style={s.joinBlobWrap}>
+            <View style={[s.joinBlob, { backgroundColor: COLORS.primary, top: -40, left: -50 }]} />
+            <View style={[s.joinBlob, { backgroundColor: COLORS.live, bottom: -60, right: -40 }]} />
+          </View>
           <View style={s.joinBadge}><Text style={s.joinBadgeTxt}>LIVE</Text></View>
           <Text style={s.joinTitle}>Watch Live Match</Text>
           <Text style={s.joinSub}>Enter the Match ID shared by the scorer</Text>
@@ -101,6 +108,13 @@ export default function LiveViewScreen({ navigation }: any) {
           <Text style={s.headerTeams} numberOfLines={1}>{match.team1} vs {match.team2}</Text>
         </View>
         <Text style={s.matchIdTxt}>#{matchId.toUpperCase()}</Text>
+        {/* Two-tone accent line, matching the shared Header component's
+            signature edge, since this screen renders its own custom header
+            instead of <Header>. Purely decorative — non-interactive. */}
+        <View pointerEvents="none" style={s.headerAccentLine}>
+          <View style={[s.headerAccentHalf, { backgroundColor: COLORS.primary }]} />
+          <View style={[s.headerAccentHalf, { backgroundColor: COLORS.live }]} />
+        </View>
       </View>
 
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
@@ -130,6 +144,11 @@ export default function LiveViewScreen({ navigation }: any) {
 
         {/* ── SCORE CARD (always visible, CricHeroes style) ── */}
         <View style={s.scoreCard}>
+          {/* Hairline highlight + soft corner tint — same cheap-depth trick used
+              by the shared Card component, applied here since this screen
+              hand-rolls its cards. Decorative only. */}
+          <View pointerEvents="none" style={s.scoreCardEdge} />
+          <View pointerEvents="none" style={s.scoreCardTint} />
           <View style={s.scoreCardTop}>
             <Text style={s.scoreCardTeam}>{match.currentInnings === 1 ? match.team1 : match.team2} batting</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -169,6 +188,7 @@ export default function LiveViewScreen({ navigation }: any) {
         {/* AI Commentary — placed right under the score, not buried below the
             full scorecard, so it's visible without scrolling. */}
         <View style={s.commentaryCard}>
+          <View pointerEvents="none" style={s.commentaryEdge} />
           <View style={s.analyticsTitleRow}>
             <AppIcon emoji="🤖" size={14} color={COLORS.primaryLight} />
             <Text style={s.analyticsTitle}>Commentary</Text>
@@ -182,6 +202,7 @@ export default function LiveViewScreen({ navigation }: any) {
 
         {/* ── BATSMEN (CricHeroes style) ── */}
         <View style={s.playersCard}>
+          <View pointerEvents="none" style={s.playersCardEdge} />
           <Text style={s.playersSectionLbl}>BATTING</Text>
           {/* Table header */}
           <View style={s.playerTableHeader}>
@@ -339,6 +360,7 @@ export default function LiveViewScreen({ navigation }: any) {
         {/* ── NO STREAM PLACEHOLDER ── */}
         {!hasStream && (
           <View style={s.noStreamBox}>
+            <View pointerEvents="none" style={s.noStreamEdge} />
             <View style={s.noStreamBadge}><Text style={s.noStreamBadgeTxt}>SCORE ONLY</Text></View>
             <Text style={s.noStreamTxt}>No live video stream available</Text>
             <Text style={s.noStreamSub}>Score is updating live from Firebase</Text>
@@ -374,18 +396,22 @@ const s = StyleSheet.create({
   connectTxt: { ...TYPE.body, color: COLORS.textSecondary, marginTop: SPACING.md },
 
   // Join screen
-  joinBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
+  joinBox: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl, overflow: 'hidden' },
+  joinBlobWrap: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  joinBlob: { position: 'absolute', width: 200, height: 200, borderRadius: 100, opacity: 0.16 },
   joinBadge: { backgroundColor: COLORS.live, paddingHorizontal: 22, paddingVertical: 9, borderRadius: RADIUS.round, marginBottom: SPACING.lg, ...SHADOW.glow(COLORS.live) },
   joinBadgeTxt: { fontSize: 18, fontWeight: '800', letterSpacing: 3, color: '#fff' },
   joinTitle: { ...TYPE.h1, color: COLORS.text, marginBottom: SPACING.sm },
   joinSub: { ...TYPE.caption, fontSize: 13, color: COLORS.textSecondary, marginBottom: 28, textAlign: 'center' },
-  joinInput: { backgroundColor: COLORS.card, color: COLORS.text, padding: SPACING.md, borderRadius: RADIUS.md, fontSize: 22, fontWeight: '700', letterSpacing: 6, textAlign: 'center', width: '100%', borderWidth: 1, borderColor: COLORS.primary + '88', marginBottom: SPACING.md, fontVariant: ['tabular-nums'] },
-  joinBtn: { backgroundColor: COLORS.primary, paddingVertical: SPACING.md, borderRadius: RADIUS.md, width: '100%', alignItems: 'center', marginBottom: SPACING.md, ...SHADOW.md },
-  joinBtnTxt: { ...TYPE.button, fontSize: 16, color: '#04140a' },
+  joinInput: { backgroundColor: COLORS.card, color: COLORS.text, padding: SPACING.md, borderRadius: RADIUS.lg, fontSize: 22, fontWeight: '700', letterSpacing: 6, textAlign: 'center', width: '100%', borderWidth: 1, borderColor: COLORS.primary + '88', marginBottom: SPACING.md, fontVariant: ['tabular-nums'] },
+  joinBtn: { backgroundColor: COLORS.primary, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, width: '100%', alignItems: 'center', marginBottom: SPACING.md, ...SHADOW.glow(COLORS.primary) },
+  joinBtnTxt: { ...TYPE.button, fontSize: 16, color: COLORS.onPrimary },
   joinHint: { ...TYPE.caption, color: COLORS.textMuted, textAlign: 'center' },
 
   // Header
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 50, paddingBottom: SPACING.sm, backgroundColor: COLORS.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 50, paddingBottom: SPACING.sm, backgroundColor: COLORS.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft, position: 'relative' },
+  headerAccentLine: { position: 'absolute', left: 0, right: 0, bottom: -1, height: 2, flexDirection: 'row', opacity: 0.55 },
+  headerAccentHalf: { flex: 1 },
   backBtn: { backgroundColor: COLORS.card2, paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.round, borderWidth: 1, borderColor: COLORS.border },
   backTxt: { ...TYPE.caption, fontWeight: '700', color: COLORS.primaryLight },
   headerCenter: { flex: 1, alignItems: 'center', gap: 5 },
@@ -413,9 +439,11 @@ const s = StyleSheet.create({
   videoToggle: { backgroundColor: COLORS.card2, paddingVertical: 9, alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
   videoToggleTxt: { ...TYPE.caption, fontWeight: '700', color: COLORS.primaryLight },
 
-  // Score card — the dominant element. Green top stripe + heaviest elevation
+  // Score card — the dominant element. Violet top stripe + heaviest elevation
   // so it reads as a broadcast scoreboard rather than one more card.
-  scoreCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, borderTopWidth: 3, borderTopColor: COLORS.primary, ...SHADOW.lg },
+  scoreCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, borderTopWidth: 3, borderTopColor: COLORS.primary, overflow: 'hidden', ...SHADOW.lg },
+  scoreCardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  scoreCardTint: { position: 'absolute', top: -40, right: -40, width: 120, height: 120, borderRadius: 60, backgroundColor: COLORS.primary, opacity: 0.1 },
   scoreCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   scoreCardTeam: { ...TYPE.caption, fontSize: 11, fontWeight: '700', color: COLORS.textSecondary, flex: 1 },
   scoreCardInn: { ...TYPE.numSm, fontSize: 11, color: COLORS.primaryLight },
@@ -435,7 +463,8 @@ const s = StyleSheet.create({
   ballTxt: { ...TYPE.numSm, fontSize: 9, color: COLORS.text },
 
   // Players card
-  playersCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, paddingBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.md },
+  playersCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, paddingBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  playersCardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
   playersSectionLbl: { ...TYPE.label, fontSize: 10, color: COLORS.primaryLight, marginBottom: 7, marginTop: 6 },
   playerTableHeader: { flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: COLORS.border, marginBottom: 2 },
   phCell: { flex: 1, textAlign: 'center', ...TYPE.colLabel, fontSize: 10, color: COLORS.textMuted },
@@ -461,7 +490,8 @@ const s = StyleSheet.create({
   extrasDtl: { ...TYPE.numSm, fontSize: 11, color: COLORS.textMuted },
 
   // No stream
-  noStreamBox: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.lg, alignItems: 'center', borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.sm },
+  noStreamBox: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.lg, alignItems: 'center', borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.sm },
+  noStreamEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
   noStreamBadge: { backgroundColor: COLORS.card2, paddingHorizontal: 12, paddingVertical: 5, borderRadius: RADIUS.round, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.border },
   noStreamBadgeTxt: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
   noStreamTxt: { ...TYPE.bodyStrong, color: COLORS.textSecondary, marginBottom: 3 },
@@ -469,15 +499,16 @@ const s = StyleSheet.create({
 
   viewTabs: { flexDirection: 'row', marginHorizontal: SPACING.md, marginTop: SPACING.sm, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, padding: 3, gap: 3, borderWidth: 1, borderColor: COLORS.borderSoft },
   viewTab: { flex: 1, paddingVertical: 9, borderRadius: RADIUS.sm, alignItems: 'center' },
-  viewTabActive: { backgroundColor: COLORS.primary, ...SHADOW.sm },
+  viewTabActive: { backgroundColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
   viewTabTxt: { ...TYPE.caption, fontWeight: '700', color: COLORS.textSecondary },
-  viewTabTxtActive: { color: '#04140a' },
+  viewTabTxtActive: { color: COLORS.onPrimary },
   analyticsCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.sm },
   analyticsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   analyticsTitle: { ...TYPE.label, color: COLORS.primaryLight, marginBottom: SPACING.sm },
   commentaryTxt: { ...TYPE.body, color: COLORS.text, lineHeight: 21 },
   commentaryTxtBig: { ...TYPE.body, color: COLORS.text, lineHeight: 23, fontSize: 15, fontWeight: '600' },
-  commentaryCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1.5, borderColor: COLORS.primary + '55', ...SHADOW.sm },
+  commentaryCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1.5, borderColor: COLORS.primary + '55', overflow: 'hidden', ...SHADOW.sm },
+  commentaryEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
   commentaryEmpty: { ...TYPE.caption, color: COLORS.textMuted, fontStyle: 'italic' },
   partnershipTxt: { ...TYPE.displaySm, fontSize: 22, color: COLORS.text },
   bbRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },

@@ -14,14 +14,14 @@ const CARD_HEIGHT = 210;
 // name, so cards are visually distinguishable from each other without any
 // real uploaded image. Same name always produces the same colors.
 const BANNER_PALETTES = [
-  ['#6366f1', '#8b5cf6'], // indigo → purple
-  ['#0ea5e9', '#06b6d4'], // sky → cyan
-  ['#f59e0b', '#ef4444'], // amber → red
-  ['#10b981', '#059669'], // emerald → green
-  ['#ec4899', '#d946ef'], // pink → fuchsia
-  ['#3b82f6', '#1d4ed8'], // blue → deep blue
-  ['#f97316', '#eab308'], // orange → yellow
-  ['#14b8a6', '#0891b2'], // teal → cyan
+  ['#7C5CFF', '#B14CFF'], // violet → purple (brand)
+  ['#3AA0FF', '#00D9B5'], // sky blue → teal
+  ['#FFB020', '#FF4D6D'], // amber → coral
+  ['#00D9B5', '#2ED66B'], // teal → green
+  ['#FF2D6B', '#B14CFF'], // pink → fuchsia
+  ['#3AA0FF', '#5B3DF0'], // blue → deep violet
+  ['#FF8A3D', '#FFC94A'], // orange → gold
+  ['#00D9B5', '#3AA0FF'], // teal → blue
 ];
 
 const getBannerPalette = (name: string): [string, string] => {

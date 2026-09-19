@@ -10,6 +10,12 @@ import AdInterstitial from "../../components/AdInterstitial";
 
 const getTodayString = () => { const d = new Date(); return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear(); };
 const STAGE_ORDER_DISPLAY = ['Round of 16', 'Quarter Final', 'Semi Final', 'Third Place Match', 'Final'];
+// Purely decorative: rotates a team's logo-chip through the multi-hue
+// palette by its position in the tournament's teams list, so the roster
+// reads as a set of distinct teams rather than one colour repeated. Never
+// read from or written to any team data, so it cannot affect identity,
+// order, or any team lookup elsewhere in the file.
+const TEAM_ACCENTS = [COLORS.primary, COLORS.blue, COLORS.orange, COLORS.teal, COLORS.purple, COLORS.live];
 export default function TournamentDetailScreen({ route, navigation }: any) {
   const { tournamentId, viewOnly } = route.params;
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -403,6 +409,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
             ) : (
               (tournament.matches ?? []).map((match: any, i: number) => (
                 <View key={i} style={[styles.matchCard, match.status === "live" && styles.matchCardLive, match.status === "completed" && styles.matchCardDone]}>
+                  <View pointerEvents="none" style={styles.cardEdge} />
                   <Text style={styles.matchNumber}>Match {i + 1}</Text>
                   <Text style={styles.matchTeams}>{match.team1} vs {match.team2}</Text>
                   <View style={styles.matchMeta}>
@@ -521,7 +528,10 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
   const invite = (tournament.captainInvites ?? []).find((inv: any) => inv.teamId === team.teamId);
   return (
     <View key={i} style={styles.teamCard}>
-      <View style={styles.teamLogoBox}><Text style={styles.teamLogoText}>{team.teamName.charAt(0).toUpperCase()}</Text></View>
+      <View pointerEvents="none" style={styles.cardEdge} />
+      <View style={[styles.teamLogoBox, { backgroundColor: TEAM_ACCENTS[i % TEAM_ACCENTS.length] + '22', borderColor: TEAM_ACCENTS[i % TEAM_ACCENTS.length] + '55' }]}>
+        <Text style={[styles.teamLogoText, { color: TEAM_ACCENTS[i % TEAM_ACCENTS.length] }]}>{team.teamName.charAt(0).toUpperCase()}</Text>
+      </View>
       {/* Tapping a team opens its squad, read-only, for ANYONE viewing the
           tournament — not just the organiser. The roster is passed straight
           from the tournament record we already have, so TeamPlayersScreen
@@ -686,9 +696,9 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                 <View key={t.teamId} style={[styles.pointsRow, i < pool.qualifyCount && { borderColor: COLORS.yellow, borderWidth: 2 }]}>
                   <Text style={[styles.pointsCell, styles.pointsName]}>{i < pool.qualifyCount ? "✓ " : ""}{t.teamName}</Text>
                   <Text style={styles.pointsCell}>{t.played}</Text>
-                  <Text style={styles.pointsCell}>{t.won}</Text>
-                  <Text style={styles.pointsCell}>{t.lost}</Text>
-                  <Text style={styles.pointsCell}>{(t.nrr ?? 0) > 0 ? "+" : ""}{(t.nrr ?? 0).toFixed(2)}</Text>
+                  <Text style={[styles.pointsCell, { color: COLORS.primary }]}>{t.won}</Text>
+                  <Text style={[styles.pointsCell, { color: COLORS.red }]}>{t.lost}</Text>
+                  <Text style={[styles.pointsCell, { color: (t.nrr ?? 0) >= 0 ? COLORS.primary : COLORS.red }]}>{(t.nrr ?? 0) > 0 ? "+" : ""}{(t.nrr ?? 0).toFixed(2)}</Text>
                   <Text style={[styles.pointsCell, styles.pointsPts]}>{t.points}</Text>
                 </View>
               ))}
@@ -832,10 +842,10 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                   <Text style={[styles.pointsCell, { color: COLORS.primary }]}>Pts</Text>
                 </View>
                 {[...(tournament.teams ?? [])].sort((a: any, b: any) => b.points - a.points).map((team: any, i: number) => (
-                  <View key={i} style={[styles.pointsRow, i === 0 && styles.pointsRowFirst]}>
+                  <View key={i} style={[styles.pointsRow, i === 0 && styles.pointsRowFirst, i === 1 && styles.pointsRowSecond, i === 2 && styles.pointsRowThird]}>
                     <Text style={[styles.pointsCell, styles.pointsName]}>{i === 0 ? " " : i === 1 ? " " : i === 2 ? " " : ""}{team.teamName}</Text>
-                    <Text style={styles.pointsCell}>{team.played}</Text><Text style={styles.pointsCell}>{team.won}</Text><Text style={styles.pointsCell}>{team.lost}</Text><Text style={styles.pointsCell}>{team.tied}</Text>
-                    <Text style={styles.pointsCell}>{team.nrr > 0 ? "+" : ""}{team.nrr.toFixed(2)}</Text>
+                    <Text style={styles.pointsCell}>{team.played}</Text><Text style={[styles.pointsCell, { color: COLORS.primary }]}>{team.won}</Text><Text style={[styles.pointsCell, { color: COLORS.red }]}>{team.lost}</Text><Text style={[styles.pointsCell, { color: COLORS.orange }]}>{team.tied}</Text>
+                    <Text style={[styles.pointsCell, { color: team.nrr >= 0 ? COLORS.primary : COLORS.red }]}>{team.nrr > 0 ? "+" : ""}{team.nrr.toFixed(2)}</Text>
                     <Text style={[styles.pointsCell, styles.pointsPts]}>{team.points}</Text>
                   </View>
                 ))}
@@ -873,7 +883,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                       const sr = bs.balls > 0 ? ((bs.runs / bs.balls) * 100).toFixed(1) : "0.0";
                       const hs = bs.scores.length > 0 ? Math.max(...bs.scores) : 0;
                       return (
-                        <View key={id} style={styles.statPCard}>
+                        <View key={id} style={[styles.statPCard, styles.statPCardBatting]}>
+                          <View pointerEvents="none" style={styles.cardEdge} />
                           <View style={styles.statPHead}>
                             <Text style={styles.statPName}>{bs.name}{bs.teamName ? " (" + bs.teamName + ")" : ""}</Text>
                             <Text style={styles.statPHighlight}>{bs.runs} runs</Text>
@@ -895,7 +906,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                       const figs = bw.figures ?? [];
                       const bbf = figs.length > 0 ? [...figs].sort((a: any, b: any) => b.w - a.w || a.r - b.r)[0] : null;
                       return (
-                        <View key={id} style={styles.statPCard}>
+                        <View key={id} style={[styles.statPCard, styles.statPCardBowling]}>
+                          <View pointerEvents="none" style={styles.cardEdge} />
                           <View style={styles.statPHead}>
                             <Text style={styles.statPName}>{bw.name}{bw.teamName ? " (" + bw.teamName + ")" : ""}</Text>
                             <Text style={[styles.statPHighlight, { color: COLORS.red }]}>{bw.wickets ?? 0} wkts</Text>
@@ -912,7 +924,8 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                     <View style={styles.empty}><Text style={styles.emptyText}>No fielding stats yet</Text></View>
                   ) : (
                     Object.entries(tournFieldMap).sort(([, a]: any, [, b]: any) => (b.catches + b.runOuts + b.stumpings) - (a.catches + a.runOuts + a.stumpings)).map(([id, f]: any) => (
-                      <View key={id} style={styles.statPCard}>
+                      <View key={id} style={[styles.statPCard, styles.statPCardFielding]}>
+                        <View pointerEvents="none" style={styles.cardEdge} />
                         <View style={styles.statPHead}>
                           <Text style={styles.statPName}>{f.name}{f.teamName ? " (" + f.teamName + ")" : ""}</Text>
                         </View>
@@ -1128,7 +1141,7 @@ export default function TournamentDetailScreen({ route, navigation }: any) {
                   Invite "{inviteTeamName}"'s captain via WhatsApp. They'll tap the link to join and add their players.
                 </Text>
                 <TouchableOpacity
-                  style={[styles.modalAddBtn, { backgroundColor: '#25D366', marginBottom: 10 }]}
+                  style={[styles.modalAddBtn, { backgroundColor: COLORS.success, marginBottom: 10 }]}
                   onPress={async () => {
                     const { Linking } = require('react-native');
                     const msg = `You've been invited to join "${inviteTeamName}" for the tournament "${tournament.name}"!\n\nOpen CricketScorer app → Join as Captain → Enter code: ${generatedInviteCode}`;
@@ -1404,6 +1417,10 @@ const styles = StyleSheet.create({
 
   content: { flex: 1 },
   tabContent: { padding: SPACING.lg },
+  // Hairline highlight along a card's top edge, matching the same cheap
+  // depth cue used by the shared Card/StatCard components — purely
+  // decorative, absolutely positioned so it cannot affect layout.
+  cardEdge: { position: "absolute", top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
   addMatchBtn: { backgroundColor: COLORS.primary, paddingVertical: 15, borderRadius: RADIUS.md, alignItems: "center", marginBottom: SPACING.md, ...SHADOW.glow(COLORS.primary) },
   addMatchBtnText: { ...TYPE.button, color: COLORS.onPrimary },
 
@@ -1443,6 +1460,10 @@ const styles = StyleSheet.create({
   // Leader highlighted with a stripe rather than a full 2px gold outline,
   // which competed with the numbers.
   pointsRowFirst: { borderLeftWidth: 3, borderLeftColor: COLORS.yellow, backgroundColor: COLORS.yellow + "0d" },
+  // Silver/bronze tints for 2nd/3rd, same convention as the dedicated
+  // points-table screen — rank-based styling only, sort order untouched.
+  pointsRowSecond: { borderLeftWidth: 3, borderLeftColor: COLORS.textSecondary, backgroundColor: COLORS.textSecondary + "0d" },
+  pointsRowThird: { borderLeftWidth: 3, borderLeftColor: COLORS.orange, backgroundColor: COLORS.orange + "0d" },
   pointsCell: { flex: 1, ...TYPE.num, fontSize: 12, color: COLORS.textSecondary, textAlign: "center" },
   pointsName: { flex: 2.5, textAlign: "left", ...TYPE.bodyStrong, color: COLORS.text },
   pointsPts: { ...TYPE.num, color: COLORS.primaryLight },
@@ -1453,7 +1474,12 @@ const styles = StyleSheet.create({
   statsSubTabActive: { backgroundColor: COLORS.primary },
   statsSubTabText: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
   statsSubTabTextActive: { color: COLORS.onPrimary },
-  statPCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.borderSoft, ...SHADOW.sm },
+  statPCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: "hidden", ...SHADOW.sm },
+  // Per-category accent stripe, mirroring the matchCardLive/matchCardDone
+  // convention above — colour/borderWidth only, same card shape and size.
+  statPCardBatting: { borderLeftWidth: 3, borderLeftColor: COLORS.primary },
+  statPCardBowling: { borderLeftWidth: 3, borderLeftColor: COLORS.red },
+  statPCardFielding: { borderLeftWidth: 3, borderLeftColor: COLORS.teal },
   statPHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   statPName: { ...TYPE.title, color: COLORS.text, flex: 1 },
   statPHighlight: { ...TYPE.num, fontSize: 16, color: COLORS.primaryLight },

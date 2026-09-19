@@ -4,7 +4,7 @@ import { getMyTeams, deleteTeam } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import { AdBanner } from '../../components/AdPlaceholder';
-import AppIcon from '../../components/AppIcon';
+import EmptyState from '../../components/EmptyState';
 
 export default function MyTeamsScreen({ navigation, route }: any) {
   const selectMode = route?.params?.selectMode ?? false;
@@ -80,8 +80,13 @@ export default function MyTeamsScreen({ navigation, route }: any) {
       onPress={() => selectMode ? handleSelectForTournament(item) : navigation.navigate('TeamDetail', { teamId: item.id })}
     >
       <View pointerEvents="none" style={s.cardEdge} />
-      <View style={s.logoBox}>
-        {item.logo ? <Image source={{ uri: item.logo }} style={s.logoImg} /> : <Text style={s.logoText}>{item.name.charAt(0).toUpperCase()}</Text>}
+      {/* Same violet/blue split already used for the "My Team"/"Other" badge
+          below — reused here so the crest ring matches its own badge colour
+          instead of always being violet. */}
+      <View style={[s.logoBox, item.teamType === 'other' ? s.logoBoxOther : s.logoBoxMy]}>
+        {item.logo ? <Image source={{ uri: item.logo }} style={s.logoImg} /> : (
+          <Text style={[s.logoText, item.teamType === 'other' && s.logoTextOther]}>{item.name.charAt(0).toUpperCase()}</Text>
+        )}
       </View>
       <View style={s.info}>
         <View style={s.nameRow}>
@@ -128,16 +133,13 @@ export default function MyTeamsScreen({ navigation, route }: any) {
       </View>
 
       {displayTeams.length === 0 ? (
-        <View style={s.empty}>
-          <View style={s.emptyIconBox}>
-            <AppIcon emoji="👥" size={30} color={COLORS.primary} />
-          </View>
-          <Text style={s.emptyTxt}>{teamTab === 'my' ? 'No My Teams yet' : 'No Other Teams yet'}</Text>
-          <Text style={s.emptySub}>{teamTab === 'my' ? 'Create teams you play in' : 'Add opponent or other teams'}</Text>
-          <TouchableOpacity style={s.createBtn} activeOpacity={0.85} onPress={() => navigation.navigate('CreateTeam')}>
-            <Text style={s.createBtnTxt}>Create Team</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          icon="👥"
+          title={teamTab === 'my' ? 'No My Teams yet' : 'No Other Teams yet'}
+          subtitle={teamTab === 'my' ? 'Create teams you play in' : 'Add opponent or other teams'}
+          btnText="Create Team"
+          onBtn={() => navigation.navigate('CreateTeam')}
+        />
       ) : (
         <FlatList
           data={displayTeams}
@@ -202,8 +204,11 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 2, borderColor: COLORS.primary,
   },
+  logoBoxMy: { backgroundColor: COLORS.primarySoft, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  logoBoxOther: { backgroundColor: COLORS.blue + '1f', borderColor: COLORS.blue, ...SHADOW.glow(COLORS.blue) },
   logoImg: { width: '100%', height: '100%' },
   logoText: { ...TYPE.h2, color: COLORS.primaryLight },
+  logoTextOther: { color: COLORS.blue },
   info: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // The name is the biggest thing in the row; its meta line sits well below it.
@@ -232,25 +237,6 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.error + '55',
   },
   deleteIcon: { ...TYPE.caption, fontSize: 11, fontWeight: '700', color: COLORS.error },
-
-  // ── Empty state ──
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
-  emptyIconBox: {
-    width: 68, height: 68, borderRadius: 34,
-    backgroundColor: COLORS.primarySoft,
-    borderWidth: 1, borderColor: COLORS.primary + '44',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: SPACING.md,
-  },
-  emptyTxt: { ...TYPE.h2, color: COLORS.text, marginBottom: 6, textAlign: 'center' },
-  emptySub: { ...TYPE.body, color: COLORS.textSecondary, marginBottom: SPACING.lg, textAlign: 'center' },
-  createBtn: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 28, paddingVertical: 14,
-    borderRadius: RADIUS.round,
-    ...SHADOW.glow(COLORS.primary),
-  },
-  createBtnTxt: { ...TYPE.button, color: COLORS.onPrimary },
 
   adBar: {
     paddingHorizontal: SPACING.lg,

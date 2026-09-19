@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { getPlayerCareerStats } from '../../utils/firebase';
 import { AdRewardedGate } from '../../components/AdPlaceholder';
-import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW, GRADIENTS } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 
@@ -43,8 +43,8 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
     return () => { cancelled = true; };
   }, [globalPlayerId]);
 
-  const Row = ({ label, value }: { label: string; value: any }) => (
-    <View style={s.statRow}>
+  const Row = ({ label, value, index }: { label: string; value: any; index?: number }) => (
+    <View style={[s.statRow, typeof index === 'number' && index % 2 === 1 && s.statRowAlt]}>
       <Text style={s.statLabel} numberOfLines={1}>{label}</Text>
       <Text style={s.statValue} numberOfLines={1}>{value}</Text>
     </View>
@@ -64,6 +64,12 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
 
       <ScrollView contentContainerStyle={{ padding: SPACING.lg }}>
         <View style={s.hero}>
+          {/* Two overlapping tinted circles behind the avatar fake a soft
+              gradient glow, matching the treatment used on Home/My Matches —
+              absolute + clipped by hero's own overflow:hidden, so this cannot
+              move the avatar, name or subtitle below it. */}
+          <View pointerEvents="none" style={[s.heroBlob, { backgroundColor: GRADIENTS.ocean[0], left: -30, top: -20 }]} />
+          <View pointerEvents="none" style={[s.heroBlob, { backgroundColor: GRADIENTS.ocean[1], right: -30, top: 10 }]} />
           <View style={s.avatar}>
             {photo
               ? <Image source={{ uri: photo }} style={s.avatarImg} />
@@ -99,17 +105,17 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
                 </View>
                 <Text style={[s.section, { color: COLORS.primary }]}>Batting</Text>
               </View>
-              <Row label="Matches" value={b.matches} />
-              <Row label="Innings" value={b.innings} />
-              <Row label="Runs" value={b.runs} />
-              <Row label="Balls" value={b.balls} />
-              <Row label="High Score" value={dash(b.highScore, b.innings > 0)} />
-              <Row label="Average" value={dash(b.average, b.innings - b.notOut > 0)} />
-              <Row label="Strike Rate" value={dash(b.strikeRate, b.balls > 0)} />
-              <Row label="Not Out" value={b.notOut} />
-              <Row label="100s / 50s / 25s" value={`${b.hundreds} / ${b.fifties} / ${b.twentyFives}`} />
-              <Row label="4s / 6s" value={`${b.fours} / ${b.sixes}`} />
-              <Row label="Ducks" value={b.ducks} />
+              <Row label="Matches" value={b.matches} index={0} />
+              <Row label="Innings" value={b.innings} index={1} />
+              <Row label="Runs" value={b.runs} index={2} />
+              <Row label="Balls" value={b.balls} index={3} />
+              <Row label="High Score" value={dash(b.highScore, b.innings > 0)} index={4} />
+              <Row label="Average" value={dash(b.average, b.innings - b.notOut > 0)} index={5} />
+              <Row label="Strike Rate" value={dash(b.strikeRate, b.balls > 0)} index={6} />
+              <Row label="Not Out" value={b.notOut} index={7} />
+              <Row label="100s / 50s / 25s" value={`${b.hundreds} / ${b.fifties} / ${b.twentyFives}`} index={8} />
+              <Row label="4s / 6s" value={`${b.fours} / ${b.sixes}`} index={9} />
+              <Row label="Ducks" value={b.ducks} index={10} />
             </View>
 
             <View style={[s.card, s.cardBowling]}>
@@ -120,18 +126,18 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
                 </View>
                 <Text style={[s.section, { color: COLORS.blue }]}>Bowling</Text>
               </View>
-              <Row label="Matches" value={w.matches} />
-              <Row label="Innings" value={w.innings} />
-              <Row label="Overs" value={`${Math.floor(w.balls / 6)}.${w.balls % 6}`} />
-              <Row label="Runs" value={w.runs} />
-              <Row label="Wickets" value={w.wickets} />
-              <Row label="Best" value={w.bestFigure} />
-              <Row label="Average" value={dash(w.average, w.wickets > 0)} />
-              <Row label="Economy" value={dash(w.economy, w.balls > 0)} />
-              <Row label="Strike Rate" value={dash(w.strikeRate, w.wickets > 0)} />
-              <Row label="Maidens" value={w.maidens} />
-              <Row label="Dots" value={w.dots} />
-              <Row label="2w / 4w" value={`${w.twoWickets} / ${w.fourWickets}`} />
+              <Row label="Matches" value={w.matches} index={0} />
+              <Row label="Innings" value={w.innings} index={1} />
+              <Row label="Overs" value={`${Math.floor(w.balls / 6)}.${w.balls % 6}`} index={2} />
+              <Row label="Runs" value={w.runs} index={3} />
+              <Row label="Wickets" value={w.wickets} index={4} />
+              <Row label="Best" value={w.bestFigure} index={5} />
+              <Row label="Average" value={dash(w.average, w.wickets > 0)} index={6} />
+              <Row label="Economy" value={dash(w.economy, w.balls > 0)} index={7} />
+              <Row label="Strike Rate" value={dash(w.strikeRate, w.wickets > 0)} index={8} />
+              <Row label="Maidens" value={w.maidens} index={9} />
+              <Row label="Dots" value={w.dots} index={10} />
+              <Row label="2w / 4w" value={`${w.twoWickets} / ${w.fourWickets}`} index={11} />
             </View>
 
             <View style={[s.card, s.cardFielding]}>
@@ -142,9 +148,9 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
                 </View>
                 <Text style={[s.section, { color: COLORS.purple }]}>Fielding</Text>
               </View>
-              <Row label="Catches" value={f.catches} />
-              <Row label="Stumpings" value={f.stumpings} />
-              <Row label="Run Outs" value={f.runOuts} />
+              <Row label="Catches" value={f.catches} index={0} />
+              <Row label="Stumpings" value={f.stumpings} index={1} />
+              <Row label="Run Outs" value={f.runOuts} index={2} />
             </View>
           </>
         )}
@@ -166,7 +172,10 @@ const s = StyleSheet.create({
   emptyHint: { ...TYPE.caption, color: COLORS.textMuted, textAlign: 'center', paddingHorizontal: SPACING.lg },
 
   // ── Player hero ──
-  hero: { alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.lg },
+  hero: { alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.lg, overflow: 'hidden' },
+  // Decorative gradient-fake blob, clipped by hero's own overflow:hidden so it
+  // can only sit behind the avatar/name, never push them.
+  heroBlob: { position: 'absolute', width: 120, height: 120, borderRadius: 60, opacity: 0.14 },
   avatar: {
     width: 84, height: 84, borderRadius: 42,
     backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center',
@@ -185,7 +194,7 @@ const s = StyleSheet.create({
   section: { ...TYPE.label, color: COLORS.primary },
   card: {
     backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.xl,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
     paddingBottom: 2,
@@ -195,15 +204,18 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     ...SHADOW.md,
   },
-  cardBatting: { borderLeftWidth: 3, borderLeftColor: COLORS.primary },
-  cardBowling: { borderLeftWidth: 3, borderLeftColor: COLORS.blue },
-  cardFielding: { borderLeftWidth: 3, borderLeftColor: COLORS.purple },
+  // A touch of the accent's own glow behind each card, echoing the shared
+  // Card component's `accent` treatment — on top of the left accent stripe,
+  // not instead of it.
+  cardBatting: { borderLeftWidth: 3, borderLeftColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  cardBowling: { borderLeftWidth: 3, borderLeftColor: COLORS.blue, ...SHADOW.glow(COLORS.blue) },
+  cardFielding: { borderLeftWidth: 3, borderLeftColor: COLORS.purple, ...SHADOW.glow(COLORS.purple) },
   cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
   cardHead: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
     paddingVertical: SPACING.sm,
   },
-  cardIconBox: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
+  cardIconBox: { width: 30, height: 30, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
 
   // ── Stat rows ──
   // Label muted and value bold + tabular, so the figures form a clean right
@@ -213,6 +225,9 @@ const s = StyleSheet.create({
     paddingVertical: 9, gap: SPACING.sm,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.borderSoft,
   },
+  // Zebra tint — background only, so alternating rows can't shift the label/
+  // value columns.
+  statRowAlt: { backgroundColor: COLORS.card2 },
   statLabel: { ...TYPE.body, color: COLORS.textSecondary, flexShrink: 1 },
   statValue: { ...TYPE.num, fontSize: 15, color: COLORS.text },
 });

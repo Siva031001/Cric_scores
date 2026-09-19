@@ -49,6 +49,16 @@ export default function MyTournamentScreen({ navigation }: any) {
         rightText="New"
         onRight={() => navigation.navigate('CreateTournament')}
       />
+      {/* Soft colour blobs behind the list — same plain tinted-View technique
+          used across the app, non-interactive and purely decorative. Starts
+          below the header's own opaque background so it never overlaps the
+          title. */}
+      {tournaments.length > 0 && (
+        <View pointerEvents="none" style={styles.heroBlobWrap}>
+          <View style={[styles.heroBlob, { backgroundColor: COLORS.blue, top: -30, left: -30 }]} />
+          <View style={[styles.heroBlob, { backgroundColor: COLORS.teal, top: -10, right: -50 }]} />
+        </View>
+      )}
       {tournaments.length === 0 ? (
         <EmptyState
           icon="🏆"
@@ -105,6 +115,10 @@ export default function MyTournamentScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
+  // Starts at ~ the header's own height (paddingTop 50 + paddingBottom +
+  // title line) so the blobs never draw over the header's title/back button.
+  heroBlobWrap: { position: 'absolute', top: 95, left: 0, right: 0, height: 140, overflow: 'hidden' },
+  heroBlob: { position: 'absolute', width: 150, height: 150, borderRadius: 75, opacity: 0.12 },
   list: { padding: SPACING.lg, gap: 12 },
   card: {
     backgroundColor: COLORS.card, borderRadius: RADIUS.lg,

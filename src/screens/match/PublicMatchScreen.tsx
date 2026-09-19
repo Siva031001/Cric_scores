@@ -27,8 +27,16 @@ export default function PublicMatchScreen({ route }: any) {
 
   return (
     <View style={styles.container}>
+      {/* Soft colour blobs behind the score card — same plain-tinted-View
+          technique used across the app (no gradient library), purely
+          decorative and clipped so they never intercept touches. */}
+      <View pointerEvents="none" style={styles.blobWrap}>
+        <View style={[styles.blob, { backgroundColor: COLORS.primary, top: -50, left: -40 }]} />
+        <View style={[styles.blob, { backgroundColor: COLORS.live, bottom: -60, right: -30 }]} />
+      </View>
       <View style={styles.scoreCard}>
         <View pointerEvents="none" style={styles.edge} />
+        <View pointerEvents="none" style={styles.tint} />
         <Text style={styles.title}>{match.team1} vs {match.team2}</Text>
         <Text style={styles.score}>{curInn?.runs}/{curInn?.wickets}</Text>
         <Text style={styles.status}>Status: {match.status}</Text>
@@ -40,19 +48,24 @@ export default function PublicMatchScreen({ route }: any) {
 const styles = StyleSheet.create({
   // This screen is the one an unauthenticated viewer lands on, so it needs the
   // app background rather than the OS default white.
-  container: { flex: 1, backgroundColor: COLORS.background, padding: SPACING.lg, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: COLORS.background, padding: SPACING.lg, paddingTop: 60, overflow: 'hidden' },
+  blobWrap: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  blob: { position: 'absolute', width: 200, height: 200, borderRadius: 100, opacity: 0.14 },
   // Single card: teams, score, status. Nothing else competes with the score.
   scoreCard: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.borderSoft,
+    borderTopWidth: 3,
+    borderTopColor: COLORS.primary,
     padding: SPACING.lg,
     alignItems: "center",
     overflow: "hidden",
-    ...SHADOW.md,
+    ...SHADOW.lg,
   },
   edge: { position: "absolute", top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  tint: { position: "absolute", top: -40, right: -40, width: 120, height: 120, borderRadius: 60, backgroundColor: COLORS.primary, opacity: 0.1 },
   title: { ...TYPE.h2, color: COLORS.text, textAlign: "center" },
   // Tabular figures: this updates ball by ball, and proportional digits make
   // the score jump sideways as it crosses 9 -> 10.

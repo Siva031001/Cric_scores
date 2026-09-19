@@ -19,6 +19,10 @@ export default function StatCard({ label, value, color, small }: Props) {
   return (
     <View style={[styles.card, small && styles.small, SHADOW.sm]}>
       <View pointerEvents="none" style={styles.edge} />
+      {/* Soft tint of the value's own colour behind it, so a coloured stat
+          reads as a coloured card rather than plain text that happens to be
+          coloured. Decorative only — `color` already drove the text before. */}
+      {color ? <View pointerEvents="none" style={[styles.tint, { backgroundColor: color }]} /> : null}
       <Text style={[styles.value, color ? { color } : {}, small && styles.smallValue]} numberOfLines={1}>
         {value}
       </Text>
@@ -41,6 +45,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   edge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
+  tint: { position: 'absolute', top: -30, right: -30, width: 90, height: 90, borderRadius: 45, opacity: 0.14 },
   small: { padding: 10, minWidth: 60 },
   value: { ...TYPE.displaySm, fontSize: 22, color: COLORS.text },
   smallValue: { fontSize: 16 },

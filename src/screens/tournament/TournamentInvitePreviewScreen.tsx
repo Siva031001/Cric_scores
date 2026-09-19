@@ -21,6 +21,15 @@ export default function TournamentInvitePreviewScreen({ route, navigation }: any
   return (
     <View style={s.container}>
       <Header title="Tournament Invite" onBack={() => navigation.goBack()} />
+      {/* Soft colour blobs behind the top of the scroll content — same plain
+          tinted-View technique used across the app, purely decorative and
+          non-interactive so it cannot intercept any tap below it. Starts
+          below the header's own opaque background so it never overlaps the
+          title. */}
+      <View pointerEvents="none" style={s.heroBlobWrap}>
+        <View style={[s.heroBlob, { backgroundColor: COLORS.yellow, top: -40, left: -30 }]} />
+        <View style={[s.heroBlob, { backgroundColor: COLORS.orange, top: -20, right: -50 }]} />
+      </View>
       <ScrollView style={s.scroll}>
         <Card style={s.card} accent={COLORS.primary}>
           <Text style={s.tourneyName}>{preview.name}</Text>
@@ -82,6 +91,10 @@ export default function TournamentInvitePreviewScreen({ route, navigation }: any
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  // Starts at ~ the header's own height so the blobs never draw over the
+  // header's title/back button.
+  heroBlobWrap: { position: 'absolute', top: 95, left: 0, right: 0, height: 140, overflow: 'hidden' },
+  heroBlob: { position: 'absolute', width: 160, height: 160, borderRadius: 80, opacity: 0.12 },
   scroll: { flex: 1, padding: SPACING.lg },
   card: { marginBottom: SPACING.sm },
   notFound: { ...TYPE.body, color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.xxl },

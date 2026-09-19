@@ -45,7 +45,7 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
     return (
       <View style={st.container}>
         <Header title="Toss" onBack={() => setStep("playing11")} />
-        <Card tone="base" elevation="lg" style={st.tossCard}>
+        <Card tone="base" elevation="lg" accent={COLORS.warning} style={st.tossCard}>
           <View style={st.tossTitleRow}>
             <AppIcon emoji="🪙" size={20} color={COLORS.warning} />
             <Text style={st.tossTitle}>Who won the toss?</Text>
@@ -66,7 +66,7 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
                     <AppIcon
                       emoji={c === "Bat" ? "🏏" : "🎯"}
                       size={30}
-                      color={tossChoice === c ? COLORS.background : COLORS.primary}
+                      color={tossChoice === c ? COLORS.onPrimary : COLORS.primary}
                       style={st.tossChoiceIcon}
                     />
                     <Text style={[st.tossChoiceText, tossChoice === c && st.tossChoiceTextActive]}>{c}</Text>
@@ -100,7 +100,7 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
       <Header title="Playing 11" onBack={() => navigation.goBack()} />
       <View style={st.tabs}>
         {[{t:team1,s:selected1,n:1},{t:team2,s:selected2,n:2}].map(item => (
-          <TouchableOpacity key={item.n} style={[st.tab, activeTeam === item.n && st.tabActive]} onPress={() => setActiveTeam(item.n as 1|2)}>
+          <TouchableOpacity key={item.n} style={[st.tab, activeTeam === item.n && (item.n === 1 ? st.tabActive1 : st.tabActive2)]} onPress={() => setActiveTeam(item.n as 1|2)}>
             <Text style={[st.tabText, activeTeam === item.n && st.tabTextActive]}>{item.t}</Text>
             <Text style={[st.tabCount, activeTeam === item.n && st.tabTextActive]}>{item.s.length}/{requiredCount}</Text>
           </TouchableOpacity>
@@ -121,7 +121,7 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
               {player.role && <Text style={st.playerRole}>{player.role}</Text>}
             </View>
             <View style={[st.check, isSel && st.checkSelected]}>
-              {isSel && <AppIcon emoji="✓" size={14} color={COLORS.background} />}
+              {isSel && <AppIcon emoji="✓" size={14} color={COLORS.onPrimary} />}
             </View>
           </TouchableOpacity>
         );
@@ -136,17 +136,18 @@ export default function PlayerSetupScreen({ route, navigation }: any) {
 
 const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  // Segmented team switcher: the active side is the brand green, so which
-  // team you are picking for is unmistakable.
+  // Segmented team switcher: each side takes its own hue (blue / orange) so
+  // which team you're picking for is unmistakable even at a glance.
   tabs: { flexDirection: "row", marginHorizontal: SPACING.lg, marginBottom: SPACING.md, gap: SPACING.sm },
   tab: {
     flex: 1, paddingVertical: SPACING.sm + 2, borderRadius: RADIUS.round,
     backgroundColor: COLORS.card2, alignItems: "center",
     borderWidth: 1, borderColor: COLORS.border,
   },
-  tabActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  tabActive1: { backgroundColor: COLORS.blue, borderColor: COLORS.blue, ...SHADOW.glow(COLORS.blue) },
+  tabActive2: { backgroundColor: COLORS.orange, borderColor: COLORS.orange, ...SHADOW.glow(COLORS.orange) },
   tabText: { ...TYPE.bodyStrong, fontSize: 13, color: COLORS.textSecondary },
-  tabTextActive: { color: COLORS.background },
+  tabTextActive: { color: COLORS.onPrimary },
   tabCount: { ...TYPE.numSm, color: COLORS.textMuted, marginTop: 2 },
   hint: { ...TYPE.caption, color: COLORS.textSecondary, textAlign: "center", marginBottom: SPACING.md },
   playerRow: {
@@ -156,8 +157,10 @@ const st = StyleSheet.create({
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.borderSoft,
     gap: 12, ...SHADOW.sm,
   },
-  // Selected rows lift: brand border plus a tinted surface.
-  playerRowSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySoft },
+  // Selected rows lift: violet glow, tinted surface and a brand border —
+  // same distinction as before (selected vs not), just a softer glow instead
+  // of a plain border.
+  playerRowSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySoft, ...SHADOW.glow(COLORS.primary) },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.card2, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
   avatarSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   avatarText: { ...TYPE.title, color: COLORS.text },
@@ -173,7 +176,7 @@ const st = StyleSheet.create({
     borderRadius: RADIUS.md, alignItems: "center", justifyContent: "center",
     ...SHADOW.glow(COLORS.primary),
   },
-  nextBtnText: { ...TYPE.button, fontSize: 16, color: COLORS.background, textAlign: "center" },
+  nextBtnText: { ...TYPE.button, fontSize: 16, color: COLORS.onPrimary, textAlign: "center" },
   tossCard: { margin: SPACING.lg, padding: SPACING.lg, gap: SPACING.lg },
   tossTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: SPACING.sm },
   tossTitle: { ...TYPE.h2, color: COLORS.text, textAlign: "center" },
@@ -186,7 +189,7 @@ const st = StyleSheet.create({
   tossChoiceBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
   tossChoiceIcon: { marginBottom: SPACING.sm },
   tossChoiceText: { ...TYPE.title, color: COLORS.text },
-  tossChoiceTextActive: { color: COLORS.background },
+  tossChoiceTextActive: { color: COLORS.onPrimary },
   tossResult: { backgroundColor: COLORS.primarySoft, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.primary + "55" },
   tossResultText: { ...TYPE.bodyStrong, color: COLORS.primaryLight, textAlign: "center", lineHeight: 22 },
   confirmBtn: {
@@ -194,5 +197,5 @@ const st = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     ...SHADOW.glow(COLORS.primary),
   },
-  confirmBtnText: { ...TYPE.button, fontSize: 16, color: COLORS.background },
+  confirmBtnText: { ...TYPE.button, fontSize: 16, color: COLORS.onPrimary },
 });

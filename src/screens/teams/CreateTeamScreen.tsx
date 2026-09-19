@@ -11,6 +11,10 @@ import database from '@react-native-firebase/database';
 
 const ROLES = ['Batter', 'Bowler', 'Wicket Keeper', 'All Rounder'];
 const BAT_STYLES = ['Right Hand', 'Left Hand'];
+// Purely decorative colour cycle for per-row accents (shirt-number chip,
+// left stripe) so a 15-row squad list doesn't read as one flat block. Values
+// only ever feed style props — never used in any comparison or logic.
+const ACCENT_CYCLE = [COLORS.primary, COLORS.teal, COLORS.orange, COLORS.blue, COLORS.purple, COLORS.yellow];
 
 function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, onExpand, expandedId, onFieldChange, onPhoneLookup, onEditName  }: any) {
   const [localPhone, setLocalPhone] = useState(player.phoneNumber || '');
@@ -26,12 +30,14 @@ function PlayerRow({ player, index, captainId, wicketKeeperId, onCaptain, onWK, 
     await onPhoneLookup(index, digits, () => {}, setLookupStatus);
   };
 
+  const accent = ACCENT_CYCLE[index % ACCENT_CYCLE.length];
+
   return (
-    <View style={styles.playerCard}>
+    <View style={[styles.playerCard, { borderLeftWidth: 3, borderLeftColor: accent }]}>
       <View pointerEvents="none" style={styles.cardEdge} />
       <View style={styles.playerHeader}>
-        <View style={styles.playerNumBox}>
-          <Text style={styles.playerNum}>{index + 1}</Text>
+        <View style={[styles.playerNumBox, { borderColor: accent + '55' }]}>
+          <Text style={[styles.playerNum, { color: accent }]}>{index + 1}</Text>
         </View>
         <TextInput
           style={[styles.playerInput, { flex: 1.2 }]}
@@ -360,14 +366,21 @@ Alert.alert(
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Header title={existingTeam ? 'Edit Team' : 'Create Team'} onBack={() => navigation.goBack()} rightText={saving ? 'Saving...' : 'Save'} onRight={handleSave} />
       <View style={styles.topSection}>
-        <TouchableOpacity style={styles.logoCircle} activeOpacity={0.8} onPress={pickLogo}>
-          {logo ? <Image source={{ uri: logo }} style={styles.logoImg} /> : (
-            <View style={styles.logoPlaceholder}>
-            <AppIcon emoji="📷" size={22} color={COLORS.primary} />
-            <Text style={styles.logoLabel}>Add Logo</Text>
-            </View>
-             )}
-        </TouchableOpacity>
+        {/* Soft colour blob in the corner — purely decorative, non-interactive,
+            clipped by topSection's overflow:hidden so it never affects hit areas. */}
+        <View pointerEvents="none" style={styles.topBlob} />
+        <View style={styles.logoWrap}>
+          {/* Two-tone ring behind the logo, echoing the header's accent line. */}
+          <View pointerEvents="none" style={styles.logoRing} />
+          <TouchableOpacity style={styles.logoCircle} activeOpacity={0.8} onPress={pickLogo}>
+            {logo ? <Image source={{ uri: logo }} style={styles.logoImg} /> : (
+              <View style={styles.logoPlaceholder}>
+              <AppIcon emoji="📷" size={22} color={COLORS.primary} />
+              <Text style={styles.logoLabel}>Add Logo</Text>
+              </View>
+               )}
+          </TouchableOpacity>
+        </View>
         <View style={styles.topRight}>
           <TextInput style={styles.teamNameInput} placeholder="Team Name *" placeholderTextColor={COLORS.textMuted} defaultValue={teamNameDisplay} onChangeText={text => { teamNameRef.current = text; }} onEndEditing={e => setTeamNameDisplay(e.nativeEvent.text)} autoCorrect={false} autoCapitalize="words" editable={!captainInviteMode} />
           {/* Team Type Selector */}
@@ -392,7 +405,10 @@ Alert.alert(
         </View>
       </View>
       <View style={styles.playersHeader}>
-        <Text style={styles.playersTitle}>Players ({filledCount}/15) — Min 11 required</Text>
+        <View style={styles.playersHeaderRow}>
+          <View pointerEvents="none" style={styles.playersBar} />
+          <Text style={styles.playersTitle}>Players ({filledCount}/15) — Min 11 required</Text>
+        </View>
         <Text style={styles.playersHint}>C = Captain   WK = Keeper   +/- = Details</Text>
       </View>
       <FlatList
@@ -451,7 +467,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, gap: SPACING.md,
     backgroundColor: COLORS.card,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft,
+    overflow: 'hidden',
     ...SHADOW.sm,
+  },
+  // Soft violet-to-purple blob tucked in the corner — same tinted-View
+  // technique as StatCard's `tint`, clipped by topSection's overflow:hidden.
+  topBlob: {
+    position: 'absolute', top: -30, right: -30,
+    width: 130, height: 130, borderRadius: 65,
+    backgroundColor: COLORS.purple, opacity: 0.12,
+  },
+  logoWrap: { width: 74, height: 74, flexShrink: 0 },
+  // Two-tone ring behind the logo circle, echoing Header's two-colour accent
+  // line — purely decorative, sits behind the touchable and never intercepts
+  // touches (pointerEvents="none" on the JSX element).
+  logoRing: {
+    position: 'absolute', top: -6, left: -6, right: -6, bottom: -6,
+    borderRadius: 43, borderWidth: 2, borderColor: COLORS.purple, opacity: 0.5,
   },
   logoCircle: {
     width: 74, height: 74, borderRadius: 37, overflow: 'hidden',
@@ -498,6 +530,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm,
     backgroundColor: COLORS.background,
   },
+  playersHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  playersBar: { width: 3, height: 16, borderRadius: 2, backgroundColor: COLORS.primary },
   playersTitle: { ...TYPE.bodyStrong, color: COLORS.text },
   playersHint: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted, marginTop: 3 },
   playerCard: {
@@ -534,8 +568,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm, alignItems: 'center',
     backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border, flexShrink: 0,
   },
-  captainActive: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow },
-  wkActive: { backgroundColor: COLORS.blue, borderColor: COLORS.blue },
+  captainActive: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow, ...SHADOW.glow(COLORS.yellow) },
+  wkActive: { backgroundColor: COLORS.blue, borderColor: COLORS.blue, ...SHADOW.glow(COLORS.blue) },
   regActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   roleBtnText: { ...TYPE.label, fontSize: 10, color: COLORS.text },
   // Dark ink on the yellow captain pill — white on yellow was unreadable.

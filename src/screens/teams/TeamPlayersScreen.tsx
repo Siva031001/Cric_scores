@@ -3,7 +3,13 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndi
 import { getPlayerPublicProfiles } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
-import AppIcon from '../../components/AppIcon';
+import EmptyState from '../../components/EmptyState';
+
+// Purely decorative colour cycle for the avatar ring — same technique used on
+// the squad-management screens (CreateTeamScreen/TeamDetailScreen) so a long
+// roster reads as a set of individuals rather than one flat list. Only ever
+// feeds style props, never compared or branched on.
+const ACCENT_CYCLE = [COLORS.primary, COLORS.teal, COLORS.orange, COLORS.blue, COLORS.purple, COLORS.yellow];
 
 // Read-only squad list for a tournament team, reachable by any viewer.
 //
@@ -42,22 +48,23 @@ export default function TeamPlayersScreen({ route, navigation }: any) {
     return () => { cancelled = true; };
   }, [roster.length]);
 
-  const renderPlayer = ({ item }: any) => {
+  const renderPlayer = ({ item, index }: any) => {
     const gid = item?.globalPlayerId ?? null;
     const profile = gid ? profiles[gid] : null;
     const photo = profile?.photo ?? null;
     const name = profile?.name || item?.name || 'Player';
+    const accent = ACCENT_CYCLE[index % ACCENT_CYCLE.length];
     return (
       <TouchableOpacity
-        style={s.row}
+        style={[s.row, { borderLeftWidth: 3, borderLeftColor: accent }]}
         activeOpacity={0.85}
         onPress={() => navigation.navigate('PlayerStats', { globalPlayerId: gid, name, photo })}
       >
         <View pointerEvents="none" style={s.rowEdge} />
-        <View style={s.avatar}>
+        <View style={[s.avatar, { borderColor: accent + '55' }]}>
           {photo
             ? <Image source={{ uri: photo }} style={s.avatarImg} />
-            : <Text style={s.avatarText}>{name.charAt(0).toUpperCase()}</Text>}
+            : <Text style={[s.avatarText, { color: accent }]}>{name.charAt(0).toUpperCase()}</Text>}
         </View>
         {/* Only the name is shown, per spec — no role, style or contact detail. */}
         <Text style={s.name} numberOfLines={1}>{name}</Text>
@@ -72,13 +79,11 @@ export default function TeamPlayersScreen({ route, navigation }: any) {
       {loading && roster.length > 0 ? (
         <View style={s.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>
       ) : roster.length === 0 ? (
-        <View style={s.center}>
-          <View style={s.emptyIconBox}>
-            <AppIcon emoji="👥" size={28} color={COLORS.textMuted} />
-          </View>
-          <Text style={s.emptyText}>No players added to this team yet</Text>
-          <Text style={s.emptyHint}>The organiser adds a squad from the tournament's Teams tab.</Text>
-        </View>
+        <EmptyState
+          icon="👥"
+          title="No players added to this team yet"
+          subtitle="The organiser adds a squad from the tournament's Teams tab."
+        />
       ) : (
         <FlatList
           data={roster}
@@ -95,15 +100,6 @@ export default function TeamPlayersScreen({ route, navigation }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.lg, gap: 6 },
-  emptyIconBox: {
-    width: 64, height: 64, borderRadius: 32,
-    backgroundColor: COLORS.card,
-    borderWidth: 1, borderColor: COLORS.borderSoft,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: SPACING.sm,
-  },
-  emptyText: { ...TYPE.title, color: COLORS.text, textAlign: 'center' },
-  emptyHint: { ...TYPE.caption, color: COLORS.textMuted, textAlign: 'center' },
 
   list: { padding: SPACING.lg, paddingBottom: SPACING.xl },
   // Squad row: photo + name only, so the name carries the whole row.

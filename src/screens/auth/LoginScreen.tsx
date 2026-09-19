@@ -188,13 +188,21 @@ export default function LoginScreen({ navigation }: any) {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       <View style={styles.header}>
+        {/* Soft colour blobs behind the logo mark — same plain tinted,
+            absolutely positioned View technique used on the Home screen's
+            hero header. Purely decorative: no touch handling, sits below
+            the logo/text in stacking order, no layout impact. */}
+        <View pointerEvents="none" style={styles.headerBlobWrap}>
+          <View style={[styles.headerBlob, { backgroundColor: COLORS.primary, top: -50, left: 10 }]} />
+          <View style={[styles.headerBlob, { backgroundColor: COLORS.purple, top: -20, right: 0 }]} />
+        </View>
         <View style={styles.logoBadge}>
           <AppIcon emoji="🏏" size={42} color={COLORS.primary} />
         </View>
         <Text style={styles.appName}>CricketScorer</Text>
         <Text style={styles.tagline}>Score every ball, track every match</Text>
       </View>
-      <Card tone="base" elevation="lg" padded={false} style={styles.card}>
+      <Card tone="base" elevation="lg" padded={false} accent={COLORS.primary} style={styles.card}>
         <Text style={styles.cardTitle}>{titleFor()}</Text>
         <Text style={styles.cardSub}>{subFor()}</Text>
 
@@ -208,7 +216,7 @@ export default function LoginScreen({ navigation }: any) {
               <TextInput style={styles.phoneInput} placeholder="Enter mobile number" placeholderTextColor={COLORS.textMuted} keyboardType="phone-pad" maxLength={10} value={phone} onChangeText={setPhone} selectionColor={COLORS.primary} />
             </View>
             <TouchableOpacity style={[styles.btn, loading && styles.btnDisabled]} onPress={checkNumber} disabled={loading}>
-              {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={styles.btnText}>Continue</Text>}
+              {loading ? <ActivityIndicator color={COLORS.onPrimary} /> : <Text style={styles.btnText}>Continue</Text>}
             </TouchableOpacity>
           </>
         )}
@@ -217,7 +225,7 @@ export default function LoginScreen({ navigation }: any) {
   <>
     <TextInput style={styles.otpInput} placeholder="Enter OTP" placeholderTextColor={COLORS.textMuted} keyboardType="number-pad" maxLength={6} value={otp} onChangeText={setOtp} selectionColor={COLORS.primary} />
     <TouchableOpacity style={[styles.btn, loading && styles.btnDisabled]} onPress={handleVerifyRegistrationOtp} disabled={loading}>
-      {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={styles.btnText}>Verify OTP</Text>}
+      {loading ? <ActivityIndicator color={COLORS.onPrimary} /> : <Text style={styles.btnText}>Verify OTP</Text>}
     </TouchableOpacity>
     <TouchableOpacity style={styles.changeBtn} onPress={handleResendRegistrationOtp} disabled={resendCooldown > 0}>
       <Text style={[styles.changeBtnText, resendCooldown > 0 && { opacity: 0.5 }]}>
@@ -246,7 +254,7 @@ export default function LoginScreen({ navigation }: any) {
           <>
             <TextInput style={styles.otpInput} placeholder="Re-enter PIN" placeholderTextColor={COLORS.textMuted} keyboardType="number-pad" maxLength={6} secureTextEntry value={confirmPinValue} onChangeText={setConfirmPinValue} selectionColor={COLORS.primary} />
             <TouchableOpacity style={[styles.btn, loading && styles.btnDisabled]} onPress={handleConfirmPinAndCreate} disabled={loading}>
-              {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={styles.btnText}>Create Account</Text>}
+              {loading ? <ActivityIndicator color={COLORS.onPrimary} /> : <Text style={styles.btnText}>Create Account</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={styles.changeBtn} onPress={() => setMode("setup-pin")}>
               <Text style={styles.changeBtnText}>Back</Text>
@@ -258,7 +266,7 @@ export default function LoginScreen({ navigation }: any) {
           <>
             <TextInput style={styles.otpInput} placeholder="Enter PIN" placeholderTextColor={COLORS.textMuted} keyboardType="number-pad" maxLength={6} secureTextEntry value={pin} onChangeText={setPin} selectionColor={COLORS.primary} />
             <TouchableOpacity style={[styles.btn, loading && styles.btnDisabled]} onPress={handleLogin} disabled={loading}>
-              {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={styles.btnText}>Login</Text>}
+              {loading ? <ActivityIndicator color={COLORS.onPrimary} /> : <Text style={styles.btnText}>Login</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={styles.changeBtn} onPress={() => navigation.navigate("ForgotPassword", { phone })}>
               <Text style={styles.changeBtnText}>Forgot Password?</Text>
@@ -284,6 +292,10 @@ export default function LoginScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background, justifyContent: "center", paddingHorizontal: SPACING.lg + 4 },
   header: { alignItems: "center", marginBottom: SPACING.xl },
+  // Wrapper that clips the decorative blobs to a band behind the logo, so
+  // they never bleed into the card below. Purely decorative, non-interactive.
+  headerBlobWrap: { position: "absolute", top: -30, left: -40, right: -40, height: 190, overflow: "hidden" },
+  headerBlob: { position: "absolute", width: 160, height: 160, borderRadius: 80, opacity: 0.18 },
   // The bat icon sits in a tinted, glowing tile instead of floating bare on
   // the background — it reads as a logo mark rather than a stray glyph.
   logoBadge: {
@@ -302,7 +314,7 @@ const styles = StyleSheet.create({
   cardSub: { ...TYPE.body, color: COLORS.textSecondary, marginBottom: SPACING.lg, lineHeight: 20 },
   phoneRow: {
     flexDirection: "row", alignItems: "center",
-    backgroundColor: COLORS.card2, borderRadius: RADIUS.md,
+    backgroundColor: COLORS.card2, borderRadius: RADIUS.lg,
     borderWidth: 1, borderColor: COLORS.border,
     marginBottom: SPACING.md, overflow: "hidden",
   },
@@ -321,18 +333,18 @@ const styles = StyleSheet.create({
   otpInput: {
     backgroundColor: COLORS.card2, color: COLORS.text,
     ...TYPE.displaySm, fontSize: 24, textAlign: "center", letterSpacing: 12,
-    paddingVertical: 18, borderRadius: RADIUS.md,
+    paddingVertical: 18, borderRadius: RADIUS.lg,
     borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md,
   },
   btn: {
-    backgroundColor: COLORS.primary, borderRadius: RADIUS.md,
+    backgroundColor: COLORS.primary, borderRadius: RADIUS.lg,
     height: 54, alignItems: "center", justifyContent: "center",
     ...SHADOW.glow(COLORS.primary),
   },
-  // A darker green rather than grey: still clearly the same button, clearly
-  // not pressable, and dark-on-green label stays legible while it says "Next".
+  // A darker violet rather than grey: still clearly the same button, clearly
+  // not pressable, and white-on-violet label stays legible while it says "Next".
   btnDisabled: { backgroundColor: COLORS.primaryDark, shadowOpacity: 0, elevation: 0 },
-  btnText: { ...TYPE.button, fontSize: 16, color: COLORS.background },
+  btnText: { ...TYPE.button, fontSize: 16, color: COLORS.onPrimary },
   changeBtn: { alignItems: "center", marginTop: SPACING.md, paddingVertical: 4 },
   changeBtnText: { ...TYPE.bodyStrong, color: COLORS.primaryLight },
   footer: { ...TYPE.caption, fontSize: 11, color: COLORS.textMuted, textAlign: "center", marginTop: SPACING.xl, lineHeight: 16, paddingHorizontal: SPACING.md },

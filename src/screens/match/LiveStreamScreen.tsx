@@ -11,6 +11,13 @@ export default function LiveStreamScreen({ navigation }: any) {
       <Header title="Live Streaming" onBack={() => navigation.goBack()} />
       <ScrollView style={s.scroll}>
         <View style={s.heroBox}>
+          {/* Soft colour blobs behind the hero — plain tinted, absolutely
+              positioned Views (no gradient library), clipped to this box so
+              they never overlap content below. Purely decorative. */}
+          <View pointerEvents="none" style={s.heroBlobWrap}>
+            <View style={[s.heroBlob, { backgroundColor: COLORS.live, top: -30, left: -30 }]} />
+            <View style={[s.heroBlob, { backgroundColor: COLORS.purple, top: -10, right: -40 }]} />
+          </View>
           <Badge label="LIVE" tone="live" style={s.heroBadge} />
           <Text style={s.heroTitle}>Live Cricket Scoring</Text>
           <Text style={s.heroSub}>Start, share and follow live matches in real time</Text>
@@ -18,7 +25,7 @@ export default function LiveStreamScreen({ navigation }: any) {
 
         <View style={s.optionsBox}>
           <TouchableOpacity style={s.optionCard} onPress={() => navigation.navigate("NewMatch")}>
-            <View style={[s.optIcon, {backgroundColor: COLORS.primary + "33"}]}>
+            <View style={[s.optIcon, {backgroundColor: COLORS.primary + "33"}, SHADOW.glow(COLORS.primary)]}>
               <Text style={[s.optIconTxt, {color: COLORS.primary, fontSize: 22}]}>+</Text>
             </View>
             <View style={s.optInfo}>
@@ -29,7 +36,7 @@ export default function LiveStreamScreen({ navigation }: any) {
           </TouchableOpacity>
 
           <TouchableOpacity style={s.optionCard} onPress={() => navigation.navigate("LiveView")}>
-            <View style={[s.optIcon, {backgroundColor: COLORS.blue + "33"}]}>
+            <View style={[s.optIcon, {backgroundColor: COLORS.blue + "33"}, SHADOW.glow(COLORS.blue)]}>
               <Text style={[s.optIconTxt, {color: COLORS.blue}]}>ID</Text>
             </View>
             <View style={s.optInfo}>
@@ -40,7 +47,7 @@ export default function LiveStreamScreen({ navigation }: any) {
           </TouchableOpacity>
 
           <TouchableOpacity style={s.optionCard} onPress={() => Alert.alert("Share Match Score", "During a live match, tap the Share button on the Scoring screen to share the live score via WhatsApp, SMS or any app.")}>
-            <View style={[s.optIcon, {backgroundColor: COLORS.orange + "33"}]}>
+            <View style={[s.optIcon, {backgroundColor: COLORS.orange + "33"}, SHADOW.glow(COLORS.orange)]}>
               <Text style={[s.optIconTxt, {color: COLORS.orange}]}>SH</Text>
             </View>
             <View style={s.optInfo}>
@@ -52,7 +59,7 @@ export default function LiveStreamScreen({ navigation }: any) {
 
           {/* NEW: My Live Streams — organizer's stream history/status view */}
           <TouchableOpacity style={s.optionCard} onPress={() => navigation.navigate("MyLiveStreams")}>
-            <View style={[s.optIcon, {backgroundColor: COLORS.purple + "33"}]}>
+            <View style={[s.optIcon, {backgroundColor: COLORS.purple + "33"}, SHADOW.glow(COLORS.purple)]}>
               <AppIcon emoji="📊" size={22} color={COLORS.purple} />
             </View>
             <View style={s.optInfo}>
@@ -64,7 +71,7 @@ export default function LiveStreamScreen({ navigation }: any) {
 
           {/* NEW: Streaming Plans — pricing page, Coming Soon */}
           <TouchableOpacity style={s.optionCard} onPress={() => navigation.navigate("StreamingPlans")}>
-            <View style={[s.optIcon, {backgroundColor: COLORS.teal + "33"}]}>
+            <View style={[s.optIcon, {backgroundColor: COLORS.teal + "33"}, SHADOW.glow(COLORS.teal)]}>
               <Text style={[s.optIconTxt, {color: COLORS.teal}]}>💎</Text>
             </View>
             <View style={s.optInfo}>
@@ -99,7 +106,9 @@ export default function LiveStreamScreen({ navigation }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { flex: 1 },
-  heroBox: { alignItems: "center", paddingVertical: SPACING.xl, paddingHorizontal: SPACING.xl },
+  heroBox: { alignItems: "center", paddingVertical: SPACING.xl, paddingHorizontal: SPACING.xl, overflow: "hidden" },
+  heroBlobWrap: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
+  heroBlob: { position: "absolute", width: 160, height: 160, borderRadius: 80, opacity: 0.16 },
   // The pulsing LIVE pill carries the "on air" idea; the old solid red block
   // read as an error banner. COLORS.live is deliberately not COLORS.error.
   heroBadge: { marginBottom: SPACING.md, paddingHorizontal: 14, paddingVertical: 6, ...SHADOW.glow(COLORS.live) },
