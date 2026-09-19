@@ -85,6 +85,11 @@ export default function CreateTournamentScreen({ navigation }: any) {
               <Image source={{ uri: banner }} style={styles.bannerImg} resizeMode="cover" />
             ) : (
               <View style={styles.bannerPlaceholder}>
+                {/* Two overlapping tinted blobs — same plain-View "gradient"
+                    technique used on the home screen's poster cards — so an
+                    empty banner still reads as colourful rather than blank. */}
+                <View pointerEvents="none" style={[styles.bannerBlob, { backgroundColor: COLORS.primary, top: -30, left: -20 }]} />
+                <View pointerEvents="none" style={[styles.bannerBlob, { backgroundColor: COLORS.purple, bottom: -40, right: -30 }]} />
                 <View style={styles.bannerIconWrap}>
                   <Text style={styles.bannerPlaceholderIcon}>+</Text>
                 </View>
@@ -114,7 +119,7 @@ export default function CreateTournamentScreen({ navigation }: any) {
           <Text style={styles.label}>Ball Type</Text>
           <View style={styles.chipRow}>
             {BALL_TYPES.map(b => (
-              <TouchableOpacity key={b} style={[styles.chip, ballType === b && styles.chipActive]} onPress={() => setBallType(b)}>
+              <TouchableOpacity key={b} style={[styles.chip, ballType === b && styles.chipActiveTeal]} onPress={() => setBallType(b)}>
                 <Text style={[styles.chipText, ballType === b && styles.chipTextActive]}>
                   {b === 'Leather Ball' ? 'Red Ball - ' : b === 'Turf' ? 'Turf - ' : 'Tennis Ball - '}{b}
                 </Text>
@@ -124,7 +129,7 @@ export default function CreateTournamentScreen({ navigation }: any) {
           <Text style={styles.label}>Tournament Format *</Text>
           <View style={styles.chipRow}>
             {(['League', 'Knockout', 'Pool + Knockout'] as const).map(f => (
-              <TouchableOpacity key={f} style={[styles.chip, tournamentFormat === f && styles.chipActive]} onPress={() => setTournamentFormat(f)}>
+              <TouchableOpacity key={f} style={[styles.chip, tournamentFormat === f && styles.chipActivePurple]} onPress={() => setTournamentFormat(f)}>
                 <Text style={[styles.chipText, tournamentFormat === f && styles.chipTextActive]}>{f}</Text>
               </TouchableOpacity>
             ))}
@@ -137,7 +142,7 @@ export default function CreateTournamentScreen({ navigation }: any) {
           <Text style={styles.label}>Match Format (Overs)</Text>
           <View style={styles.chipRow}>
             {FORMAT_OPTIONS.map(f => (
-              <TouchableOpacity key={f} style={[styles.chip, format === f && styles.chipActive]} onPress={() => setFormat(f)}>
+              <TouchableOpacity key={f} style={[styles.chip, format === f && styles.chipActiveBlue]} onPress={() => setFormat(f)}>
                 <Text style={[styles.chipText, format === f && styles.chipTextActive]}>{f}</Text>
               </TouchableOpacity>
             ))}
@@ -175,6 +180,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
   },
   chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  // Each chip group gets its own accent — ball type, tournament format and
+  // match format are three unrelated choices, so giving each a distinct hue
+  // (instead of every selected chip in the form turning the same violet)
+  // makes the sections easier to tell apart at a glance and is a cheap way
+  // to bring the new multi-hue palette into a form-heavy screen.
+  chipActiveTeal: { backgroundColor: COLORS.teal, borderColor: COLORS.teal, ...SHADOW.glow(COLORS.teal) },
+  chipActivePurple: { backgroundColor: COLORS.purple, borderColor: COLORS.purple, ...SHADOW.glow(COLORS.purple) },
+  chipActiveBlue: { backgroundColor: COLORS.blue, borderColor: COLORS.blue, ...SHADOW.glow(COLORS.blue) },
   chipText: { ...TYPE.body, fontSize: 13, color: COLORS.textSecondary },
   chipTextActive: { color: COLORS.onPrimary, fontWeight: '700' },
 
@@ -188,12 +201,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
   },
   bannerImg: { width: '100%', height: '100%' },
-  bannerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: SPACING.sm },
+  bannerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: SPACING.sm, position: 'relative', overflow: 'hidden' },
+  bannerBlob: { position: 'absolute', width: 130, height: 130, borderRadius: 65, opacity: 0.16 },
   bannerIconWrap: {
     width: 52, height: 52, borderRadius: 26,
     backgroundColor: COLORS.primarySoft,
     borderWidth: 1, borderColor: COLORS.primary + '33',
     alignItems: 'center', justifyContent: 'center',
+    ...SHADOW.glow(COLORS.primary),
   },
   bannerPlaceholderIcon: { color: COLORS.primary, fontSize: 26, fontWeight: '700', marginTop: -2 },
   bannerLabel: { ...TYPE.bodyStrong, color: COLORS.text },

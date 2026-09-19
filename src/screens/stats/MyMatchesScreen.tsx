@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { getMyLinkedPlayerId, getMatchesForPlayer } from '../../utils/firebase';
-import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW, GRADIENTS } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
 import { AdBanner } from '../../components/AdPlaceholder';
@@ -137,8 +137,12 @@ export default function MyMatchesScreen({ navigation }: any) {
     ? [...bolAgg.figures].sort((a, b) => b.w - a.w || a.r - b.r)[0]
     : null;
 
-  const StatRow = ({ label, value, highlight }: any) => (
-    <View style={s.statRow}>
+  const StatRow = ({ label, value, highlight, index }: any) => (
+    <View style={[
+      s.statRow,
+      typeof index === 'number' && index % 2 === 1 && s.statRowAlt,
+      highlight && s.statRowHighlight,
+    ]}>
       <Text style={s.statLbl}>{label}</Text>
       <Text style={[s.statVal, highlight && { color: COLORS.primary, fontWeight: 'bold' }]}>{value ?? '-'}</Text>
     </View>
@@ -160,6 +164,12 @@ export default function MyMatchesScreen({ navigation }: any) {
       />
 
       <View style={s.profileBanner}>
+        {/* Two overlapping tinted circles fake a gradient glow behind the
+            avatar — same trick used on the Home screen's featured CTA, no
+            gradient library. Absolute + pointerEvents none, so it cannot
+            affect the row's layout or hit testing. */}
+        <View pointerEvents="none" style={[s.bannerBlob, { backgroundColor: GRADIENTS.violet[0], left: -20, top: -30 }]} />
+        <View pointerEvents="none" style={[s.bannerBlob, { backgroundColor: GRADIENTS.violet[1], left: 30, bottom: -36 }]} />
         <View style={s.profileAvatar}>
           <Text style={s.profileAvatarTxt}>{(myName || 'M').charAt(0).toUpperCase()}</Text>
         </View>
@@ -200,6 +210,8 @@ export default function MyMatchesScreen({ navigation }: any) {
         return (
           <View style={s.formCard}>
             <View pointerEvents="none" style={s.cardEdge} />
+            <View pointerEvents="none" style={[s.bannerBlob, s.formBlob, { backgroundColor: GRADIENTS.berry[0], right: -24, top: -28 }]} />
+            <View pointerEvents="none" style={[s.bannerBlob, s.formBlob, { backgroundColor: GRADIENTS.berry[1], right: 36, bottom: -30 }]} />
             <Text style={s.formLabel}>RECENT FORM</Text>
             <View style={s.formRow}>
               {formResults.map((r: any, i: number) => (
@@ -243,7 +255,7 @@ export default function MyMatchesScreen({ navigation }: any) {
               <View style={s.pCard}>
                 <View pointerEvents="none" style={s.cardEdge} />
                 <View style={s.pCardHead}>
-                  <View style={s.pAvatar}>
+                  <View style={[s.pAvatar, SHADOW.glow(COLORS.primary)]}>
                     <Text style={s.pAvatarTxt}>{(myName || 'M').charAt(0).toUpperCase()}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -251,18 +263,19 @@ export default function MyMatchesScreen({ navigation }: any) {
                     <Text style={s.pSub}>{batAgg.innings} innings</Text>
                   </View>
                   <View style={s.pHighlight}>
+                    <View pointerEvents="none" style={[s.pHighlightTint, { backgroundColor: COLORS.primary }]} />
                     <Text style={s.pHNum}>{batAgg.runs}</Text>
                     <Text style={s.pHLbl}>RUNS</Text>
                   </View>
                 </View>
-                <StatRow label="Balls Faced"   value={batAgg.balls} />
-                <StatRow label="4s"            value={batAgg.fours} />
-                <StatRow label="6s"            value={batAgg.sixes} />
-                <StatRow label="Strike Rate"   value={sr}  highlight />
-                <StatRow label="Average"       value={avg} highlight />
-                <StatRow label="Highest Score" value={hs}  highlight />
-                <StatRow label="50s"           value={fifties} />
-                <StatRow label="100s"          value={hundreds} />
+                <StatRow label="Balls Faced"   value={batAgg.balls} index={0} />
+                <StatRow label="4s"            value={batAgg.fours} index={1} />
+                <StatRow label="6s"            value={batAgg.sixes} index={2} />
+                <StatRow label="Strike Rate"   value={sr}  highlight index={3} />
+                <StatRow label="Average"       value={avg} highlight index={4} />
+                <StatRow label="Highest Score" value={hs}  highlight index={5} />
+                <StatRow label="50s"           value={fifties} index={6} />
+                <StatRow label="100s"          value={hundreds} index={7} />
               </View>
             )}
           </View>
@@ -280,7 +293,7 @@ export default function MyMatchesScreen({ navigation }: any) {
               <View style={s.pCard}>
                 <View pointerEvents="none" style={s.cardEdge} />
                 <View style={s.pCardHead}>
-                  <View style={[s.pAvatar, { backgroundColor: COLORS.red }]}>
+                  <View style={[s.pAvatar, { backgroundColor: COLORS.red }, SHADOW.glow(COLORS.red)]}>
                     <Text style={s.pAvatarTxt}>{(myName || 'M').charAt(0).toUpperCase()}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -288,16 +301,17 @@ export default function MyMatchesScreen({ navigation }: any) {
                     <Text style={s.pSub}>{bolAgg.innings} innings</Text>
                   </View>
                   <View style={[s.pHighlight, { backgroundColor: COLORS.red + '22', borderColor: COLORS.red }]}>
+                    <View pointerEvents="none" style={[s.pHighlightTint, { backgroundColor: COLORS.red }]} />
                     <Text style={[s.pHNum, { color: COLORS.red }]}>{bolAgg.wickets}</Text>
                     <Text style={s.pHLbl}>WKTS</Text>
                   </View>
                 </View>
-                <StatRow label="Overs"         value={bolAgg.overs + '.' + bolAgg.balls} />
-                <StatRow label="Runs Conceded" value={bolAgg.runs} />
-                <StatRow label="Economy"       value={eco} highlight />
-                <StatRow label="Best Bowling"  value={bbf ? bbf.w + '/' + bbf.r : '-'} highlight />
-                <StatRow label="Wides"         value={bolAgg.wides} />
-                <StatRow label="No Balls"      value={bolAgg.noBalls} />
+                <StatRow label="Overs"         value={bolAgg.overs + '.' + bolAgg.balls} index={0} />
+                <StatRow label="Runs Conceded" value={bolAgg.runs} index={1} />
+                <StatRow label="Economy"       value={eco} highlight index={2} />
+                <StatRow label="Best Bowling"  value={bbf ? bbf.w + '/' + bbf.r : '-'} highlight index={3} />
+                <StatRow label="Wides"         value={bolAgg.wides} index={4} />
+                <StatRow label="No Balls"      value={bolAgg.noBalls} index={5} />
               </View>
             )}
           </View>
@@ -314,8 +328,9 @@ export default function MyMatchesScreen({ navigation }: any) {
                 { icon: '🥅', label: 'Stumpings', value: fieldAgg.stumpings,          color: COLORS.purple },
                 { icon: '📋', label: 'Matches',   value: matches.length,              color: COLORS.primary },
               ].map((f, i) => (
-                <View key={i} style={[s.fieldBox, { borderColor: f.color + '55' }]}>
+                <View key={i} style={[s.fieldBox, { borderColor: f.color + '55' }, SHADOW.glow(f.color)]}>
                   <View pointerEvents="none" style={s.cardEdge} />
+                  <View pointerEvents="none" style={[s.fieldTint, { backgroundColor: f.color }]} />
                   <View style={[s.fieldIcon, { backgroundColor: f.color + '22' }]}>
                     <AppIcon emoji={f.icon} size={20} color={f.color} />
                   </View>
@@ -357,14 +372,19 @@ const s = StyleSheet.create({
   // ── Identity banner ──
   // Ringed avatar with a soft glow, matching the Home screen, so the two
   // screens read as the same product.
-  profileBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  profileBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft, overflow: 'hidden' },
+  // Decorative gradient-fake blobs — absolute + clipped by the banner's own
+  // overflow:hidden, so they can only ever sit behind the avatar/text, never
+  // shift them.
+  bannerBlob: { position: 'absolute', width: 100, height: 100, borderRadius: 50, opacity: 0.16 },
+  formBlob: { width: 90, height: 90, borderRadius: 45, opacity: 0.14 },
   profileAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
   profileAvatarTxt: { ...TYPE.h2, color: COLORS.primary },
   profileName: { ...TYPE.title, color: COLORS.text },
   profileSub: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 2 },
 
   // ── Recent form strip ──
-  formCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 14, margin: SPACING.lg, marginBottom: 0, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  formCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.xl, padding: 14, margin: SPACING.lg, marginBottom: 0, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
   formLabel: { ...TYPE.label, color: COLORS.textMuted, marginBottom: 10 },
   formRow: { flexDirection: 'row', gap: 9 },
   formPill: { width: 34, height: 34, borderRadius: 17, backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.borderSoft, justifyContent: 'center', alignItems: 'center', ...SHADOW.sm },
@@ -389,7 +409,7 @@ const s = StyleSheet.create({
   startBtnTxt: { ...TYPE.button, color: COLORS.onPrimary },
 
   // ── Player stat card ──
-  pCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
+  pCard: { backgroundColor: COLORS.card, borderRadius: RADIUS.xl, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft, overflow: 'hidden', ...SHADOW.md },
   pCardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SPACING.sm, paddingBottom: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
   pAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', ...SHADOW.sm },
   pAvatarTxt: { ...TYPE.title, color: '#fff' },
@@ -397,7 +417,10 @@ const s = StyleSheet.create({
   pSub: { ...TYPE.caption, fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
   // The headline figure (runs / wickets) is the single biggest thing in the
   // card, in tabular figures so it never shifts width.
-  pHighlight: { backgroundColor: COLORS.primarySoft, borderRadius: RADIUS.md, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary + '55', minWidth: 62 },
+  pHighlight: { backgroundColor: COLORS.primarySoft, borderRadius: RADIUS.md, paddingVertical: 8, paddingHorizontal: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary + '55', minWidth: 62, overflow: 'hidden' },
+  // Soft tint circle behind the headline figure, same technique as the shared
+  // StatCard component's `color` tint — decorative only.
+  pHighlightTint: { position: 'absolute', top: -22, right: -22, width: 64, height: 64, borderRadius: 32, opacity: 0.16 },
   pHNum: { ...TYPE.displaySm, fontSize: 24, color: COLORS.primary },
   pHLbl: { ...TYPE.label, fontSize: 9, color: COLORS.textMuted, marginTop: 1 },
 
@@ -405,12 +428,20 @@ const s = StyleSheet.create({
   // Label left in uppercase tracking, figure right in tabular numerals, so the
   // values form a clean right-hand column instead of ragged text.
   statRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
+  // Zebra tint and a soft highlight tint — background-only, so a dense stat
+  // list reads as scannable rows without touching row height or column
+  // alignment.
+  statRowAlt: { backgroundColor: COLORS.card2 },
+  statRowHighlight: { backgroundColor: COLORS.primarySoft },
   statLbl: { ...TYPE.colLabel, color: COLORS.textMuted },
   statVal: { ...TYPE.num, color: COLORS.text, textAlign: 'right' },
 
   // ── Fielding summary grid ──
   fieldGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  fieldBox: { width: '46%', backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, alignItems: 'center', borderWidth: 1, overflow: 'hidden', ...SHADOW.sm },
+  fieldBox: { width: '46%', backgroundColor: COLORS.card, borderRadius: RADIUS.xl, padding: 16, alignItems: 'center', borderWidth: 1, overflow: 'hidden', ...SHADOW.sm },
+  // Soft tint circle behind the icon, same technique as StatCard's `color`
+  // tint — decorative only, the icon/value/label are unchanged.
+  fieldTint: { position: 'absolute', top: -26, right: -26, width: 84, height: 84, borderRadius: 42, opacity: 0.16 },
   fieldIcon: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.sm },
   fieldIconTxt: { fontSize: 20 },
   fieldVal: { ...TYPE.displaySm, fontSize: 26 },

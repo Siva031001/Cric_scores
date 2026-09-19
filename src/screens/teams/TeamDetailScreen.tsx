@@ -5,9 +5,14 @@ import {
 } from 'react-native';
 import { getMyTeams } from '../../utils/firebase';
 import { Team, Player } from '../../types/cricket';
-import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW, GRADIENTS } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
+
+// Purely decorative colour cycle for the squad list's shirt-number chips, so
+// a long roster doesn't read as one flat block. Only ever feeds style props
+// — never compared or branched on.
+const ACCENT_CYCLE = [COLORS.primary, COLORS.teal, COLORS.orange, COLORS.blue, COLORS.purple, COLORS.yellow];
 
 export default function TeamDetailScreen({ route, navigation }: any) {
   const { teamId } = route.params;
@@ -46,6 +51,11 @@ export default function TeamDetailScreen({ route, navigation }: any) {
 
       {/* Team Header */}
       <View style={styles.teamHeader}>
+        {/* Two overlapping tinted blobs suggest a gradient behind the crest
+            without a gradient library — purely decorative, non-interactive,
+            clipped by the header's overflow:hidden. */}
+        <View pointerEvents="none" style={[styles.headerBlob, { backgroundColor: GRADIENTS.ocean[0], top: -40, left: -30 }]} />
+        <View pointerEvents="none" style={[styles.headerBlob, { backgroundColor: GRADIENTS.ocean[1], top: -10, right: -40 }]} />
         <View style={styles.logoBox}>
           {team.logo ? (
             <Image source={{ uri: team.logo }} style={styles.logoImg} />
@@ -88,10 +98,10 @@ export default function TeamDetailScreen({ route, navigation }: any) {
           <Text style={styles.sectionTitle}>Squad ({players.length})</Text>
         </View>
         {players.map((player: Player, index: number) => (
-          <View key={player.id} style={styles.playerRow}>
+          <View key={player.id} style={[styles.playerRow, { borderLeftWidth: 3, borderLeftColor: ACCENT_CYCLE[index % ACCENT_CYCLE.length] }]}>
             <View pointerEvents="none" style={styles.cardEdge} />
-            <View style={styles.playerNum}>
-              <Text style={styles.playerNumText}>{index + 1}</Text>
+            <View style={[styles.playerNum, { borderColor: ACCENT_CYCLE[index % ACCENT_CYCLE.length] + '55' }]}>
+              <Text style={[styles.playerNumText, { color: ACCENT_CYCLE[index % ACCENT_CYCLE.length] }]}>{index + 1}</Text>
             </View>
             <View style={styles.playerInfo}>
               <View style={styles.playerNameRow}>
@@ -127,7 +137,11 @@ const styles = StyleSheet.create({
   notFound: { ...TYPE.title, color: COLORS.text },
 
   // ── Crest hero ──
-  teamHeader: { alignItems: 'center', paddingVertical: SPACING.lg, paddingHorizontal: SPACING.lg },
+  teamHeader: {
+    alignItems: 'center', paddingVertical: SPACING.lg, paddingHorizontal: SPACING.lg,
+    position: 'relative', overflow: 'hidden',
+  },
+  headerBlob: { position: 'absolute', width: 110, height: 110, borderRadius: 55, opacity: 0.16 },
   logoBox: {
     width: 96, height: 96, borderRadius: 48,
     backgroundColor: COLORS.primarySoft, justifyContent: 'center',
@@ -197,11 +211,11 @@ const styles = StyleSheet.create({
   playerName: { ...TYPE.title, color: COLORS.text, flexShrink: 1 },
   badge: {
     ...TYPE.label, fontSize: 9,
-    backgroundColor: COLORS.yellow, color: '#1a1400',
+    backgroundColor: COLORS.yellow, color: COLORS.onAccent,
     paddingHorizontal: 6, paddingVertical: 2,
     borderRadius: RADIUS.sm,
     overflow: 'hidden',
   },
-  wkBadge: { backgroundColor: COLORS.blue, color: '#ffffff' },
+  wkBadge: { backgroundColor: COLORS.blue, color: COLORS.onPrimary },
   playerSub: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 3 },
 });

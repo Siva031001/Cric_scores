@@ -124,12 +124,17 @@ export default function NewMatchScreen({ route, navigation }: any) {
 
       {/* Teams Row */}
       <Card tone="base" elevation="md" padded={false} style={styles.teamsCard}>
+        {/* Soft two-tone blobs behind the team slots — purely decorative,
+            echoes the violet/coral pairing used across the redesigned
+            components (Button glow, Header accent line). */}
+        <View pointerEvents="none" style={[styles.teamsBlob, styles.teamsBlobLeft]} />
+        <View pointerEvents="none" style={[styles.teamsBlob, styles.teamsBlobRight]} />
         <View style={styles.teamsRow}>
         {/* Team 1 */}
         <View style={styles.teamBox}>
-          <Text style={styles.teamLabel}>Team 1</Text>
+          <Text style={[styles.teamLabel, styles.teamLabel1]}>Team 1</Text>
           <TouchableOpacity
-            style={[styles.logoCircle, team1Data?.logo ? styles.logoCircleFilled : null]}
+            style={[styles.logoCircle, team1Data?.logo ? styles.logoCircleFilled1 : null]}
             onPress={() => navigation.navigate('CreateTeam', {
               fromNewMatch: true, teamSlot: 1, prefillName: team1Name,
             })}>
@@ -164,9 +169,9 @@ export default function NewMatchScreen({ route, navigation }: any) {
 
         {/* Team 2 */}
         <View style={styles.teamBox}>
-          <Text style={styles.teamLabel}>Team 2</Text>
+          <Text style={[styles.teamLabel, styles.teamLabel2]}>Team 2</Text>
           <TouchableOpacity
-            style={[styles.logoCircle, team2Data?.logo ? styles.logoCircleFilled : null]}
+            style={[styles.logoCircle, team2Data?.logo ? styles.logoCircleFilled2 : null]}
             onPress={() => navigation.navigate('CreateTeam', {
               fromNewMatch: true, teamSlot: 2, prefillName: team2Name,
             })}>
@@ -199,7 +204,7 @@ export default function NewMatchScreen({ route, navigation }: any) {
 
       {/* My Teams Quick Select */}
       {myTeams.length > 0 && (
-        <Card tone="base" elevation="md" style={styles.quickBox}>
+        <Card tone="base" elevation="md" accent={COLORS.blue} style={styles.quickBox}>
           <Text style={styles.quickTitle}>Quick Select from My Teams</Text>
           {myTeams.map(team => (
             <View key={team.id} style={styles.quickRow}>
@@ -220,7 +225,7 @@ export default function NewMatchScreen({ route, navigation }: any) {
       )}
 
       {/* Venue */}
-      <Card tone="base" elevation="md" style={styles.fieldBox}>
+      <Card tone="base" elevation="md" accent={COLORS.teal} style={styles.fieldBox}>
         <Text style={styles.fieldLabel}>📍 Venue (Optional)</Text>
         <TextInput
           style={styles.fieldInput}
@@ -232,7 +237,7 @@ export default function NewMatchScreen({ route, navigation }: any) {
       </Card>
 
       {/* Overs */}
-      <Card tone="base" elevation="md" style={styles.fieldBox}>
+      <Card tone="base" elevation="md" accent={COLORS.orange} style={styles.fieldBox}>
         <Text style={styles.fieldLabel}>🕐 Overs</Text>
         <View style={styles.oversRow}>
           {['5', '10', '15', '20', '50'].map(o => (
@@ -257,7 +262,7 @@ export default function NewMatchScreen({ route, navigation }: any) {
         </View>
       </Card>
 
-      <Card tone="base" elevation="md" style={styles.fieldBox}>
+      <Card tone="base" elevation="md" accent={COLORS.purple} style={styles.fieldBox}>
         <Text style={styles.fieldLabel}>🏏 Ball Type</Text>
         {ballType === 'Turf' && (
   <View style={styles.subGroup}>
@@ -294,7 +299,7 @@ export default function NewMatchScreen({ route, navigation }: any) {
         variant="primary"
         size="lg"
         full
-        left={<AppIcon emoji="🏏" size={20} color={COLORS.background} />}
+        left={<AppIcon emoji="🏏" size={20} color={COLORS.onPrimary} />}
         style={styles.startBtn}
       />
 
@@ -307,13 +312,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   // The two teams are the headline of this screen, so they sit on their own
   // elevated card instead of floating on the background.
-  teamsCard: { marginHorizontal: SPACING.lg, marginTop: SPACING.sm, marginBottom: SPACING.md, paddingVertical: SPACING.lg, paddingHorizontal: SPACING.sm },
+  teamsCard: { marginHorizontal: SPACING.lg, marginTop: SPACING.sm, marginBottom: SPACING.md, paddingVertical: SPACING.lg, paddingHorizontal: SPACING.sm, overflow: 'hidden' },
+  // Two soft, oversized tinted discs sitting behind the team slots. Purely
+  // decorative (pointerEvents="none", absolute, behind everything else) —
+  // the same cheap "gradient-ish" technique StatCard uses for its corner tint.
+  teamsBlob: { position: 'absolute', top: -40, width: 140, height: 140, borderRadius: 70, opacity: 0.14 },
+  teamsBlobLeft: { left: -40, backgroundColor: COLORS.blue },
+  teamsBlobRight: { right: -40, backgroundColor: COLORS.orange },
   teamsRow: {
     flexDirection: 'row', alignItems: 'flex-start',
     justifyContent: 'space-around',
   },
   teamBox: { flex: 1, alignItems: 'center', gap: SPACING.sm },
   teamLabel: { ...TYPE.label, color: COLORS.textSecondary },
+  // Each side gets its own hue so "Team 1" vs "Team 2" reads at a glance —
+  // decorative colour-coding only, the underlying slot/condition is unchanged.
+  teamLabel1: { color: COLORS.blue },
+  teamLabel2: { color: COLORS.orange },
   logoCircle: {
     width: 76, height: 76, borderRadius: 38,
     backgroundColor: COLORS.card2, borderWidth: 2,
@@ -321,8 +336,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
   },
   // Once a logo is loaded the slot stops advertising itself as empty: solid
-  // brand ring, no dashes.
-  logoCircleFilled: { borderStyle: 'solid', borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
+  // ring in the team's own colour, no dashes.
+  logoCircleFilled1: { borderStyle: 'solid', borderColor: COLORS.blue, ...SHADOW.glow(COLORS.blue) },
+  logoCircleFilled2: { borderStyle: 'solid', borderColor: COLORS.orange, ...SHADOW.glow(COLORS.orange) },
   logoImg: { width: '100%', height: '100%' },
   logoPlus: { color: COLORS.primary, fontSize: 30, fontWeight: '700', marginTop: -2 },
   teamInput: {
@@ -334,13 +350,14 @@ const styles = StyleSheet.create({
   foundRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   foundText: { ...TYPE.caption, fontSize: 11, color: COLORS.success },
   // A circular chip rather than floating text, and vertically centred on the
-  // logos instead of nudged down with a magic 55px.
+  // logos instead of nudged down with a magic 55px. Tinted violet so it reads
+  // as a deliberate accent rather than a neutral divider.
   vsBadge: {
     width: 34, height: 34, borderRadius: 17,
-    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.primarySoft, borderWidth: 1, borderColor: COLORS.primary + '55',
     alignItems: 'center', justifyContent: 'center', marginTop: 40,
   },
-  vs: { ...TYPE.label, fontSize: 11, color: COLORS.textSecondary },
+  vs: { ...TYPE.label, fontSize: 11, color: COLORS.primaryLight },
   quickBox: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md },
   quickTitle: { ...TYPE.label, color: COLORS.textSecondary, marginBottom: SPACING.sm },
   quickRow: {
@@ -353,7 +370,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7, borderRadius: RADIUS.round,
   },
   quickBtn2: { backgroundColor: COLORS.info },
-  quickBtnText: { ...TYPE.label, fontSize: 10, color: COLORS.background },
+  quickBtnText: { ...TYPE.label, fontSize: 10, color: COLORS.onPrimary },
   quickBtnText2: { color: COLORS.text },
   fieldBox: { marginHorizontal: SPACING.lg, marginBottom: SPACING.md },
   fieldLabel: { ...TYPE.label, fontSize: 12, color: COLORS.textSecondary, marginBottom: SPACING.sm },
@@ -379,7 +396,7 @@ const styles = StyleSheet.create({
   },
   oversBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
   oversBtnText: { ...TYPE.num, color: COLORS.textSecondary },
-  oversBtnTextActive: { color: COLORS.background },
+  oversBtnTextActive: { color: COLORS.onPrimary },
   oversInput: {
     paddingHorizontal: 14, paddingVertical: 11,
     borderRadius: RADIUS.round, backgroundColor: COLORS.card2,

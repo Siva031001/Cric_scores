@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput,
 import { useFocusEffect } from '@react-navigation/native';
 import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory, getTournamentsVersion, canManageMatch } from '../../utils/firebase';
 import { AdBanner } from '../../components/AdPlaceholder';
-import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, TYPE, SHADOW, GRADIENTS } from '../../constants/theme';
 import { getPublicTournaments, searchPublicTournaments, getHomePageTournaments, getTournamentDisplayStatus } from '../../utils/firebase';
 import LiveTournamentCarousel from '../../components/LiveTournamentCarousel';
 import AppIcon from '../../components/AppIcon';
@@ -130,6 +130,15 @@ export default function HomeScreen({ navigation }: any) {
   return (
     <View style={st.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      {/* Soft colour blobs behind the top bar only — plain tinted, absolutely
+          positioned Views (same technique already used on the tournament
+          banner cards), clipped to this wrapper so they never overlap the
+          scroll content below. Purely decorative: no touch handling, no
+          layout impact on the real content. */}
+      <View pointerEvents="none" style={st.heroBlobWrap}>
+        <View style={[st.heroBlob, { backgroundColor: COLORS.primary, top: -60, left: -40 }]} />
+        <View style={[st.heroBlob, { backgroundColor: COLORS.live, top: -30, right: -60 }]} />
+      </View>
       <View style={st.topBar}>
         <TouchableOpacity style={st.profileRow} onPress={() => navigation.navigate('ProfileEdit')}>
           <View style={st.avatar}>
@@ -242,6 +251,11 @@ export default function HomeScreen({ navigation }: any) {
           </View>
 
           <TouchableOpacity style={st.featuredBtn} onPress={() => navigation.navigate('NewMatch')}>
+            {/* Two overlapping tinted circles suggest a gradient without a
+                gradient library — the CTA is the single most important tap
+                target on the screen, so it gets the strongest colour treatment. */}
+            <View pointerEvents="none" style={[st.featuredBlob, { backgroundColor: GRADIENTS.sunset[0], right: -20, top: -30 }]} />
+            <View pointerEvents="none" style={[st.featuredBlob, { backgroundColor: GRADIENTS.sunset[1], right: 40, bottom: -40 }]} />
             <View style={st.featuredLeft}>
               <AppIcon emoji="🏏" size={32} color="#fff" />
             <View>
@@ -255,7 +269,7 @@ export default function HomeScreen({ navigation }: any) {
             {MENU.map(item => (
               <TouchableOpacity key={item.id} style={st.menuCard} onPress={() => navigation.navigate(item.screen)}>
                 <View pointerEvents="none" style={st.menuEdge} />
-                <View style={[st.iconBox, { backgroundColor: item.color + '22' }]}>
+                <View style={[st.iconBox, { backgroundColor: item.color + '22' }, SHADOW.glow(item.color)]}>
                   <AppIcon emoji={item.icon} size={22} color={item.color} />
                 </View>
                 <Text style={st.menuLabel}>{item.label}</Text>
@@ -276,6 +290,8 @@ export default function HomeScreen({ navigation }: any) {
 const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
+  heroBlobWrap: { position: 'absolute', top: 0, left: 0, right: 0, height: 170, overflow: 'hidden' },
+  heroBlob: { position: 'absolute', width: 180, height: 180, borderRadius: 90, opacity: 0.16 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: 55, paddingBottom: SPACING.md },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   // Ring gap between border and image reads as a deliberate avatar frame
@@ -324,7 +340,8 @@ const st = StyleSheet.create({
   sectionTitle: { ...TYPE.h2, color: COLORS.text },
 
   // ── Primary call to action ──
-  featuredBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.primary, marginHorizontal: SPACING.lg, borderRadius: RADIUS.lg, padding: 18, marginBottom: SPACING.lg, marginTop: SPACING.sm, ...SHADOW.glow(COLORS.primary) },
+  featuredBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.primary, marginHorizontal: SPACING.lg, borderRadius: RADIUS.lg, padding: 18, marginBottom: SPACING.lg, marginTop: SPACING.sm, overflow: 'hidden', ...SHADOW.glow(COLORS.primary) },
+  featuredBlob: { position: 'absolute', width: 110, height: 110, borderRadius: 55, opacity: 0.3 },
   featuredLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   featuredIcon: { fontSize: 32 },
   featuredTitle: { ...TYPE.title, fontSize: 17, color: COLORS.onPrimary },

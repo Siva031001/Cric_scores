@@ -124,9 +124,18 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
     <View style={s.container}>
       <Header title="Forgot Password" onBack={() => navigation.goBack()} />
       <View style={s.content}>
+        {/* Soft colour blobs behind the first card — same plain tinted,
+            absolutely positioned View technique used on the Home screen's
+            hero header and the Login screen. Purely decorative: no touch
+            handling, sits below the card in stacking order (rendered
+            first), no layout impact since it is absolutely positioned. */}
+        <View pointerEvents="none" style={s.blobWrap}>
+          <View style={[s.blob, { backgroundColor: COLORS.primary, top: -60, left: -20 }]} />
+          <View style={[s.blob, { backgroundColor: COLORS.teal, top: -40, right: -30 }]} />
+        </View>
         {step === "phone" && (
           <>
-            <Card tone="base" elevation="md" style={s.card}>
+            <Card tone="base" elevation="md" accent={COLORS.primary} style={s.card}>
               <Text style={s.label}>Enter your registered mobile number</Text>
               <TextInput
                 style={s.input}
@@ -138,14 +147,14 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
               />
             </Card>
             <TouchableOpacity style={s.btn} onPress={handleSendOtp} disabled={loading}>
-              {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={s.btnTxt}>Send OTP</Text>}
+              {loading ? <ActivityIndicator color={COLORS.onPrimary} /> : <Text style={s.btnTxt}>Send OTP</Text>}
             </TouchableOpacity>
           </>
         )}
 
         {step === "otp" && (
           <>
-            <Card tone="base" elevation="md" style={s.card}>
+            <Card tone="base" elevation="md" accent={COLORS.blue} style={s.card}>
               <Text style={s.label}>Enter the OTP sent to {phone}</Text>
               <Text style={s.hint}>
                 {verifyAttemptsLeft < 5 ? `${verifyAttemptsLeft} attempt${verifyAttemptsLeft !== 1 ? "s" : ""} remaining` : "Valid for 15 minutes"}
@@ -160,7 +169,7 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
               />
             </Card>
             <TouchableOpacity style={s.btn} onPress={handleVerifyOtp} disabled={loading}>
-              {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={s.btnTxt}>Verify OTP</Text>}
+              {loading ? <ActivityIndicator color={COLORS.onPrimary} /> : <Text style={s.btnTxt}>Verify OTP</Text>}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleSendOtp}
@@ -179,7 +188,7 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
 
         {step === "newPin" && (
           <>
-            <Card tone="base" elevation="md" style={s.card}>
+            <Card tone="base" elevation="md" accent={COLORS.teal} style={s.card}>
               <Text style={s.label}>Set a new PIN</Text>
               <TextInput
                 style={s.input}
@@ -203,7 +212,7 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
               />
             </Card>
             <TouchableOpacity style={s.btn} onPress={handleResetPin} disabled={loading}>
-              {loading ? <ActivityIndicator color={COLORS.background} /> : <Text style={s.btnTxt}>Reset PIN</Text>}
+              {loading ? <ActivityIndicator color={COLORS.onPrimary} /> : <Text style={s.btnTxt}>Reset PIN</Text>}
             </TouchableOpacity>
           </>
         )}
@@ -232,6 +241,10 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.lg, gap: 12 },
+  // Wrapper that clips the decorative blobs to a band behind the first card,
+  // so they never bleed past the content area. Purely decorative.
+  blobWrap: { position: "absolute", top: 0, left: 0, right: 0, height: 140, overflow: "hidden" },
+  blob: { position: "absolute", width: 140, height: 140, borderRadius: 70, opacity: 0.14 },
   // Each step's fields now sit in one elevated card, so the screen reads as a
   // single task rather than controls stacked on a flat background.
   card: { padding: SPACING.md + 2 },
@@ -242,7 +255,7 @@ const s = StyleSheet.create({
     backgroundColor: COLORS.card2, color: COLORS.text,
     ...TYPE.body, fontSize: 15,
     paddingHorizontal: SPACING.md, paddingVertical: 16,
-    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border,
+    borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border,
     marginBottom: SPACING.sm,
   },
   inputLast: { marginBottom: 0 },
@@ -250,14 +263,14 @@ const s = StyleSheet.create({
   codeInput: {
     backgroundColor: COLORS.card2, color: COLORS.text,
     ...TYPE.displaySm, fontSize: 22, textAlign: "center", letterSpacing: 8,
-    paddingVertical: 16, borderRadius: RADIUS.md,
+    paddingVertical: 16, borderRadius: RADIUS.lg,
     borderWidth: 1, borderColor: COLORS.border,
   },
   btn: {
     backgroundColor: COLORS.primary, height: 54,
-    borderRadius: RADIUS.md, alignItems: "center", justifyContent: "center",
+    borderRadius: RADIUS.lg, alignItems: "center", justifyContent: "center",
     marginTop: SPACING.xs, ...SHADOW.glow(COLORS.primary),
   },
-  btnTxt: { ...TYPE.button, fontSize: 16, color: COLORS.background },
+  btnTxt: { ...TYPE.button, fontSize: 16, color: COLORS.onPrimary },
   link: { ...TYPE.bodyStrong, color: COLORS.primaryLight, textAlign: "center", paddingVertical: SPACING.sm },
 });

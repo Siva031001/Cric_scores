@@ -151,8 +151,9 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
           <Text style={s.infoRow}>Status: {match.status}</Text>
         </Card>
 
-        {/* Streaming Status */}
-        <Card style={s.card}>
+        {/* Streaming Status — accented with the live colour while on air, same
+            treatment the shared Card component already offers elsewhere. */}
+        <Card style={s.card} accent={streamStatus === 'LIVE' ? COLORS.live : undefined}>
           <View style={s.statusRow}>
             <Badge
               label={streamStatus}
@@ -382,10 +383,10 @@ const s = StyleSheet.create({
     backgroundColor: COLORS.card2,
   },
   controlBtnPrimary: { backgroundColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
-  controlBtnWarning: { backgroundColor: COLORS.warning },
+  controlBtnWarning: { backgroundColor: COLORS.warning, ...SHADOW.glow(COLORS.warning) },
   // End Live is genuinely destructive, so this one is COLORS.error rather than
   // COLORS.live — live is reserved for the on-air state.
-  controlBtnDanger: { backgroundColor: COLORS.error },
+  controlBtnDanger: { backgroundColor: COLORS.error, ...SHADOW.glow(COLORS.error) },
   controlBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border },
   controlBtnTxt: { ...TYPE.bodyStrong, fontSize: 13, color: '#fff' },
   controlBtnOutlineTxt: { ...TYPE.bodyStrong, fontSize: 13, color: COLORS.text },
@@ -397,7 +398,7 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border,
     minWidth: 92, alignItems: 'center',
   },
-  qualityChipActive: { backgroundColor: COLORS.primarySoft, borderColor: COLORS.primary },
+  qualityChipActive: { backgroundColor: COLORS.primarySoft, borderColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
   qualityChipTxt: { ...TYPE.num, fontSize: 13, color: COLORS.text },
   qualityChipSub: { ...TYPE.numSm, fontSize: 9, color: COLORS.textMuted, marginTop: 2 },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm + 2 },

@@ -57,14 +57,20 @@ export default function SettingsScreen({ navigation }: any) {
     <View style={styles.container}>
       <Header title="Settings" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content}>
-        {items.map((item: any, i) => (
+        {items.map((item: any, i) => {
+          // Ordinary rows cycle through a small set of vivid tints so the
+          // menu reads as colourful rather than a flat list — purely a
+          // decorative colour choice, danger/warning rows keep their own
+          // semantic colour exactly as before and always take priority.
+          const tint = item.danger ? COLORS.error : item.warning ? COLORS.warning : ICON_TINTS[i % ICON_TINTS.length];
+          return (
             <TouchableOpacity key={i} style={[styles.item, item.danger && styles.dangerItem, item.warning && styles.warningItem]} onPress={item.onPress}>
             <View pointerEvents="none" style={styles.itemEdge} />
-            <View style={[styles.itemIcon, item.danger && styles.itemIconDanger, item.warning && styles.itemIconWarning]}>
+            <View style={[styles.itemIcon, { backgroundColor: tint + '1f' }]}>
             <AppIcon
               emoji={item.icon}
               size={20}
-              color={item.danger ? COLORS.red : item.warning ? COLORS.orange : COLORS.text}
+              color={tint}
             />
             </View>
             <View style={styles.itemInfo}>
@@ -73,12 +79,18 @@ export default function SettingsScreen({ navigation }: any) {
             </View>
               <AppIcon emoji="›" size={20} color={COLORS.textMuted} />
             </TouchableOpacity>
-        ))}
+          );
+        })}
         <Text style={styles.version}>Cricket Scorer v1.0.0</Text>
       </ScrollView>
     </View>
   );
 }
+
+// Vivid, non-semantic accents for ordinary (non-danger/warning) row icons —
+// cycled by row index. Kept clear of red/orange since those already carry
+// the danger/warning meaning for the two rows below.
+const ICON_TINTS = [COLORS.blue, COLORS.purple, COLORS.teal, COLORS.yellow];
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
@@ -87,7 +99,7 @@ const styles = StyleSheet.create({
   // the menu grid on the home screen — they used to be flat outlined boxes.
   item: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.card, borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.card, borderRadius: RADIUS.xl,
     paddingVertical: SPACING.md, paddingHorizontal: SPACING.md,
     borderWidth: 1, borderColor: COLORS.borderSoft,
     gap: 14, overflow: 'hidden', ...SHADOW.sm,
@@ -98,12 +110,9 @@ const styles = StyleSheet.create({
   dangerItem: { borderColor: COLORS.error + '55' },
   warningItem: { borderColor: COLORS.warning + '55' },
   itemIcon: {
-    width: 44, height: 44, borderRadius: RADIUS.md,
-    backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center',
+    width: 44, height: 44, borderRadius: RADIUS.lg,
+    justifyContent: 'center', alignItems: 'center',
   },
-  itemIconDanger: { backgroundColor: COLORS.error + '1f' },
-  itemIconWarning: { backgroundColor: COLORS.warning + '1f' },
-  itemIconText: { fontSize: 20 },
   itemInfo: { flex: 1 },
   itemLabel: { ...TYPE.title, fontSize: 15, color: COLORS.text },
   dangerText: { color: COLORS.error },

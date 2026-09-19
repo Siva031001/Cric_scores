@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { enableFreeze } from 'react-native-screens';
 enableFreeze(false);
 import AppIcon from "./src/components/AppIcon";
+import { COLORS } from "./src/constants/theme";
 import LoginScreen from "./src/screens/auth/LoginScreen";
 import ForgotPasswordScreen from "./src/screens/auth/ForgotPasswordScreen";
 import HomeScreen from "./src/screens/home/HomeScreen";
@@ -65,13 +66,20 @@ function SplashScreen() {
     ]).start();
   }, []);
   return (
-    <View style={{ flex: 1, backgroundColor: '#0a1628', justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{ flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }}>
+      {/* Two soft colour blobs behind the mark — same layered-blob technique
+          used on the tournament banner cards, just plain tinted Views, so
+          the splash reads as branded rather than a bare logo on black. */}
+      <View pointerEvents="none" style={{ position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: COLORS.primary, opacity: 0.16, top: '28%' }} />
+      <View pointerEvents="none" style={{ position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: COLORS.live, opacity: 0.12, top: '42%', left: '58%' }} />
       <Animated.View style={{ alignItems: 'center', opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
-        <AppIcon emoji="0" size={80} color="#fff" style={{ marginBottom: 16 }} />
-        <Text style={{ color: '#ffffff', fontSize: 36, fontWeight: 'bold' }}>CricketScorer</Text>
-        <Text style={{ color: '#4ade80', fontSize: 16, marginTop: 8 }}>Your cricket companion</Text>
+        <View style={{ width: 120, height: 120, borderRadius: 60, backgroundColor: COLORS.primarySoft, borderWidth: 2, borderColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+          <AppIcon emoji="🏏" size={56} color={COLORS.primary} />
+        </View>
+        <Text style={{ color: COLORS.text, fontSize: 36, fontWeight: 'bold' }}>CricketScorer</Text>
+        <Text style={{ color: COLORS.primaryLight, fontSize: 16, marginTop: 8 }}>Your cricket companion</Text>
       </Animated.View>
-      <Text style={{ position: 'absolute', bottom: 60, color: '#6b7280', fontSize: 14 }}>Loading...</Text>
+      <Text style={{ position: 'absolute', bottom: 60, color: COLORS.textMuted, fontSize: 14 }}>Loading...</Text>
     </View>
   );
 }

@@ -659,8 +659,9 @@ const s = StyleSheet.create({
 
   // ── Result ──
   // Celebratory but restrained: one tinted surface, a solid accent along the
-  // top edge, and elevation. No second colour, no gradient.
-  resultBox: { backgroundColor: COLORS.primarySoft, marginHorizontal: SPACING.lg, paddingVertical: 14, paddingHorizontal: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.primary + "3d", borderTopWidth: 2, borderTopColor: COLORS.primary, marginBottom: SPACING.sm, alignItems: "center", ...SHADOW.md },
+  // top edge, and elevation, now with a soft violet glow to make the result
+  // the clear high point of the screen. No second colour, no gradient.
+  resultBox: { backgroundColor: COLORS.primarySoft, marginHorizontal: SPACING.lg, paddingVertical: 14, paddingHorizontal: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.primary + "3d", borderTopWidth: 2, borderTopColor: COLORS.primary, marginBottom: SPACING.sm, alignItems: "center", ...SHADOW.glow(COLORS.primary) },
   resultTxt: { ...TYPE.title, fontSize: 17, color: COLORS.primaryLight, textAlign: "center", lineHeight: 23 },
 
   // ── AI summary ──
@@ -724,7 +725,7 @@ const s = StyleSheet.create({
   extrasDetail: { ...TYPE.numSm, color: COLORS.textSecondary, flex: 1, textAlign: "right" },
 
   // ── Player of the match ──
-  momBanner: { backgroundColor: COLORS.yellow + "14", marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.yellow + "55", borderLeftWidth: 3, borderLeftColor: COLORS.yellow, flexDirection: "row", gap: SPACING.md, alignItems: "center", ...SHADOW.md },
+  momBanner: { backgroundColor: COLORS.yellow + "14", marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.yellow + "55", borderLeftWidth: 3, borderLeftColor: COLORS.yellow, flexDirection: "row", gap: SPACING.md, alignItems: "center", ...SHADOW.glow(COLORS.yellow) },
   momIcon: { marginTop: 2 },
   momLabel: { ...TYPE.label, fontSize: 10, color: COLORS.yellow, marginBottom: 3 },
   momName: { ...TYPE.h2, fontSize: 17, color: COLORS.text, marginBottom: 5 },
@@ -745,14 +746,17 @@ const s = StyleSheet.create({
   momStatRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },
   momStatLabel: { ...TYPE.caption, fontSize: 13, color: COLORS.textSecondary },
   momStatVal: { ...TYPE.num, fontSize: 13, color: COLORS.text, flex: 1, textAlign: "right" },
-  momConfirmBtn: { backgroundColor: COLORS.yellow, paddingVertical: 15, borderRadius: RADIUS.md, alignItems: "center", marginBottom: SPACING.sm, ...SHADOW.md },
+  momConfirmBtn: { backgroundColor: COLORS.yellow, paddingVertical: 15, borderRadius: RADIUS.md, alignItems: "center", marginBottom: SPACING.sm, ...SHADOW.glow(COLORS.yellow) },
   momConfirmTxt: { ...TYPE.button, color: "#1a1200" },
   momSkipBtn: { backgroundColor: COLORS.card2, paddingVertical: 12, borderRadius: RADIUS.md, alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
   momSkipTxt: { ...TYPE.button, fontSize: 14, color: COLORS.textSecondary },
 
   // ── Buttons ──
   // Split `margin` into sides so the existing `marginTop: 0` overrides at the
-  // call sites keep working exactly as before.
+  // call sites keep working exactly as before. Kept to a neutral elevation
+  // (not a colour glow) because this style is reused with red and neutral
+  // background overrides elsewhere — a baked-in violet glow would look
+  // mismatched under those.
   shareBtn: { backgroundColor: COLORS.primary, marginHorizontal: SPACING.lg, marginTop: SPACING.lg, marginBottom: SPACING.sm, paddingVertical: 15, borderRadius: RADIUS.md, alignItems: "center", ...SHADOW.md },
   // Stays white: this style also sits on the red and neutral button variants.
   shareBtnTxt: { ...TYPE.button, color: "#fff" },

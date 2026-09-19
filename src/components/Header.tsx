@@ -40,6 +40,15 @@ export default function Header({ title, onBack, rightText, onRight, rightColor }
           </View>
         )}
       </TouchableOpacity>
+      {/* Two-tone accent line instead of a flat hairline — every screen in
+          the app renders one of these, so it is the cheapest way to give the
+          whole app a consistent, colourful signature edge. Purely decorative,
+          non-interactive, and sits below the hairline so it doesn't change
+          the header's height or hit areas. */}
+      <View pointerEvents="none" style={styles.accentLine}>
+        <View style={[styles.accentHalf, { backgroundColor: COLORS.primary }]} />
+        <View style={[styles.accentHalf, { backgroundColor: COLORS.live }]} />
+      </View>
     </View>
   );
 }
@@ -54,11 +63,10 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: SPACING.md,
     backgroundColor: COLORS.background,
-    // Hairline base instead of a hard border — separates the header from
-    // content without drawing a line across the screen.
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.borderSoft,
+    position: 'relative',
   },
+  accentLine: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, flexDirection: 'row', opacity: 0.55 },
+  accentHalf: { flex: 1 },
   side: { width: 62, justifyContent: 'center' },
   rightSide: { alignItems: 'flex-end' },
   backBtn: {

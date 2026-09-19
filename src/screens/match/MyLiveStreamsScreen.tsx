@@ -79,6 +79,7 @@ export default function MyLiveStreamsScreen({ navigation }: any) {
               activeOpacity={0.85}
               onPress={() => navigation.navigate(m.status === 'completed' ? 'Scorecard' : 'StreamingDashboard', { matchId: m.id })}
             >
+              <View pointerEvents="none" style={s.cardEdge} />
               <View style={s.cardTop}>
                 <Text style={s.cardTeams}>{m.team1} vs {m.team2}</Text>
                 <Badge
@@ -109,7 +110,7 @@ const s = StyleSheet.create({
     backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.borderSoft,
   },
   tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: RADIUS.round },
-  tabActive: { backgroundColor: COLORS.primary, ...SHADOW.sm },
+  tabActive: { backgroundColor: COLORS.primary, ...SHADOW.glow(COLORS.primary) },
   // numSm, not label: the trailing "(3)" is a figure and should not jitter as
   // counts change width.
   tabTxt: { ...TYPE.numSm, color: COLORS.textSecondary },
@@ -119,8 +120,10 @@ const s = StyleSheet.create({
     backgroundColor: COLORS.card, borderRadius: RADIUS.lg,
     padding: SPACING.md, marginBottom: SPACING.sm,
     borderWidth: 1, borderColor: COLORS.borderSoft,
+    overflow: 'hidden',
     ...SHADOW.sm,
   },
+  cardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight },
   // On-air stream gets a live-coloured left edge, matching the live card
   // treatment on the home screen. COLORS.live, never COLORS.error.
   cardLive: { borderLeftWidth: 3, borderLeftColor: COLORS.live, borderColor: COLORS.live + '44', ...SHADOW.md },

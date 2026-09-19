@@ -13,6 +13,17 @@ import AppIcon from '../../components/AppIcon';
 
 type SelectionTab = 'striker' | 'nonstriker' | 'bowler';
 
+// Decorative colour-coding only: each role gets its own accent so the
+// striker/non-striker/bowler summary and tab bar read as distinct at a
+// glance, instead of everything sharing one flat brand colour. Purely
+// cosmetic — does not affect which tab/summary value is shown.
+const SUMMARY_ACCENTS = [COLORS.blue, COLORS.teal, COLORS.orange];
+const TAB_ACCENTS: Record<SelectionTab, string> = {
+  striker: COLORS.blue,
+  nonstriker: COLORS.teal,
+  bowler: COLORS.orange,
+};
+
 export default function BattingSetupScreen({ route, navigation }: any) {
   const {
     team1, team2, overs, venue, ballType,
@@ -134,7 +145,10 @@ export default function BattingSetupScreen({ route, navigation }: any) {
 
       {/* Toss Result */}
       {tossWinner && tossChoice && (
-        <Card tone="base" elevation="md" accent={COLORS.primary} style={styles.tossCard}>
+        <Card tone="base" elevation="md" accent={COLORS.warning} style={styles.tossCard}>
+          {/* Soft coin-toned blob, purely decorative — echoes the 🪙 emoji and
+              the amber accent stripe without competing with the text. */}
+          <View pointerEvents="none" style={styles.tossBlob} />
           <View style={styles.tossRow}>
             <AppIcon emoji="🪙" size={14} color={COLORS.warning} />
             <Text style={styles.tossText}>
@@ -154,14 +168,14 @@ export default function BattingSetupScreen({ route, navigation }: any) {
       <Card tone="base" elevation="md" style={styles.teamsCard}>
         <View style={styles.teamsRow}>
           <View style={styles.teamInfo}>
-            <Text style={styles.teamRole}>BATTING</Text>
+            <Text style={[styles.teamRole, styles.teamRoleBatting]}>BATTING</Text>
             <Text style={styles.teamName}>{battingTeam}</Text>
           </View>
           <View style={styles.vsBadge}>
             <Text style={styles.vs}>VS</Text>
           </View>
           <View style={styles.teamInfo}>
-            <Text style={styles.teamRole}>BOWLING</Text>
+            <Text style={[styles.teamRole, styles.teamRoleBowling]}>BOWLING</Text>
             <Text style={styles.teamName}>{bowlingTeam}</Text>
           </View>
         </View>
@@ -174,9 +188,9 @@ export default function BattingSetupScreen({ route, navigation }: any) {
           { label: '🏃 Non-Str', value: getName(battingPlayers, nonStrikerId) },
           { label: '🎯 Bowler', value: getName(bowlingPlayers, bowlerId) },
         ].map((s, i) => (
-          <View key={i} style={styles.summaryBox}>
+          <View key={i} style={[styles.summaryBox, { borderColor: SUMMARY_ACCENTS[i] + '55' }]}>
             <Text style={styles.summaryLabel}>{s.label}</Text>
-            <Text style={styles.summaryValue} numberOfLines={1}>{s.value}</Text>
+            <Text style={[styles.summaryValue, { color: SUMMARY_ACCENTS[i] }]} numberOfLines={1}>{s.value}</Text>
           </View>
         ))}
       </View>
@@ -186,7 +200,7 @@ export default function BattingSetupScreen({ route, navigation }: any) {
         <View style={styles.tabBar}>
           {TABS.map(t => (
             <TouchableOpacity key={t.key}
-              style={[styles.tab, activeTab === t.key && styles.tabActive]}
+              style={[styles.tab, activeTab === t.key && { backgroundColor: TAB_ACCENTS[t.key], ...SHADOW.glow(TAB_ACCENTS[t.key]) }]}
               onPress={() => setActiveTab(t.key)}>
               <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>
                 {t.label}
@@ -234,7 +248,7 @@ export default function BattingSetupScreen({ route, navigation }: any) {
               </View>
               {isSelected && (
                 <View style={styles.checkCircle}>
-                  <AppIcon emoji="✓" size={14} color={COLORS.background} />
+                  <AppIcon emoji="✓" size={14} color={COLORS.onPrimary} />
                 </View>
               )}
             </TouchableOpacity>
@@ -246,6 +260,11 @@ export default function BattingSetupScreen({ route, navigation }: any) {
         style={[styles.startBtn, loading && styles.startBtnDisabled]}
         onPress={handleStart}
         disabled={loading}>
+        {/* Two-tone blob peeking from behind the CTA — same faked-gradient
+            technique as the Home screen's featured button. Decorative only,
+            doesn't intercept the button's own touch handling. */}
+        <View pointerEvents="none" style={[styles.startBtnBlob, styles.startBtnBlobA]} />
+        <View pointerEvents="none" style={[styles.startBtnBlob, styles.startBtnBlobB]} />
         <Text style={styles.startBtnText}>
           {loading ? 'Starting...' : '🏏 Start Match!'}
         </Text>
@@ -264,6 +283,9 @@ const styles = StyleSheet.create({
     margin: SPACING.lg, marginBottom: 0,
     padding: SPACING.md, gap: 6,
   },
+  // Purely decorative amber disc echoing the 🪙 emoji; clipped by the Card's
+  // own overflow:hidden so it never spills past the rounded corners.
+  tossBlob: { position: 'absolute', top: -30, right: -20, width: 90, height: 90, borderRadius: 45, backgroundColor: COLORS.warning, opacity: 0.14 },
   tossRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tossText: { ...TYPE.caption, color: COLORS.textSecondary },
   battingFirst: { ...TYPE.bodyStrong, color: COLORS.text },
@@ -273,14 +295,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   teamInfo: { flex: 1, alignItems: 'center' },
-  teamRole: { ...TYPE.label, fontSize: 10, color: COLORS.primary, marginBottom: 4 },
+  teamRole: { ...TYPE.label, fontSize: 10, marginBottom: 4 },
+  // Batting/bowling now each carry their own hue instead of sharing the
+  // brand colour, so the roles read apart at a glance.
+  teamRoleBatting: { color: COLORS.success },
+  teamRoleBowling: { color: COLORS.orange },
   teamName: { ...TYPE.title, color: COLORS.text, textAlign: 'center' },
   vsBadge: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: COLORS.card2, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.primarySoft, borderWidth: 1, borderColor: COLORS.primary + '55',
     alignItems: 'center', justifyContent: 'center',
   },
-  vs: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
+  vs: { ...TYPE.label, fontSize: 10, color: COLORS.primaryLight },
   summaryRow: {
     flexDirection: 'row', marginHorizontal: SPACING.lg,
     marginBottom: SPACING.md, gap: 8,
@@ -301,18 +327,19 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.borderSoft,
   },
   tab: { flex: 1, paddingVertical: SPACING.sm, alignItems: 'center', borderRadius: RADIUS.sm },
-  tabActive: { backgroundColor: COLORS.primary },
   tabText: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary },
-  tabTextActive: { color: COLORS.background },
+  tabTextActive: { color: COLORS.onPrimary },
   tabTeam: { ...TYPE.caption, fontSize: 9, color: COLORS.textMuted, marginTop: 2 },
-  tabTeamActive: { color: COLORS.background, opacity: 0.7 },
+  tabTeamActive: { color: COLORS.onPrimary, opacity: 0.7 },
   playerRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: COLORS.card2, padding: 12,
-    borderRadius: RADIUS.md, marginBottom: SPACING.sm - 2,
+    borderRadius: RADIUS.lg, marginBottom: SPACING.sm - 2,
     borderWidth: 1, borderColor: COLORS.borderSoft, gap: 12,
   },
-  playerRowSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySoft },
+  // Selected row lifts with a soft violet glow instead of a plain border —
+  // same selected/unselected distinction as before.
+  playerRowSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySoft, ...SHADOW.glow(COLORS.primary) },
   playerRowDisabled: { opacity: 0.4 },
   avatar: {
     width: 40, height: 40, borderRadius: 20,
@@ -333,10 +360,13 @@ const styles = StyleSheet.create({
   // The single most important action on the screen, so it carries the glow.
   startBtn: {
     backgroundColor: COLORS.primary, margin: SPACING.lg,
-    height: 56, borderRadius: RADIUS.md,
-    alignItems: 'center', justifyContent: 'center',
+    height: 56, borderRadius: RADIUS.lg,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
     ...SHADOW.glow(COLORS.primary),
   },
+  startBtnBlob: { position: 'absolute', width: 90, height: 90, borderRadius: 45, opacity: 0.22 },
+  startBtnBlobA: { backgroundColor: COLORS.purple, left: -20, top: -35 },
+  startBtnBlobB: { backgroundColor: COLORS.live, right: -20, bottom: -35 },
   startBtnDisabled: { backgroundColor: COLORS.primaryDark, shadowOpacity: 0, elevation: 0 },
-  startBtnText: { ...TYPE.button, fontSize: 17, color: COLORS.background },
+  startBtnText: { ...TYPE.button, fontSize: 17, color: COLORS.onPrimary },
 });

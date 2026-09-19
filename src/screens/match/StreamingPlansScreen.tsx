@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { COLORS, RADIUS, SPACING } from '../../constants/theme';
+import { COLORS, RADIUS, SPACING, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
+import Card from '../../components/Card';
+import Badge from '../../components/Badge';
 
 // Design-only per instructions — payment integration deliberately deferred.
 // Layout follows the reference pricing pattern (per-match / time-based /
@@ -26,16 +28,24 @@ export default function StreamingPlansScreen({ navigation }: any) {
       <ScrollView style={s.scroll}>
         <View style={s.grid}>
           {PLANS.map((p) => (
-            <View key={p.title} style={[s.card, p.popular && s.cardPopular]}>
-              {p.popular && (
-                <View style={s.popularTag}><Text style={s.popularTagTxt}>Most Popular</Text></View>
-              )}
-              <Text style={[s.cardTitle, p.popular && { color: '#fff' }]}>{p.title}</Text>
-              <Text style={[s.cardPrice, p.popular && { color: '#fff' }]}>{p.price}</Text>
+            // A pricing card is a plain elevated surface, so the shared Card
+            // takes over the border/elevation/edge-highlight work this screen
+            // used to hand-roll. The popular tier gets Card's own accent-stripe
+            // + glow treatment instead of a flat solid fill, matching how
+            // emphasis is carried everywhere else in the app.
+            <Card
+              key={p.title}
+              tone={p.popular ? 'raised' : 'base'}
+              elevation={p.popular ? 'md' : 'sm'}
+              accent={p.popular ? COLORS.teal : undefined}
+            >
+              {p.popular && <Badge label="Most Popular" tone="warning" style={s.popularTag} />}
+              <Text style={[s.cardTitle, p.popular && s.cardTitlePopular]}>{p.title}</Text>
+              <Text style={[s.cardPrice, p.popular && s.cardPricePopular]}>{p.price}</Text>
               {p.features.map((f, i) => (
-                <Text key={i} style={[s.cardFeature, p.popular && { color: 'rgba(255,255,255,0.85)' }]}>• {f}</Text>
+                <Text key={i} style={s.cardFeature}>• {f}</Text>
               ))}
-            </View>
+            </Card>
           ))}
         </View>
         <View style={{ height: 40 }} />
@@ -46,16 +56,22 @@ export default function StreamingPlansScreen({ navigation }: any) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  comingSoonBanner: { backgroundColor: COLORS.teal + '22', margin: SPACING.lg, marginBottom: 0, padding: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.teal + '55', alignItems: 'center' },
+  // Same accent-stripe + glow banner treatment used for milestone/callout
+  // banners elsewhere (e.g. LiveViewScreen's milestone banner) instead of a
+  // flat tinted box.
+  comingSoonBanner: {
+    backgroundColor: COLORS.card2, margin: SPACING.lg, marginBottom: 0, padding: 14,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.teal + '55',
+    borderLeftWidth: 3, borderLeftColor: COLORS.teal, alignItems: 'center', ...SHADOW.md,
+  },
   comingSoonTxt: { color: COLORS.teal, fontSize: 15, fontWeight: 'bold', marginBottom: 4 },
   comingSoonSub: { color: COLORS.textSecondary, fontSize: 12, textAlign: 'center' },
   scroll: { flex: 1 },
   grid: { padding: SPACING.lg, gap: 12 },
-  card: { backgroundColor: COLORS.card, borderRadius: RADIUS.lg, padding: 16, borderWidth: 1, borderColor: COLORS.border },
-  cardPopular: { backgroundColor: COLORS.teal, borderColor: COLORS.teal },
+  popularTag: { alignSelf: 'flex-start', marginBottom: 10 },
   cardTitle: { color: COLORS.text, fontSize: 15, fontWeight: 'bold', marginBottom: 6 },
+  cardTitlePopular: { color: COLORS.teal },
   cardPrice: { color: COLORS.primary, fontSize: 26, fontWeight: 'bold', marginBottom: 10 },
+  cardPricePopular: { color: COLORS.teal },
   cardFeature: { color: COLORS.textSecondary, fontSize: 12, marginBottom: 4 },
-  popularTag: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: RADIUS.round, marginBottom: 10 },
-  popularTagTxt: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
 });

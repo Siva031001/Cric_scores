@@ -104,14 +104,21 @@ export default function ProfileEditScreen({ navigation }: any) {
       <ScrollView>
         <Header title="Edit Profile" onBack={() => navigation.goBack()} rightText="Save" onRight={handleSave} />
         <View style={styles.photoSection}>
-          <TouchableOpacity style={styles.photoCircle} onPress={pickPhoto}>
-            {photo ? <Image source={{ uri: photo }} style={styles.photoImg} /> : (
-              <View style={styles.photoPlaceholder}>
-                <AppIcon emoji="📷" size={26} color={COLORS.textSecondary} />
-                <Text style={styles.photoLabel}>Add Photo</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={styles.avatarWrap}>
+            {/* Two-tone tinted blobs behind the avatar ring — same layered
+                "tint" technique StatCard uses, built from plain absolutely
+                positioned Views since there's no gradient lib. */}
+            <View pointerEvents="none" style={styles.avatarGlowA} />
+            <View pointerEvents="none" style={styles.avatarGlowB} />
+            <TouchableOpacity style={styles.photoCircle} onPress={pickPhoto}>
+              {photo ? <Image source={{ uri: photo }} style={styles.photoImg} /> : (
+                <View style={styles.photoPlaceholder}>
+                  <AppIcon emoji="📷" size={26} color={COLORS.textSecondary} />
+                  <Text style={styles.photoLabel}>Add Photo</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity onPress={pickPhoto} style={styles.changePhotoBtn}>
             <AppIcon emoji="📷" size={14} color={COLORS.primary} />
             <Text style={styles.changePhoto}>Change Photo</Text>
@@ -203,12 +210,29 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
   photoSection: { alignItems: 'center', paddingVertical: SPACING.lg },
+  // Wrapper sized exactly to the ring, so the decorative blobs behind it can
+  // be positioned with simple negative offsets instead of guessing at the
+  // section's padding.
+  avatarWrap: {
+    width: 108, height: 108, alignItems: 'center', justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  // Layered two-tone tinted blobs (same technique as StatCard's `tint`) —
+  // purely decorative, sit behind the ring since they're earlier in the JSX.
+  avatarGlowA: {
+    position: 'absolute', top: -16, left: -16, width: 140, height: 140,
+    borderRadius: 70, backgroundColor: COLORS.primary, opacity: 0.18,
+  },
+  avatarGlowB: {
+    position: 'absolute', top: -6, left: -6, width: 120, height: 120,
+    borderRadius: 60, backgroundColor: COLORS.primaryLight, opacity: 0.16,
+  },
   // Ring + glow, so the avatar reads as the subject of the screen rather than
   // a cropped square.
   photoCircle: {
     width: 108, height: 108, borderRadius: 54, overflow: 'hidden',
     borderWidth: 3, borderColor: COLORS.primary,
-    marginBottom: SPACING.sm, ...SHADOW.glow(COLORS.primary),
+    ...SHADOW.glow(COLORS.primary),
   },
   photoImg: { width: '100%', height: '100%' },
   photoPlaceholder: { flex: 1, backgroundColor: COLORS.card2, justifyContent: 'center', alignItems: 'center' },
@@ -229,7 +253,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card2, color: COLORS.text,
     ...TYPE.body, fontSize: 15,
     paddingHorizontal: SPACING.md, paddingVertical: 15,
-    borderRadius: RADIUS.md, marginBottom: SPACING.md,
+    borderRadius: RADIUS.lg, marginBottom: SPACING.md,
     borderWidth: 1, borderColor: COLORS.border,
   },
   inputLast: { marginBottom: 0 },
@@ -249,7 +273,7 @@ const styles = StyleSheet.create({
   dropdownBtn: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: COLORS.card2, paddingHorizontal: SPACING.md, paddingVertical: 15,
-    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border,
+    borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border,
   },
   dropdownText: { ...TYPE.body, fontSize: 15, color: COLORS.text },
   dropdownArrow: { color: COLORS.primary, fontSize: 12 },

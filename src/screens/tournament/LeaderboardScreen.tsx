@@ -72,6 +72,8 @@ export default function LeaderboardScreen({ route, navigation }: any) {
 
           {teams.map((team: any, i: number) => {
             const isFirst = i === 0;
+            const isSecond = i === 1;
+            const isThird = i === 2;
             const nrrVal = team.nrr ?? 0;
             const nrrStr = (nrrVal > 0 ? "+" : "") + nrrVal.toFixed(2);
             return (
@@ -80,6 +82,8 @@ export default function LeaderboardScreen({ route, navigation }: any) {
                 style={[
                   s.row,
                   isFirst && s.rowFirst,
+                  isSecond && s.rowSecond,
+                  isThird && s.rowThird,
                   i % 2 === 1 && s.rowAlt,
                 ]}
               >
@@ -91,7 +95,15 @@ export default function LeaderboardScreen({ route, navigation }: any) {
                     )}
                 </View>
                 <View style={s.nameCell}>
-                  <Text style={[s.teamName, isFirst && { color: COLORS.yellow }]} numberOfLines={1}>
+                  <Text
+                    style={[
+                      s.teamName,
+                      isFirst && { color: COLORS.yellow },
+                      isSecond && { color: COLORS.textSecondary },
+                      isThird && { color: COLORS.orange },
+                    ]}
+                    numberOfLines={1}
+                  >
                     {team.teamName ?? team.teamId ?? "—"}
                   </Text>
                 </View>
@@ -151,6 +163,11 @@ const s = StyleSheet.create({
     borderBottomColor: COLORS.borderSoft,
   },
   rowFirst: { backgroundColor: COLORS.yellow + "12", borderLeftWidth: 3, borderLeftColor: COLORS.yellow },
+  // Silver/bronze tints for 2nd and 3rd — same tinted-stripe technique as
+  // 1st, at lower opacity so gold still reads as the strongest of the three.
+  // Purely a rank-based style choice; the sort order above is untouched.
+  rowSecond: { backgroundColor: COLORS.textSecondary + "0f", borderLeftWidth: 3, borderLeftColor: COLORS.textSecondary },
+  rowThird: { backgroundColor: COLORS.orange + "0f", borderLeftWidth: 3, borderLeftColor: COLORS.orange },
   rowAlt: { backgroundColor: "rgba(255,255,255,0.02)" },
 
   rankCell: { flex: 0.6, textAlign: "center" },

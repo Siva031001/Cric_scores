@@ -50,6 +50,14 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
 
   return (
     <View style={styles.container}>
+      {/* Soft two-tone blobs behind the header only — same technique as the
+          Home screen's hero blobs (plain tinted, absolutely positioned,
+          clipped Views). Purely decorative: pointerEvents="none", no layout
+          impact on the header or search box rendered on top of it. */}
+      <View pointerEvents="none" style={styles.heroBlobWrap}>
+        <View style={[styles.heroBlob, { backgroundColor: COLORS.primary, top: -60, left: -40 }]} />
+        <View style={[styles.heroBlob, { backgroundColor: COLORS.teal, top: -30, right: -60 }]} />
+      </View>
       <Header
         title="Match History"
         onBack={() => navigation.navigate('Home')}
@@ -100,6 +108,7 @@ export default function HistoryScreen({ navigation }: { navigation: any }) {
                 <View style={[
                   styles.statusBadge,
                   item.status === 'live' && styles.liveBadge,
+                  item.status === 'paused' && styles.pausedBadge,
                 ]}>
                   <View style={styles.badgeInner}>
 
@@ -158,6 +167,8 @@ const styles = StyleSheet.create({
     flex: 1, justifyContent: 'center',
     alignItems: 'center', backgroundColor: COLORS.background,
   },
+  heroBlobWrap: { position: 'absolute', top: 0, left: 0, right: 0, height: 170, overflow: 'hidden' },
+  heroBlob: { position: 'absolute', width: 180, height: 180, borderRadius: 90, opacity: 0.16 },
 
   // ── Search ──
   searchBox: {
@@ -193,6 +204,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.borderSoft,
   },
   liveBadge: { backgroundColor: COLORS.live + '1f', borderColor: COLORS.live + '55' },
+  // "Paused" reads as a hold, not a problem, so it gets the warm amber
+  // treatment instead of the same red used for "Live" — same badge shape.
+  pausedBadge: { backgroundColor: COLORS.warning + '1f', borderColor: COLORS.warning + '55' },
   badgeInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   statusText: { ...TYPE.label, fontSize: 10, color: COLORS.text },
   teams: { ...TYPE.h2, fontSize: 17, color: COLORS.text, marginBottom: 5 },

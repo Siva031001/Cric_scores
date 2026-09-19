@@ -43,6 +43,7 @@ export default function ThemeSelectorScreen({ route, navigation }: any) {
             onPress={() => handleSelect(theme.id, theme.isPremium)}
             activeOpacity={0.85}
           >
+            <View pointerEvents="none" style={s.themeCardEdge} />
             <View style={s.previewWrap}>
               <LiveScoreOverlay match={match} themeId={theme.id} />
             </View>
@@ -75,8 +76,13 @@ const s = StyleSheet.create({
     borderColor: COLORS.borderSoft,
     backgroundColor: COLORS.card,
     overflow: 'hidden',
+    position: 'relative',
     ...SHADOW.md,
   },
+  // Hairline highlight along the card's top edge — same cheap-depth trick the
+  // shared Card component uses, applied by hand here since this list needs
+  // per-card selection styling that Card's own accent prop doesn't cover.
+  themeCardEdge: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: COLORS.edgeHighlight, zIndex: 1 },
   // Selection is carried by a brand-coloured edge plus a glow, so the current
   // theme is obvious at a glance in a scrolling list of similar cards.
   themeCardActive: {

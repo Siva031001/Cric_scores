@@ -38,6 +38,13 @@ export default function JoinAsCaptainScreen({ navigation }: any) {
   return (
     <View style={s.container}>
       <Header title="Join as Team Captain" onBack={() => navigation.goBack()} />
+      {/* Soft colour blobs behind the form — same plain tinted-View technique
+          used elsewhere in the app, purely decorative. Starts below the
+          header's own opaque background so it never overlaps the title. */}
+      <View pointerEvents="none" style={s.heroBlobWrap}>
+        <View style={[s.heroBlob, { backgroundColor: COLORS.live, top: -50, left: -40 }]} />
+        <View style={[s.heroBlob, { backgroundColor: COLORS.purple, top: -20, right: -60 }]} />
+      </View>
       <View style={s.content}>
         <View style={s.logoBlock}>
           <View style={s.logoRing}>
@@ -66,6 +73,10 @@ export default function JoinAsCaptainScreen({ navigation }: any) {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  // Starts at ~ the header's own height (paddingTop 50 + paddingBottom +
+  // title line) so the blobs never draw over the header's title/back button.
+  heroBlobWrap: { position: 'absolute', top: 95, left: 0, right: 0, height: 150, overflow: 'hidden' },
+  heroBlob: { position: 'absolute', width: 170, height: 170, borderRadius: 85, opacity: 0.14 },
   content: { padding: SPACING.lg },
   logoBlock: { alignItems: 'center', marginBottom: SPACING.xl, marginTop: SPACING.sm },
   // Tinted ring around the mark: gives the bare glyph a surface to sit on so

@@ -100,7 +100,10 @@ export default function Button({
 }
 
 const styles = StyleSheet.create({
-  base: { borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  // Rounder than the old RADIUS.md: a slightly softer, friendlier shape reads
+  // as fresher across every button in the app since every variant shares
+  // this base.
+  base: { borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   full: { alignSelf: 'stretch' },
   smText: { fontSize: 13 },

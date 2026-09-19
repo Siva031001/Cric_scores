@@ -47,6 +47,12 @@ export default function Card({
         styles.card,
         { backgroundColor: TONE_BG[tone] },
         SHADOW[elevation],
+        // A soft coloured glow behind an accented card, on top of the
+        // ordinary elevation shadow — the accent stripe alone read as a
+        // rule rather than emphasis. Colour-only; overridden by `elevation`
+        // like the rest of the shadow, and by the same 1 borderWidth `card`
+        // already carries, so this cannot change hit testing or layout.
+        accent ? SHADOW.glow(accent) : null,
         padded && styles.padded,
         accent ? { borderLeftWidth: 3, borderLeftColor: accent } : null,
         style,
