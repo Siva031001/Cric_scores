@@ -10,6 +10,7 @@ import Badge from '../../components/Badge';
 import AppIcon from '../../components/AppIcon';
 import { getBallByBall, getCurrentPartnership, getWormData, getWinProbability } from '../../utils/matchAnalytics';
 import WormGraph from '../../components/WormGraph';
+import OverSummaryModal from '../../components/OverSummaryModal';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -19,6 +20,7 @@ export default function LiveViewScreen({ navigation }: any) {
   const [watching, setWatching] = useState(false);
   const [videoVisible, setVideoVisible] = useState(true);
   const [viewTab, setViewTab] = useState<'live'|'analytics'>('live');
+  const [showOverSummary, setShowOverSummary] = useState(false);
 
   const joinMatch = () => {
     const trimmed = matchId.trim();
@@ -130,7 +132,12 @@ export default function LiveViewScreen({ navigation }: any) {
         <View style={s.scoreCard}>
           <View style={s.scoreCardTop}>
             <Text style={s.scoreCardTeam}>{match.currentInnings === 1 ? match.team1 : match.team2} batting</Text>
-            <Text style={s.scoreCardInn}>Innings {match.currentInnings}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={s.scoreCardInn}>Innings {match.currentInnings}</Text>
+              <TouchableOpacity style={s.overSummaryBtn} onPress={() => setShowOverSummary(true)}>
+                <Text style={s.overSummaryBtnTxt}>Overs ▾</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={s.scoreMainRow}>
             <Text style={s.scoreBig}>{inn?.runs ?? 0}/{inn?.wickets ?? 0}</Text>
@@ -156,6 +163,20 @@ export default function LiveViewScreen({ navigation }: any) {
                 </View>
               ))}
             </View>
+          )}
+        </View>
+
+        {/* AI Commentary — placed right under the score, not buried below the
+            full scorecard, so it's visible without scrolling. */}
+        <View style={s.commentaryCard}>
+          <View style={s.analyticsTitleRow}>
+            <AppIcon emoji="🤖" size={14} color={COLORS.primaryLight} />
+            <Text style={s.analyticsTitle}>Commentary</Text>
+          </View>
+          {inn?.latestCommentaryText ? (
+            <Text style={s.commentaryTxtBig}>{inn.latestCommentaryText}</Text>
+          ) : (
+            <Text style={s.commentaryEmpty}>Commentary will appear here once scoring begins.</Text>
           )}
         </View>
 
@@ -254,18 +275,6 @@ export default function LiveViewScreen({ navigation }: any) {
   </TouchableOpacity>
 )}
 
-<View style={s.analyticsCard}>
-  <View style={s.analyticsTitleRow}>
-    <AppIcon emoji="🤖" size={14} color={COLORS.primaryLight} />
-    <Text style={s.analyticsTitle}>AI Commentary</Text>
-  </View>
-  {inn?.latestCommentaryText ? (
-    <Text style={s.commentaryTxt}>{inn.latestCommentaryText}</Text>
-  ) : (
-    <Text style={s.commentaryEmpty}>Commentary will appear here once scoring begins.</Text>
-  )}
-</View>
-
         {viewTab === 'live' && (() => {
           const partnership = getCurrentPartnership(inn, match);
           const ballByBall = getBallByBall(inn, 12);
@@ -338,6 +347,13 @@ export default function LiveViewScreen({ navigation }: any) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      <OverSummaryModal
+        visible={showOverSummary}
+        onClose={() => setShowOverSummary(false)}
+        ballHistory={inn?.ballHistory ?? []}
+        wormPoints={inn?.wormPoints}
+        bowlingPlayers={bolP}
+      />
     </View>
   );
 }
@@ -403,6 +419,8 @@ const s = StyleSheet.create({
   scoreCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   scoreCardTeam: { ...TYPE.caption, fontSize: 11, fontWeight: '700', color: COLORS.textSecondary, flex: 1 },
   scoreCardInn: { ...TYPE.numSm, fontSize: 11, color: COLORS.primaryLight },
+  overSummaryBtn: { paddingVertical: 4, paddingHorizontal: 8, backgroundColor: COLORS.card2, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.border },
+  overSummaryBtnTxt: { color: COLORS.text, fontSize: 11, fontWeight: "600" },
   scoreMainRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: SPACING.md },
   scoreBig: { fontSize: 54, fontWeight: '800', lineHeight: 58, letterSpacing: -1.5, color: COLORS.text, fontVariant: ['tabular-nums'] },
   scoreMeta: { alignItems: 'flex-end', paddingBottom: 7 },
@@ -458,6 +476,8 @@ const s = StyleSheet.create({
   analyticsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   analyticsTitle: { ...TYPE.label, color: COLORS.primaryLight, marginBottom: SPACING.sm },
   commentaryTxt: { ...TYPE.body, color: COLORS.text, lineHeight: 21 },
+  commentaryTxtBig: { ...TYPE.body, color: COLORS.text, lineHeight: 23, fontSize: 15, fontWeight: '600' },
+  commentaryCard: { backgroundColor: COLORS.card, marginHorizontal: SPACING.md, marginTop: SPACING.sm, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1.5, borderColor: COLORS.primary + '55', ...SHADOW.sm },
   commentaryEmpty: { ...TYPE.caption, color: COLORS.textMuted, fontStyle: 'italic' },
   partnershipTxt: { ...TYPE.displaySm, fontSize: 22, color: COLORS.text },
   bbRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.borderSoft },

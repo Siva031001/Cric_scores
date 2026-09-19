@@ -1545,6 +1545,23 @@ export const assignScorerToMatch = async (tournamentId, matchId, phone) => {
   }
 };
 
+// Standalone-match and tournament-match permission check in one place, for
+// screens (Home, Match History, Scorecard) that only have the match on hand
+// and may not have already loaded its tournament. A viewer who merely has
+// this match in their history must never get true here.
+export const canManageMatch = async (match: any): Promise<boolean> => {
+  const user = getCurrentUser();
+  if (!user || !match) return false;
+  if (match.scorerId === user.uid) return true;
+  if (match.assignedScorerPhone && user.uid === 'phone_' + match.assignedScorerPhone) return true;
+  if (match.tournamentId) {
+    const snap = await database().ref(`tournaments/${match.tournamentId}`).once('value');
+    const t = snap.val();
+    if (t && t.createdBy === user.uid) return true;
+  }
+  return false;
+};
+
 // True if the current signed-in user is allowed to score this specific
 // match: the organizer always can; a scorer only if THIS match is
 // specifically assigned to their phone. A match with no scorer assigned
@@ -1729,6 +1746,15 @@ export const getOrCreateTestTeam = async () => {
 export const uploadLocalImageToStorage = async (localUri: string, storagePath: string): Promise<string> => {
   const storageMod = require('@react-native-firebase/storage').default;
   const ref = storageMod().ref(storagePath);
-  await ref.putFile(localUri);
-  return await ref.getDownloadURL();
+  try {
+    await ref.putFile(localUri);
+    return await ref.getDownloadURL();
+  } catch (e: any) {
+    // Firebase Storage errors (e.g. storage/unauthorized when the rules
+    // reject the write) often surface with an unhelpful native message —
+    // the code is the actionable part.
+    throw new Error(
+      e?.code ? `Image upload failed (${e.code}). Please try again.` : 'Image upload failed. Please try again.'
+    );
+  }
 };

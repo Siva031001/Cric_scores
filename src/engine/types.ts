@@ -353,6 +353,10 @@ export interface InningsState {
   penaltyRunsAgainst: number;
   isSuperOver: boolean;
   battingOrder: number[];
+  /** Bowler ids in the order they first bowled — the only reliable order,
+   *  since bowlerStats keys ("p3", "p10", ...) sort lexicographically once
+   *  round-tripped through Firebase, not by insertion order. */
+  bowlingOrder: number[];
 
   /**
    * Which crease is empty and needs an incoming batter, or null. Set after

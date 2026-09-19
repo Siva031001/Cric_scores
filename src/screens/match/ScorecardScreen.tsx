@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Share, Alert, Modal } from "react-native";
-import { subscribeToMatch, updateMatch, calculateManOfMatch, calculateManOfMatchCandidates, saveManOfMatch, generateMatchSummary } from "../../utils/firebase";
+import { subscribeToMatch, updateMatch, calculateManOfMatch, calculateManOfMatchCandidates, saveManOfMatch, generateMatchSummary, canManageMatch } from "../../utils/firebase";
 import { AdBanner, AdRewardedGate } from "../../components/AdPlaceholder";
 import { getOversString, getRunRate, statKey } from "../../utils/cricketLogic";
 import { COLORS, RADIUS, SPACING, SHADOW, TYPE } from "../../constants/theme";
@@ -20,6 +20,7 @@ export default function ScorecardScreen({ route, navigation }: any) {
   const [showMOM, setShowMOM] = useState(false);
   const [momCandidates, setMomCandidates] = useState<any[]>([]);
   const [selectedMOM, setSelectedMOM] = useState<any>(null);
+  const [canManage, setCanManage] = useState(false);
   const [showAIConfirm, setShowAIConfirm] = useState(false);
   const [showAIRewarded, setShowAIRewarded] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
@@ -33,20 +34,27 @@ export default function ScorecardScreen({ route, navigation }: any) {
     if (injectedMatch) {
       setMatch(injectedMatch);
       setLoading(false);
+      // Embedded inside ScoringScreen, which only an authorized scorer can
+      // reach in the first place.
+      setCanManage(true);
       return;
     }
     if (!matchId) { setLoading(false); return; }
     const unsub = subscribeToMatch(matchId, (data: any) => {
       setMatch(data);
       setLoading(false);
+      canManageMatch(data).then(setCanManage);
       if (data?.status === "completed" && !data?.manOfMatch && !momShownRef.current) {
         momShownRef.current = true;
-        const candidates = calculateManOfMatchCandidates(data);
-        if (candidates.length > 0) {
-          setMomCandidates(candidates);
-          setSelectedMOM(candidates[0]);
-          setShowMOM(true);
-        }
+        canManageMatch(data).then((allowed) => {
+          if (!allowed) return;
+          const candidates = calculateManOfMatchCandidates(data);
+          if (candidates.length > 0) {
+            setMomCandidates(candidates);
+            setSelectedMOM(candidates[0]);
+            setShowMOM(true);
+          }
+        });
       }
       // Interstitial fires once per screen visit, only for completed matches,
       // and only after the MOM flow has had a chance to show first (avoid
@@ -239,9 +247,20 @@ const goBackSafe = () => {
     );
   };
 
-  // Only bowlers who actually bowled — iterate bowlerStats values, not the roster
-  const BowlingTable = ({ players, stats }: any) => {
-    const bowlerRows = Object.values(stats ?? {}) as any[];
+  // Only bowlers who actually bowled — iterate bowlerStats values, not the
+  // roster, and rank by the innings' recorded bowling order (the order they
+  // first bowled in), not by object key order — bowlerStats keys like "p3"
+  // vs "p10" sort lexicographically once round-tripped through Firebase, not
+  // by insertion order, so 10th-bowler-onward would jump ahead of others.
+  // Matches scored before this field existed fall back to key order.
+  const BowlingTable = ({ players, stats, order }: any) => {
+    const statsMap = stats ?? {};
+    const orderedIds: number[] = order?.length
+      ? order
+      : Object.values(statsMap).map((bw: any) => bw?.playerId);
+    const bowlerRows = orderedIds
+      .map((id) => statsMap[statKey(id)])
+      .filter(Boolean) as any[];
     const hasBowled = bowlerRows.filter((bw: any) => bw && (
       (bw.overs ?? 0) > 0 || (bw.balls ?? 0) > 0 ||
       (bw.wides ?? 0) > 0 || (bw.noBalls ?? 0) > 0
@@ -451,7 +470,7 @@ const goBackSafe = () => {
               currentInn={match.currentInnings === 1 ? match.innings1 : null}
               bowlingPlayers={match.team2Players}
             />
-            <BowlingTable players={match.team2Players} stats={match.innings1?.bowlerStats} />
+            <BowlingTable players={match.team2Players} stats={match.innings1?.bowlerStats} order={match.innings1?.bowlingOrder} />
           </View>
         )}
 
@@ -465,7 +484,7 @@ const goBackSafe = () => {
               currentInn={match.currentInnings === 2 ? match.innings2 : null}
               bowlingPlayers={match.team1Players}
             />
-            <BowlingTable players={match.team1Players} stats={match.innings2?.bowlerStats} />
+            <BowlingTable players={match.team1Players} stats={match.innings2?.bowlerStats} order={match.innings2?.bowlingOrder} />
           </View>
         )}
 
@@ -477,20 +496,20 @@ const goBackSafe = () => {
           <Text style={s.shareBtnTxt}>Share Scorecard</Text>
         </TouchableOpacity>
 
-        {/* Action Buttons */}
-        {match.status === "live" && match.currentInnings === 1 && ((match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers) && (
+        {/* Action Buttons — scoring re-entry is for the assigned scorer/organizer only */}
+        {canManage && match.status === "live" && match.currentInnings === 1 && ((match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers) && (
   <TouchableOpacity style={[s.shareBtn, {backgroundColor: COLORS.primary, marginTop: 0}]}
       onPress={goBackSafe}>
      <Text style={s.shareBtnTxt}>Back to Scoring — Start 2nd Innings There</Text>
   </TouchableOpacity>
 )}
-{match.status === "live" && match.currentInnings === 1 && !((match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers) && (
+{canManage && match.status === "live" && match.currentInnings === 1 && !((match.innings1?.wickets ?? 0) >= 10 || (match.innings1?.overs ?? 0) >= match.totalOvers) && (
   <TouchableOpacity style={[s.shareBtn, { backgroundColor: COLORS.red, marginTop: 0 }]}
     onPress={goBackSafe}>
     <Text style={s.shareBtnTxt}>Back to Scoring</Text>
   </TouchableOpacity>
 )}
-        {match.status === "live" && match.currentInnings === 2 && (
+        {canManage && match.status === "live" && match.currentInnings === 2 && (
   <TouchableOpacity style={[s.shareBtn, { backgroundColor: COLORS.red, marginTop: 0 }]}
     onPress={goBackSafe}>
     <Text style={s.shareBtnTxt}>Continue Scoring</Text>
@@ -545,7 +564,7 @@ const goBackSafe = () => {
               disabled={!selectedMOM}
               onPress={async () => {
                 setShowMOM(false);
-                if (selectedMOM) await saveManOfMatch(matchId, selectedMOM);
+                if (selectedMOM && canManage) await saveManOfMatch(matchId, selectedMOM);
               }}
             >
               <Text style={s.momConfirmTxt}>Confirm as Man of the Match</Text>

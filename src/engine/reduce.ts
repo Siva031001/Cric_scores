@@ -119,6 +119,7 @@ const createInitialState = (setup: InningsSetup, rules: CompetitionRules): Innin
   penaltyRunsAgainst: 0,
   isSuperOver: !!setup.isSuperOver,
   battingOrder: [setup.strikerId, setup.nonStrikerId],
+  bowlingOrder: [setup.bowlerId],
   awaitingBatsmanSlot: null,
   awaitingBowler: false,
 });
@@ -162,7 +163,10 @@ export const reduceInningsVerbose = (
 
   const ensureBowl = (id: number): DerivedBowlerStats => {
     const k = statKey(id);
-    if (!state.bowlerStats[k]) state.bowlerStats[k] = emptyBowlerStats(id);
+    if (!state.bowlerStats[k]) {
+      state.bowlerStats[k] = emptyBowlerStats(id);
+      if (!state.bowlingOrder.includes(id)) state.bowlingOrder.push(id);
+    }
     const s = state.bowlerStats[k];
     if (gidBowl.has(id)) s.globalPlayerId = gidBowl.get(id) ?? null;
     return s;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native';import { getMatchHistory } from '../../utils/firebase';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native';import { getMatchHistory, canManageMatch } from '../../utils/firebase';
 import { getPartnerships } from '../../utils/matchAnalytics';
 import { AdBanner, AdRewardedGate } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
@@ -451,7 +451,11 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
                 <SectionHeader title={filter === 'all' ? 'All Matches' : (COUNTERS.find(c => c.f === filter)?.l ?? '') + ' Matches'} subtitle={filteredMatches.length + ' match' + (filteredMatches.length !== 1 ? 'es' : '')} />
                 {filteredMatches.map((m: any, i: number) => (
                   <TouchableOpacity key={m.id ?? i} style={s.matchCard} activeOpacity={0.85}
-                    onPress={() => m.status === 'live' ? navigation.navigate('Scoring', { matchId: m.id }) : navigation.navigate('Scorecard', { matchId: m.id })}>
+                    onPress={async () => {
+                      if (m.status !== 'live') { navigation.navigate('Scorecard', { matchId: m.id }); return; }
+                      const allowed = await canManageMatch(m);
+                      navigation.navigate(allowed ? 'Scoring' : 'Scorecard', { matchId: m.id });
+                    }}>
                     <View style={s.cardEdge} pointerEvents="none" />
                     <View style={s.mCardTop}>
                       <Text style={s.mDate}>{m.matchDate ?? ''}</Text>

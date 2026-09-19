@@ -51,6 +51,9 @@ export interface RunsAction {
   /** Short-run bookkeeping: credited = attemptedRuns - shortRuns. */
   attemptedRuns?: number;
   shortRuns?: number;
+  /** G1/G2 scoring shortcuts: runs are credited as usual, but strike never
+   *  rotates for this delivery, regardless of parity. */
+  keepStrike?: boolean;
 }
 
 export interface WideAction {
@@ -388,7 +391,7 @@ export const deriveEvent = (
         batterFacedBall: true,
         batterRuns: runs,
         totalRuns: runs,
-        crossingRuns: boundary ? 0 : runs,
+        crossingRuns: action.keepStrike || boundary ? 0 : runs,
         runType: action.runType ?? inferRunType(runs, boundary, overthrow),
         boundary,
         overthrowRuns: overthrow,

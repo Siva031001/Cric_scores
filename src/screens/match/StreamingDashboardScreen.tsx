@@ -294,9 +294,11 @@ export default function StreamingDashboardScreen({ route, navigation }: any) {
           </Card>
         )}
 
-        <TouchableOpacity style={s.scoringLink} onPress={() => navigation.navigate('Scoring', { matchId })}>
-          <Text style={s.scoringLinkTxt}>Go to Scoring Screen →</Text>
-        </TouchableOpacity>
+        {isOrganizer && (
+          <TouchableOpacity style={s.scoringLink} onPress={() => navigation.navigate('Scoring', { matchId })}>
+            <Text style={s.scoringLinkTxt}>Go to Scoring Screen →</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={{ height: 40 }} />
 

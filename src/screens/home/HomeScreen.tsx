@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Image, StatusBar, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory, getTournamentsVersion } from '../../utils/firebase';
+import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory, getTournamentsVersion, canManageMatch } from '../../utils/firebase';
 import { AdBanner } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import { getPublicTournaments, searchPublicTournaments, getHomePageTournaments, getTournamentDisplayStatus } from '../../utils/firebase';
@@ -50,6 +50,11 @@ export default function HomeScreen({ navigation }: any) {
         setPublicTournaments([]);
       });
   }, []));
+
+  const openLiveMatch = async (m: any) => {
+    const allowed = await canManageMatch(m);
+    navigation.navigate(allowed ? 'Scoring' : 'Scorecard', { matchId: m.id });
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -179,7 +184,7 @@ export default function HomeScreen({ navigation }: any) {
                 <Text style={st.liveSectionTitle}>Live Matches</Text>
               </View>
               {liveMatches.map((m: any) => (
-                <TouchableOpacity key={m.id} style={st.liveCard} onPress={() => navigation.navigate('Scoring', { matchId: m.id })}>
+                <TouchableOpacity key={m.id} style={st.liveCard} onPress={() => openLiveMatch(m)}>
                   <View style={st.liveCardTop}>
                     <Text style={st.liveTeams} numberOfLines={1}>{m.team1} vs {m.team2}</Text>
                     <Text style={st.liveContinue}>Continue →</Text>

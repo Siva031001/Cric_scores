@@ -18,6 +18,9 @@ import {
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from '../../components/AppIcon';
+import OverSummaryModal from '../../components/OverSummaryModal';
+import EventPopup, { PopupEventKind } from '../../components/EventPopup';
+import { isLegacyWicket } from '../../engine/legacy';
 import { useFocusEffect } from "@react-navigation/native";
 import ScorecardScreen from "./ScorecardScreen";
 import { getBallCommentary } from '../../utils/aiCommentary';
@@ -138,6 +141,30 @@ export default function ScoringScreen({ route, navigation }: any) {
   // "More runs" covers 5 and 7+, which the old six-button row could not
   // express at all, plus the boundary / overthrow distinction.
   const [showMoreRuns, setShowMoreRuns] = useState(false);
+  const [showOverSummary, setShowOverSummary] = useState(false);
+  const [popupEvent, setPopupEvent] = useState<PopupEventKind | null>(null);
+  const lastBallCountRef = useRef<number>(-1);
+
+  // Fires the wicket/4/6/wide/no-ball pop-up exactly once per newly-added
+  // ball. -1 sentinel skips the initial load (balls already in history), and
+  // a ball count that goes DOWN (undo) just re-syncs the ref, no pop-up.
+  useEffect(() => {
+    if (!match) return;
+    const curInn = match.currentInnings === 1 ? match.innings1 : match.innings2;
+    const balls = (curInn?.ballHistory ?? []).filter((b: any) => b?.type !== "NEW_BATSMAN");
+    const count = balls.length;
+    if (lastBallCountRef.current !== -1 && count > lastBallCountRef.current) {
+      const result: string = balls[balls.length - 1]?.result ?? "";
+      let kind: PopupEventKind | null = null;
+      if (isLegacyWicket(result)) kind = "WICKET";
+      else if (result === "4") kind = "FOUR";
+      else if (result === "6") kind = "SIX";
+      else if (result.startsWith("WD")) kind = "WIDE";
+      else if (result.startsWith("NB")) kind = "NOBALL";
+      if (kind) setPopupEvent(kind);
+    }
+    lastBallCountRef.current = count;
+  }, [match]);
   const [moreRunsInput, setMoreRunsInput] = useState("5");
   const [moreRunsIsBoundary, setMoreRunsIsBoundary] = useState(false);
   const [moreRunsIsOverthrow, setMoreRunsIsOverthrow] = useState(false);
@@ -453,6 +480,14 @@ useEffect(() => {
     });
     setMoreRunsIsBoundary(false);
     setMoreRunsIsOverthrow(false);
+  };
+
+  // G1/G2: fixed-run shortcuts distinct from the plain run buttons. G1
+  // credits 1 run without rotating strike (the normal single always would);
+  // G2 is a plain 2-run delivery, which is already strike-neutral.
+  const submitGRun = (runs: 1 | 2) => {
+    setShowMoreRuns(false);
+    dispatchAction({ type: "RUNS", runs, keepStrike: runs === 1 });
   };
 
   const submitShortRun = () => {
@@ -779,6 +814,7 @@ useEffect(() => {
 
   return (
     <View style={s.container}>
+      <EventPopup event={popupEvent} onHide={() => setPopupEvent(null)} />
       <View style={s.header}>
         <TouchableOpacity style={s.headerBack} onPress={() => setShowEndConfirm(true)}>
           <Text style={s.headerBackTxt}>X</Text>
@@ -827,8 +863,11 @@ useEffect(() => {
                 <Text style={s.sbRR}>RR {getRunRate(inn?.runs ?? 0, inn?.overs ?? 0, inn?.balls ?? 0)}</Text>
               </View>
             </View>
-            {tgt && <Text style={s.sbTarget}>Need {Math.max(0, tgt - (inn?.runs ?? 0))} off {((match.totalOvers - (inn?.overs ?? 0)) - (inn?.balls ?? 0) / 6).toFixed(1)} ov - RRR: {getRequiredRunRate(tgt, inn?.runs ?? 0, match.totalOvers, inn?.overs ?? 0, inn?.balls ?? 0)}</Text>}
+            {tgt && <Text style={s.sbTarget}>Need {Math.max(0, tgt - (inn?.runs ?? 0))} off {Math.max(0, match.totalOvers * 6 - ((inn?.overs ?? 0) * 6 + (inn?.balls ?? 0)))} balls - RRR: {getRequiredRunRate(tgt, inn?.runs ?? 0, match.totalOvers, inn?.overs ?? 0, inn?.balls ?? 0)}</Text>}
           </View>
+          <TouchableOpacity style={s.overSummaryBtn} onPress={() => setShowOverSummary(true)}>
+            <Text style={s.overSummaryBtnTxt}>Overs ▾</Text>
+          </TouchableOpacity>
         </View>
 
         {(inn?.ballHistory?.length ?? 0) > 0 && (() => {
@@ -841,12 +880,13 @@ useEffect(() => {
             overMap[k].push(b);
           });
           const overKeys = Object.keys(overMap).map(Number).sort((a, b) => a - b);
-          const lastOvers = overKeys.slice(-3);
+          // Only the current over here — the full over-by-over history is
+          // one tap away via "Overs ▾" instead of cluttering the main screen.
+          const currentOver = overKeys.slice(-1);
           return (
             <View style={s.ballsRow}>
-              {lastOvers.map((ov, oi) => (
+              {currentOver.map((ov) => (
                 <React.Fragment key={ov}>
-                  {oi > 0 && <Text style={{color: COLORS.textMuted, fontSize: 10, alignSelf:"center", marginHorizontal: 2}}>|</Text>}
                   {overMap[ov].map((b: any, i: number) => (
                     <View key={i} style={[s.ball,
                       b.result === "W" && s.bW, b.result === "4" && s.b4, b.result === "6" && s.b6,
@@ -1353,15 +1393,15 @@ useEffect(() => {
 
       <Modal visible={showRunOutPicker} transparent animationType="slide">
         <View style={s.mOverlay}><View style={s.modal}>
-          <Text style={s.mTitle}>Run Out — Who is Out?</Text>
-          <Text style={{color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 16}}>A run out can happen at either end. Select the dismissed batter.</Text>
+          <Text style={s.mTitle}>Run Out — Which End?</Text>
+          <Text style={{color: COLORS.textSecondary, fontSize: 13, textAlign: "center", marginBottom: 16}}>Pick the end where the stumps were broken — not who "was" striker before the run.</Text>
           <TouchableOpacity style={[s.endBtn, {borderColor: COLORS.yellow, marginBottom: 12}]} onPress={() => handleRunOutWho("striker")}>
-            <Text style={{color: COLORS.yellow, fontSize: 15, fontWeight: "bold", textAlign: "center"}}>* {getName(batP, inn?.strikerId)}</Text>
-            <Text style={{color: COLORS.textMuted, fontSize: 12, textAlign: "center"}}>Striker</Text>
+            <Text style={{color: COLORS.yellow, fontSize: 16, fontWeight: "bold", textAlign: "center"}}>Striker's End</Text>
+            <Text style={{color: COLORS.textMuted, fontSize: 12, textAlign: "center"}}>{getName(batP, inn?.strikerId)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.endBtn, {borderColor: COLORS.blue}]} onPress={() => handleRunOutWho("nonStriker")}>
-            <Text style={{color: COLORS.blue, fontSize: 15, fontWeight: "bold", textAlign: "center"}}>{getName(batP, inn?.nonStrikerId)}</Text>
-            <Text style={{color: COLORS.textMuted, fontSize: 12, textAlign: "center"}}>Non-Striker</Text>
+            <Text style={{color: COLORS.blue, fontSize: 16, fontWeight: "bold", textAlign: "center"}}>Non-Striker's End</Text>
+            <Text style={{color: COLORS.textMuted, fontSize: 12, textAlign: "center"}}>{getName(batP, inn?.nonStrikerId)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.cancelBtn, {marginTop: 12}]} onPress={() => setShowRunOutPicker(false)}>
             <Text style={s.cancelTxt}>Cancel</Text>
@@ -1488,6 +1528,18 @@ useEffect(() => {
           <Text style={{ color: COLORS.textMuted, fontSize: 11, textAlign: "center", marginBottom: 12 }}>
             Any number of runs. There is no six-run limit.
           </Text>
+          <View style={{ flexDirection: "row", gap: 8, justifyContent: "center", marginBottom: 12 }}>
+            <TouchableOpacity
+              style={{ paddingVertical: 10, paddingHorizontal: 18, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.primary }}
+              onPress={() => submitGRun(1)}>
+              <Text style={{ color: COLORS.text, fontSize: 14, fontWeight: "bold" }}>G1 — 1 run, same striker</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ paddingVertical: 10, paddingHorizontal: 18, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.primary }}
+              onPress={() => submitGRun(2)}>
+              <Text style={{ color: COLORS.text, fontSize: 14, fontWeight: "bold" }}>G2 — 2 runs</Text>
+            </TouchableOpacity>
+          </View>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 12 }}>
             {[5,7,8,9,10].map(n => (
               <TouchableOpacity key={n}
@@ -1515,6 +1567,14 @@ useEffect(() => {
           </TouchableOpacity>
         </View></View>
       </Modal>
+
+      <OverSummaryModal
+        visible={showOverSummary}
+        onClose={() => setShowOverSummary(false)}
+        ballHistory={inn?.ballHistory ?? []}
+        wormPoints={inn?.wormPoints}
+        bowlingPlayers={bolP}
+      />
 
       {/* ── Short run ──────────────────────────────────────────── */}
       <Modal visible={showShortRun} transparent animationType="slide">
@@ -1624,6 +1684,8 @@ const s = StyleSheet.create({
     ...SHADOW.lg,
   },
   sbTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  overSummaryBtn: { paddingVertical: 6, paddingHorizontal: 10, backgroundColor: COLORS.card2, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.border },
+  overSummaryBtnTxt: { color: COLORS.text, fontSize: 12, fontWeight: "600" },
   sbBatting: { ...TYPE.label, fontSize: 10, color: COLORS.textSecondary, marginBottom: 4 },
   sbScoreRow: { flexDirection: "row", alignItems: "flex-end", gap: 12 },
   // Tabular figures matter here above everywhere else: without them the score
