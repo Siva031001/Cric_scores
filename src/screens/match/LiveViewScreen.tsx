@@ -47,6 +47,32 @@ export default function LiveViewScreen({ navigation }: any) {
     lastBallCountRef.current = count;
   }, [match]);
 
+  // Batsman (50/100/150) and bowler (3/4/5 wickets) milestones, written by
+  // the Scorer's dispatch to match.lastMilestone / match.lastBowlingMilestone.
+  // Tracks each by its timestamp so a milestone only pops once, and — since
+  // it's declared after the ball-event effect above — takes priority over a
+  // plain four/six/wicket pop-up landing in the same update.
+  const lastMilestoneTsRef = useRef<number>(-1);
+  const lastBowlingMilestoneTsRef = useRef<number>(-1);
+  useEffect(() => {
+    if (!match) return;
+    const m = match.lastMilestone;
+    const mTs = m?.ts ?? 0;
+    if (lastMilestoneTsRef.current !== -1 && mTs > lastMilestoneTsRef.current) {
+      const kind: UmpireEventKind = m.kind === 'HUNDRED_FIFTY' ? 'HUNDRED_FIFTY' : m.kind === 'HUNDRED' ? 'HUNDRED' : 'FIFTY';
+      setUmpireEvent(kind);
+    }
+    lastMilestoneTsRef.current = mTs;
+
+    const bm = match.lastBowlingMilestone;
+    const bmTs = bm?.ts ?? 0;
+    if (lastBowlingMilestoneTsRef.current !== -1 && bmTs > lastBowlingMilestoneTsRef.current) {
+      const kind: UmpireEventKind = bm.kind === 'FIVE_WKTS' ? 'FIVE_WKTS' : bm.kind === 'FOUR_WKTS' ? 'FOUR_WKTS' : 'THREE_WKTS';
+      setUmpireEvent(kind);
+    }
+    lastBowlingMilestoneTsRef.current = bmTs;
+  }, [match]);
+
   const joinMatch = () => {
     const trimmed = matchId.trim();
     if (trimmed.length < 4 || !/^[A-Z0-9]+$/i.test(trimmed)) { Alert.alert('Error', 'Please enter a valid Match ID'); return; }

@@ -10,5 +10,7 @@ export const detectMilestone = (prevRuns: number, newRuns: number): string | nul
 
 export const detectBowlingMilestone = (prevWickets: number, newWickets: number): string | null => {
   if (prevWickets < 5 && newWickets >= 5) return '5-wicket haul!';
+  if (prevWickets < 4 && newWickets >= 4) return '4 wickets!';
+  if (prevWickets < 3 && newWickets >= 3) return '3 wickets!';
   return null;
 };

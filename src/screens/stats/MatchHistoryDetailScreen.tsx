@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native';import { getMatchHistory, canManageMatch } from '../../utils/firebase';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native';import { getMatchHistory, canManageMatch, getPlayerPublicProfiles } from '../../utils/firebase';
 import { getPartnerships } from '../../utils/matchAnalytics';
 import { AdBanner, AdRewardedGate } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW, GRADIENTS } from '../../constants/theme';
@@ -41,12 +41,30 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
   const [showDateAdRewarded, setShowDateAdRewarded] = useState(false);
   const [batSort, setBatSort] = useState<SortKey>('runs');
   const [bolSort, setBolSort] = useState<SortKey>('wickets');
+  // Live current name per globalPlayerId, so a post-registration rename
+  // (or a former guest name) overrides whatever was frozen into each old
+  // match's roster at play time. Populated once matches load; see effect below.
+  const [liveNames, setLiveNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     getMatchHistory()
       .then(d => {
         const sorted = (d ?? []).sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
         setMatches(sorted);
+        const ids = new Set<string>();
+        sorted.forEach((m: any) => {
+          [m.innings1, m.innings2].forEach((inn: any) => {
+            Object.values(inn?.batsmanStats ?? {}).forEach((bs: any) => { if (bs?.globalPlayerId) ids.add(bs.globalPlayerId); });
+            Object.values(inn?.bowlerStats ?? {}).forEach((bw: any) => { if (bw?.globalPlayerId) ids.add(bw.globalPlayerId); });
+          });
+        });
+        if (ids.size > 0) {
+          getPlayerPublicProfiles(Array.from(ids)).then((profiles) => {
+            const names: Record<string, string> = {};
+            Object.entries(profiles).forEach(([id, p]: [string, any]) => { if (p?.name) names[id] = p.name; });
+            setLiveNames(names);
+          }).catch(() => {});
+        }
       })
       .catch(() => setMatches([]))
       .finally(() => setLoading(false));
@@ -142,7 +160,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
       batMap[key].sixes += bs.sixes ?? 0;
       if ((bs.balls ?? 0) > 0) { batMap[key].innings += 1; batMap[key].scores.push(bs.runs ?? 0); }
       if (bs.isOut) batMap[key].outs += 1;
-      batMap[key].name = player.name;
+      batMap[key].name = (bs.globalPlayerId && liveNames[bs.globalPlayerId]) || player.name;
     });
   });
 });
@@ -172,7 +190,7 @@ export default function MatchHistoryDetailScreen({ navigation }: any) {
         bolMap[key].innings += 1;
         bolMap[key].figures.push({ w: bw.wickets ?? 0, r: bw.runs ?? 0 });
       }
-      bolMap[key].name = player.name;
+      bolMap[key].name = (bw.globalPlayerId && liveNames[bw.globalPlayerId]) || player.name;
     });
   });
 });

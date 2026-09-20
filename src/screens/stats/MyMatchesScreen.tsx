@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { getMyLinkedPlayerId, getMatchesForPlayer } from '../../utils/firebase';
+import { getMyLinkedPlayerId, getMatchesForPlayer, getPlayerPublicProfile } from '../../utils/firebase';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW, GRADIENTS } from '../../constants/theme';
 import Header from '../../components/Header';
 import AppIcon from '../../components/AppIcon';
@@ -19,8 +19,12 @@ export default function MyMatchesScreen({ navigation }: any) {
         const pid = await getMyLinkedPlayerId();
         setMyPlayerId(pid);
         if (pid) {
-          const m = await getMatchesForPlayer(pid);
+          const [m, profile] = await Promise.all([getMatchesForPlayer(pid), getPlayerPublicProfile(pid)]);
           setMatches(m ?? []);
+          // Live name from the player's own record, not whatever was frozen
+          // into an old match's roster — so a post-registration name change
+          // (or a guest name) shows up correctly here immediately.
+          if (profile?.name) setMyName(profile.name);
         }
       } catch (e) {
         console.error(e);

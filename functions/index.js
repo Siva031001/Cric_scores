@@ -367,8 +367,18 @@ exports.generateScorecardPdf = functions.https.onCall(async (request) => {
   const bucket = admin.storage().bucket();
   const filePath = `scorecard_pdfs/${matchId}.pdf`;
   const file = bucket.file(filePath);
-  await file.save(buffer, { contentType: 'application/pdf' });
-  const [url] = await file.getSignedURL({ action: 'read', expires: Date.now() + 7 * 24 * 60 * 60 * 1000 });
+  // Not getSignedUrl(): that needs the IAM "Service Account Token Creator"
+  // role to sign a blob, which Cloud Functions' default service account
+  // does not have — every call failed with a permissions error, surfaced to
+  // the app as "Could not generate PDF". A Firebase Storage download token
+  // (the same mechanism the client SDK's getDownloadURL() uses) needs no
+  // IAM role at all: it's just a UUID stashed in the file's own metadata.
+  const downloadToken = require('crypto').randomUUID();
+  await file.save(buffer, {
+    contentType: 'application/pdf',
+    metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
+  });
+  const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${downloadToken}`;
 
   return { url };
 });

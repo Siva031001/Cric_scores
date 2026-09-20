@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Image, StatusBar, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMatchHistory, getTournamentsVersion, canManageMatch } from '../../utils/firebase';
+import { signInAnonymously, getCurrentUser, subscribeToProfile, getUserProfile, getMyTeams, getMyHomepageMatches, getTournamentsVersion, canManageMatch } from '../../utils/firebase';
 import { AdBanner } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW, GRADIENTS } from '../../constants/theme';
 import { getPublicTournaments, searchPublicTournaments, getHomePageTournaments, getTournamentDisplayStatus } from '../../utils/firebase';
@@ -58,7 +58,7 @@ export default function HomeScreen({ navigation }: any) {
 
   const loadData = useCallback(async () => {
     try {
-      const [t, m, p] = await Promise.all([getMyTeams(), getMatchHistory(), getUserProfile()]);
+      const [t, m, p] = await Promise.all([getMyTeams(), getMyHomepageMatches(), getUserProfile()]);
       setTeams(t ?? []);
       setMatches(m ?? []);
       setLiveMatches((m ?? []).filter((x: any) => x.status === 'live' || x.status === 'paused'));
@@ -78,6 +78,18 @@ export default function HomeScreen({ navigation }: any) {
   }, []);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+
+  // useFocusEffect only fires on in-app navigation focus, not on the OS
+  // backgrounding/foregrounding the app while Home is already the focused
+  // screen — so a match scored while the app was away (or on another
+  // device) looked "gone" or stale until the user navigated off and back.
+  useEffect(() => {
+    const { AppState } = require('react-native');
+    const sub = AppState.addEventListener('change', (state: string) => {
+      if (state === 'active') loadData();
+    });
+    return () => sub.remove();
+  }, [loadData]);
 
   useEffect(() => {
     const unsub = subscribeToProfile((data: any) => { if (data) setProfile(data); });

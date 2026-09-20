@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Linking } from 'react-native';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
 import { deleteAccount } from '../../utils/firebase';
@@ -44,6 +44,22 @@ export default function SettingsScreen({ navigation }: any) {
     ]);
   };
 
+  const SUPPORT_WHATSAPP = '9087600372';
+  const SUPPORT_EMAIL = 'Cric_score@gmail.com';
+
+  const openWhatsApp = () => {
+    const digits = SUPPORT_WHATSAPP.replace(/\D/g, '');
+    Linking.openURL(`https://wa.me/91${digits}`).catch(() =>
+      Alert.alert('Could not open WhatsApp', `You can reach us at ${SUPPORT_WHATSAPP}`)
+    );
+  };
+
+  const openEmail = () => {
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() =>
+      Alert.alert('Could not open Mail', `You can reach us at ${SUPPORT_EMAIL}`)
+    );
+  };
+
   const items = [
     { icon: '👤', label: 'Edit Profile', sublabel: 'Name, photo, playing role', onPress: () => navigation.navigate('ProfileEdit') },
     { icon: '👥', label: 'My Teams', sublabel: 'Manage your teams', onPress: () => navigation.navigate('MyTeams') },
@@ -81,6 +97,31 @@ export default function SettingsScreen({ navigation }: any) {
             </TouchableOpacity>
           );
         })}
+        <View style={styles.supportCard}>
+          <View pointerEvents="none" style={styles.itemEdge} />
+          <Text style={styles.supportTitle}>Need Help?</Text>
+          <Text style={styles.supportSub}>If you have any queries or face any issues, please contact our support team.</Text>
+          <TouchableOpacity style={styles.supportRow} onPress={openWhatsApp}>
+            <View style={[styles.itemIcon, { backgroundColor: COLORS.success + '1f' }]}>
+              <AppIcon emoji="💬" size={18} color={COLORS.success} />
+            </View>
+            <View style={styles.itemInfo}>
+              <Text style={styles.supportLabel}>WhatsApp</Text>
+              <Text style={styles.supportValue}>{SUPPORT_WHATSAPP}</Text>
+            </View>
+            <AppIcon emoji="›" size={20} color={COLORS.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.supportRow} onPress={openEmail}>
+            <View style={[styles.itemIcon, { backgroundColor: COLORS.blue + '1f' }]}>
+              <AppIcon emoji="✉️" size={18} color={COLORS.blue} />
+            </View>
+            <View style={styles.itemInfo}>
+              <Text style={styles.supportLabel}>Email</Text>
+              <Text style={styles.supportValue}>{SUPPORT_EMAIL}</Text>
+            </View>
+            <AppIcon emoji="›" size={20} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.version}>Cricket Scorer v1.0.0</Text>
       </ScrollView>
     </View>
@@ -120,4 +161,14 @@ const styles = StyleSheet.create({
   itemSub: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 2 },
   arrow: { color: COLORS.textSecondary, fontSize: 20 },
   version: { ...TYPE.label, fontSize: 10, color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.lg },
+  supportCard: {
+    backgroundColor: COLORS.card, borderRadius: RADIUS.xl,
+    padding: SPACING.md, borderWidth: 1, borderColor: COLORS.borderSoft,
+    overflow: 'hidden', ...SHADOW.sm, marginTop: SPACING.sm,
+  },
+  supportTitle: { ...TYPE.title, fontSize: 15, color: COLORS.text },
+  supportSub: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 4, marginBottom: 10, lineHeight: 17 },
+  supportRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 8 },
+  supportLabel: { ...TYPE.title, fontSize: 14, color: COLORS.text },
+  supportValue: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 2 },
 });

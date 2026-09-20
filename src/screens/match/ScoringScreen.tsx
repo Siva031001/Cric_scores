@@ -19,12 +19,11 @@ import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from "../../constants/theme";
 import Header from "../../components/Header";
 import AppIcon from '../../components/AppIcon';
 import OverSummaryModal from '../../components/OverSummaryModal';
-import EventPopup, { PopupEventKind } from '../../components/EventPopup';
 import { isLegacyWicket } from '../../engine/legacy';
 import { useFocusEffect } from "@react-navigation/native";
 import ScorecardScreen from "./ScorecardScreen";
 import { getBallCommentary } from '../../utils/aiCommentary';
-import { detectMilestone } from '../../utils/milestoneDetector';
+import { detectMilestone, detectBowlingMilestone } from '../../utils/milestoneDetector';
 // ── Rules engine ─────────────────────────────────────────────
 // This screen owns NO cricket rules. It describes what the scorer tapped and
 // the engine decides legality, extras, strike rotation, wickets, over
@@ -144,29 +143,6 @@ export default function ScoringScreen({ route, navigation }: any) {
   // express at all, plus the boundary / overthrow distinction.
   const [showMoreRuns, setShowMoreRuns] = useState(false);
   const [showOverSummary, setShowOverSummary] = useState(false);
-  const [popupEvent, setPopupEvent] = useState<PopupEventKind | null>(null);
-  const lastBallCountRef = useRef<number>(-1);
-
-  // Fires the wicket/4/6/wide/no-ball pop-up exactly once per newly-added
-  // ball. -1 sentinel skips the initial load (balls already in history), and
-  // a ball count that goes DOWN (undo) just re-syncs the ref, no pop-up.
-  useEffect(() => {
-    if (!match) return;
-    const curInn = match.currentInnings === 1 ? match.innings1 : match.innings2;
-    const balls = (curInn?.ballHistory ?? []).filter((b: any) => b?.type !== "NEW_BATSMAN");
-    const count = balls.length;
-    if (lastBallCountRef.current !== -1 && count > lastBallCountRef.current) {
-      const result: string = balls[balls.length - 1]?.result ?? "";
-      let kind: PopupEventKind | null = null;
-      if (isLegacyWicket(result)) kind = "WICKET";
-      else if (result === "4") kind = "FOUR";
-      else if (result === "6") kind = "SIX";
-      else if (result.startsWith("WD")) kind = "WIDE";
-      else if (result.startsWith("NB")) kind = "NOBALL";
-      if (kind) setPopupEvent(kind);
-    }
-    lastBallCountRef.current = count;
-  }, [match]);
   const [moreRunsInput, setMoreRunsInput] = useState("5");
   const [moreRunsIsBoundary, setMoreRunsIsBoundary] = useState(false);
   const [moreRunsIsOverthrow, setMoreRunsIsOverthrow] = useState(false);
@@ -408,8 +384,18 @@ useEffect(() => {
           const newRuns = res.innings.batsmanStats?.[statKey(inn?.strikerId)]?.runs ?? 0;
           const milestone = detectMilestone(prevRuns, newRuns);
           if (milestone) {
+            const kind = newRuns >= 150 ? 'HUNDRED_FIFTY' : newRuns >= 100 ? 'HUNDRED' : 'FIFTY';
             await updateMatch(matchId, {
-              lastMilestone: { text: milestone, playerName: batterName, ts: Date.now() },
+              lastMilestone: { text: milestone, playerName: batterName, kind, ts: Date.now() },
+            });
+          }
+          const prevWkts = inn?.bowlerStats?.[statKey(inn?.currentBowlerId)]?.wickets ?? 0;
+          const newWkts = res.innings.bowlerStats?.[statKey(inn?.currentBowlerId)]?.wickets ?? 0;
+          const bowlingMilestone = detectBowlingMilestone(prevWkts, newWkts);
+          if (bowlingMilestone) {
+            const kind = newWkts >= 5 ? 'FIVE_WKTS' : newWkts >= 4 ? 'FOUR_WKTS' : 'THREE_WKTS';
+            await updateMatch(matchId, {
+              lastBowlingMilestone: { text: bowlingMilestone, playerName: bowlerName, kind, wickets: newWkts, ts: Date.now() },
             });
           }
         }
@@ -835,7 +821,6 @@ useEffect(() => {
 
   return (
     <View style={s.container}>
-      <EventPopup event={popupEvent} onHide={() => setPopupEvent(null)} />
       <View style={s.header}>
         <TouchableOpacity style={s.headerBack} onPress={() => setShowEndConfirm(true)}>
           <Text style={s.headerBackTxt}>X</Text>
@@ -995,15 +980,24 @@ useEffect(() => {
       )}
 
       <View style={s.runsArea}>
-        {QUICK_RUNS.map(r => (
-          <Pressable key={r} style={[s.runBtn, r===4&&s.rb4, r===6&&s.rb6, !!byeMode&&s.rbBye]} onPress={() => handleRunTap(r)} disabled={!!(saving || matchCompleted)}>
-            <Text style={[s.runBtnTxt, (r===4||r===6)&&{color:"#000"}]}>{r}</Text>
+        <View style={s.runsRow}>
+          {QUICK_RUNS.slice(0, 4).map(r => (
+            <Pressable key={r} style={[s.runBtn, r===4&&s.rb4, !!byeMode&&s.rbBye]} onPress={() => handleRunTap(r)} disabled={!!(saving || matchCompleted)}>
+              <Text style={[s.runBtnTxt, r===4&&{color:"#000"}]}>{r}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={s.runsRow}>
+          {QUICK_RUNS.slice(4).map(r => (
+            <Pressable key={r} style={[s.runBtn, r===6&&s.rb6, !!byeMode&&s.rbBye]} onPress={() => handleRunTap(r)} disabled={!!(saving || matchCompleted)}>
+              <Text style={[s.runBtnTxt, r===6&&{color:"#000"}]}>{r}</Text>
+            </Pressable>
+          ))}
+          {/* 7+, runs that were RUN rather than hit, overthrows and short runs. */}
+          <Pressable style={[s.runBtn, !!byeMode&&s.rbBye]} onPress={() => setShowMoreRuns(true)} disabled={!!(saving || matchCompleted)}>
+            <Text style={[s.runBtnTxt, {fontSize: 15}]}>More</Text>
           </Pressable>
-        ))}
-        {/* 7+, runs that were RUN rather than hit, overthrows and short runs. */}
-        <Pressable style={[s.runBtn, !!byeMode&&s.rbBye]} onPress={() => setShowMoreRuns(true)} disabled={!!(saving || matchCompleted)}>
-          <Text style={[s.runBtnTxt, {fontSize: 13}]}>More</Text>
-        </Pressable>
+        </View>
       </View>
 
       <View style={s.extrasArea}>
@@ -1793,8 +1787,9 @@ const s = StyleSheet.create({
   // ── Run buttons ──
   // Tallest targets on the screen: these are hit hundreds of times per match.
   // 4 and 6 keep their own colour so they are findable without reading.
-  runsArea: { flexDirection: "row", marginHorizontal: SPACING.md, marginTop: 12, gap: 6 },
-  runBtn: { flex: 1, height: 68, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border, ...SHADOW.sm },
+  runsArea: { marginHorizontal: SPACING.md, marginTop: 12, gap: 8 },
+  runsRow: { flexDirection: "row", gap: 8 },
+  runBtn: { flex: 1, height: 76, backgroundColor: COLORS.card2, borderRadius: RADIUS.md, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border, ...SHADOW.sm },
   rb4: { backgroundColor: COLORS.blue, borderColor: COLORS.blue, ...SHADOW.glow(COLORS.blue) },
   rb6: { backgroundColor: COLORS.yellow, borderColor: COLORS.yellow, ...SHADOW.glow(COLORS.yellow) },
   rbBye: { borderColor: COLORS.teal, borderWidth: 1.5 },

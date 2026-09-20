@@ -4,6 +4,7 @@ import {
   StyleSheet, ScrollView, Alert, Image, ActivityIndicator,
 } from 'react-native';
 import { findTeamByName, getMyTeams } from '../../utils/firebase';
+import { DEFAULT_TEAM } from '../../constants/defaultTeam';
 import { Team } from '../../types/cricket';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW } from '../../constants/theme';
 import Header from '../../components/Header';
@@ -203,26 +204,40 @@ export default function NewMatchScreen({ route, navigation }: any) {
       </Card>
 
       {/* My Teams Quick Select */}
-      {myTeams.length > 0 && (
-        <Card tone="base" elevation="md" accent={COLORS.blue} style={styles.quickBox}>
-          <Text style={styles.quickTitle}>Quick Select from My Teams</Text>
-          {myTeams.map(team => (
-            <View key={team.id} style={styles.quickRow}>
-              <Text style={styles.quickName} numberOfLines={1}>{team.name}</Text>
-              <TouchableOpacity
-                style={styles.quickBtn}
-                onPress={() => { setTeam1Name(team.name); setTeam1Data(team); }}>
-                <Text style={styles.quickBtnText}>Team 1</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.quickBtn, styles.quickBtn2]}
-                onPress={() => { setTeam2Name(team.name); setTeam2Data(team); }}>
-                <Text style={[styles.quickBtnText, styles.quickBtnText2]}>Team 2</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </Card>
-      )}
+      <Card tone="base" elevation="md" accent={COLORS.blue} style={styles.quickBox}>
+        <Text style={styles.quickTitle}>Quick Select</Text>
+        {/* Always available, even with no teams set up yet — for when the
+            real opponent isn't known and shouldn't block starting a match.
+            No stats are ever recorded for this team or its players. */}
+        <View style={styles.quickRow}>
+          <Text style={styles.quickName} numberOfLines={1}>TBD Opponent (no stats tracked)</Text>
+          <TouchableOpacity
+            style={styles.quickBtn}
+            onPress={() => { setTeam1Name(DEFAULT_TEAM.name); setTeam1Data(DEFAULT_TEAM); }}>
+            <Text style={styles.quickBtnText}>Team 1</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickBtn, styles.quickBtn2]}
+            onPress={() => { setTeam2Name(DEFAULT_TEAM.name); setTeam2Data(DEFAULT_TEAM); }}>
+            <Text style={[styles.quickBtnText, styles.quickBtnText2]}>Team 2</Text>
+          </TouchableOpacity>
+        </View>
+        {myTeams.map(team => (
+          <View key={team.id} style={styles.quickRow}>
+            <Text style={styles.quickName} numberOfLines={1}>{team.name}</Text>
+            <TouchableOpacity
+              style={styles.quickBtn}
+              onPress={() => { setTeam1Name(team.name); setTeam1Data(team); }}>
+              <Text style={styles.quickBtnText}>Team 1</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickBtn, styles.quickBtn2]}
+              onPress={() => { setTeam2Name(team.name); setTeam2Data(team); }}>
+              <Text style={[styles.quickBtnText, styles.quickBtnText2]}>Team 2</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </Card>
 
       {/* Venue */}
       <Card tone="base" elevation="md" accent={COLORS.teal} style={styles.fieldBox}>

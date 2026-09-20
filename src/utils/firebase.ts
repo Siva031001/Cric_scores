@@ -194,6 +194,21 @@ export const subscribeToMatch = (matchId: string, callback: (data: Match) => voi
 };
 
 // ── getMatchHistory — parallel reads via Promise.all ────────
+
+// Matches indexed under users/{uid}/matches — every match this account has
+// ever created/scored, regardless of whether they were a rostered player.
+const _getScorerIndexMatches = async (uid: string, limit = 50) => {
+  const indexSnap = await database().ref(`users/${uid}/matches`).once('value');
+  const matchIds: string[] = [];
+  indexSnap.forEach(child => { matchIds.push(child.key as string); return undefined; });
+  const ids = matchIds.reverse().slice(0, limit);
+  if (ids.length === 0) return [];
+  const snaps = await Promise.all(
+    ids.map(id => database().ref(`matches/${id}`).once('value'))
+  );
+  return snaps.map(s => s.val()).filter(Boolean);
+};
+
 export const getMatchHistory = async () => {
   // Prefer the linked player's own participation index, so History shows
   // only matches this phone number / App ID actually played in.
@@ -205,15 +220,27 @@ export const getMatchHistory = async () => {
   // Fallback for accounts with no linked player record yet — old scorer-scoped behavior.
   const user = getCurrentUser();
   if (!user) return [];
-  const indexSnap = await database().ref(`users/${user.uid}/matches`).once('value');
-  const matchIds: string[] = [];
-  indexSnap.forEach(child => { matchIds.push(child.key as string); return undefined; });
-  const ids = matchIds.reverse().slice(0, 50);
-  if (ids.length === 0) return [];
-  const snaps = await Promise.all(
-    ids.map(id => database().ref(`matches/${id}`).once('value'))
-  );
-  return snaps.map(s => s.val()).filter(Boolean);
+  return await _getScorerIndexMatches(user.uid);
+};
+
+// Home screen's "Live" section and its search need every match this account
+// is meaningfully connected to — played in OR scoring/organizing — not just
+// played matches. An organizer/parent/umpire scoring a match they aren't
+// rostered in was previously invisible here (and unfindable by search)
+// because getMatchHistory only follows the played-in index once a linked
+// player exists. History screen intentionally stays played-only; this is
+// additive, not a replacement.
+export const getMyHomepageMatches = async () => {
+  const user = getCurrentUser();
+  if (!user) return [];
+  const linkedPlayerId = await getMyLinkedPlayerId();
+  const [played, scored] = await Promise.all([
+    linkedPlayerId ? getMatchesForPlayer(linkedPlayerId) : Promise.resolve([]),
+    _getScorerIndexMatches(user.uid),
+  ]);
+  const byId = new Map<string, any>();
+  [...played, ...scored].forEach((m: any) => { if (m?.id) byId.set(m.id, m); });
+  return Array.from(byId.values()).sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
 };
 
 // ── getLiveMatches — parallel reads via Promise.all ─────────

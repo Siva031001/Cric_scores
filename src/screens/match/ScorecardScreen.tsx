@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Share, Alert, Modal } from "react-native";
-import { subscribeToMatch, updateMatch, calculateManOfMatch, calculateManOfMatchCandidates, saveManOfMatch, generateMatchSummary, canManageMatch, generateScorecardPdf } from "../../utils/firebase";
+import { subscribeToMatch, updateMatch, calculateManOfMatch, calculateManOfMatchCandidates, saveManOfMatch, generateMatchSummary, canManageMatch, generateScorecardPdf, getPlayerPublicProfiles } from "../../utils/firebase";
 import { AdBanner, AdRewardedGate } from "../../components/AdPlaceholder";
 import { getOversString, getRunRate, statKey } from "../../utils/cricketLogic";
 import { COLORS, RADIUS, SPACING, SHADOW, TYPE } from "../../constants/theme";
@@ -21,6 +21,13 @@ export default function ScorecardScreen({ route, navigation }: any) {
   const [momCandidates, setMomCandidates] = useState<any[]>([]);
   const [selectedMOM, setSelectedMOM] = useState<any>(null);
   const [canManage, setCanManage] = useState(false);
+  // A match's roster snapshot freezes each player's name as it was AT THAT
+  // TIME — if they registered/renamed later, old scorecards kept showing the
+  // stale (often guest) name. This resolves the CURRENT name from the
+  // player's live record when one exists, without touching the frozen
+  // snapshot itself (stats/ids are unaffected).
+  const [liveNames, setLiveNames] = useState<Record<string, string>>({});
+  const nameFor = (p: any): string => (p?.globalPlayerId && liveNames[p.globalPlayerId]) || p?.name || '';
   const [showAIConfirm, setShowAIConfirm] = useState(false);
   const [showAIRewarded, setShowAIRewarded] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
@@ -67,6 +74,22 @@ export default function ScorecardScreen({ route, navigation }: any) {
     return unsub;
   }, [matchId, injectedMatch]);
 
+  // Refetches only when the actual set of players changes (not on every
+  // ball), since `match` otherwise updates continuously while live.
+  const rosterIds = [...(match?.team1Players ?? []), ...(match?.team2Players ?? [])]
+    .map((p: any) => p?.globalPlayerId)
+    .filter(Boolean)
+    .sort()
+    .join(',');
+  useEffect(() => {
+    if (!rosterIds) { setLiveNames({}); return; }
+    getPlayerPublicProfiles(rosterIds.split(',')).then((profiles) => {
+      const names: Record<string, string> = {};
+      Object.entries(profiles).forEach(([id, p]: [string, any]) => { if (p?.name) names[id] = p.name; });
+      setLiveNames(names);
+    }).catch(() => {});
+  }, [rosterIds]);
+
   // Safely go back whether this screen is a real routed screen (where
 // canGoBack() tells us if there's a previous screen) or an embedded modal
 // inside ScoringScreen (where canGoBack is undefined but goBack/reset are
@@ -97,10 +120,10 @@ const goBackSafe = () => {
       (battingPlayers ?? []).forEach((p: any) => {
         // fix: use statKey for lookup
         const bs = battingStats?.[statKey(p.id)];
-        if (!bs || bs.balls === 0) { innLines.push(p.name + " — Yet to Bat"); return; }
+        if (!bs || bs.balls === 0) { innLines.push(nameFor(p) + " — Yet to Bat"); return; }
         const sr = bs.balls > 0 ? ((bs.runs / bs.balls) * 100).toFixed(0) : "0";
         innLines.push(
-          p.name + (p.isCaptain ? " (C)" : "") + (p.isWicketKeeper ? " (WK)" : "") +
+          nameFor(p) + (p.isCaptain ? " (C)" : "") + (p.isWicketKeeper ? " (WK)" : "") +
           " — " + bs.runs + "(" + bs.balls + ")" +
           " 4s:" + (bs.fours ?? 0) + " 6s:" + (bs.sixes ?? 0) + " SR:" + sr +
           " — " + (bs.isOut ? (bs.dismissalType ?? "out") + (bs.fielderName && bs.fielderName !== "Skip" ? " (" + bs.fielderName + ")" : "") : "not out")
@@ -172,7 +195,8 @@ const goBackSafe = () => {
   // ── #1 #2 #5 Batting table — statKey lookup + "Yet to Bat" rows ──────────
   const formatDismissal = (bs: any, bowlingPlayers: any[]) => {
     if (!bs.isOut) return "not out";
-    const bowlerName = bowlingPlayers?.find((p: any) => p.id === bs.bowlerId)?.name;
+    const bowler = bowlingPlayers?.find((p: any) => p.id === bs.bowlerId);
+    const bowlerName = bowler ? nameFor(bowler) : null;
     const fielder = bs.fielderName && bs.fielderName !== "Skip" ? bs.fielderName : null;
     switch (bs.dismissalType) {
       case "CAUGHT":
@@ -225,7 +249,7 @@ const goBackSafe = () => {
           return (
             <View key={p.id} style={s.tableRow}>
               <View style={[s.cell, s.namecell]}>
-                <Text style={s.playerName}>{p.name}{p.isCaptain ? " (C)" : ""}{p.isWicketKeeper ? " (WK)" : ""}</Text>
+                <Text style={s.playerName}>{nameFor(p)}{p.isCaptain ? " (C)" : ""}{p.isWicketKeeper ? " (WK)" : ""}</Text>
                 <Text style={s.dismissal}>
                   {formatDismissal(bs, bowlingPlayers)}
                 </Text>
@@ -244,7 +268,7 @@ const goBackSafe = () => {
           <View style={s.yetToBatBox}>
             <Text style={s.yetToBatLabel}>Yet to Bat</Text>
             <Text style={s.yetToBatNames}>
-              {yetToBat.map((p: any) => p.name + (p.isCaptain ? " (C)" : "") + (p.isWicketKeeper ? " (WK)" : "")).join("  •  ")}
+              {yetToBat.map((p: any) => nameFor(p) + (p.isCaptain ? " (C)" : "") + (p.isWicketKeeper ? " (WK)" : "")).join("  •  ")}
             </Text>
           </View>
         )}
@@ -293,7 +317,8 @@ const goBackSafe = () => {
           <Text style={[s.cell, s.colHead]}>NB</Text>
         </View>
         {hasBowled.map((bw: any) => {
-          const name = players?.find((p: any) => p.id === bw.playerId)?.name ?? ("Player " + ((bw.playerId ?? 0) + 1));
+          const bowler = players?.find((p: any) => p.id === bw.playerId);
+          const name = (bowler ? nameFor(bowler) : null) ?? ("Player " + ((bw.playerId ?? 0) + 1));
           const total = (bw.overs ?? 0) + (bw.balls ?? 0) / 6;
           const eco = total > 0 ? (bw.runs / total).toFixed(1) : "0.0";
           return (
@@ -511,7 +536,7 @@ const goBackSafe = () => {
           {generatingPdf ? (
             <ActivityIndicator size="small" color={COLORS.text} />
           ) : (
-            <Text style={s.shareBtnTxt}>Share Scorecard (PDF)</Text>
+            <Text style={s.shareBtnTxt}>Share</Text>
           )}
         </TouchableOpacity>
 

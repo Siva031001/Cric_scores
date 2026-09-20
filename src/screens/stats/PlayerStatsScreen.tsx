@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
-import { getPlayerCareerStats } from '../../utils/firebase';
+import { getPlayerCareerStats, getPlayerPublicProfile } from '../../utils/firebase';
 import { AdRewardedGate } from '../../components/AdPlaceholder';
 import { COLORS, RADIUS, SPACING, TYPE, SHADOW, GRADIENTS } from '../../constants/theme';
 import Header from '../../components/Header';
@@ -21,6 +21,20 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAd, setShowAd] = useState(true);
+  // The caller passes whatever name it had on hand (often frozen into an old
+  // match roster). Prefer the player's own current record when it has one.
+  const [liveName, setLiveName] = useState<string | null>(null);
+  const [livePhoto, setLivePhoto] = useState<string | null>(null);
+  const displayName = liveName ?? name;
+  const displayPhoto = livePhoto ?? photo;
+
+  useEffect(() => {
+    if (!globalPlayerId) return;
+    getPlayerPublicProfile(globalPlayerId).then((p) => {
+      if (p?.name) setLiveName(p.name);
+      if (p?.photo) setLivePhoto(p.photo);
+    }).catch(() => {});
+  }, [globalPlayerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,7 +74,7 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
 
   return (
     <View style={s.container}>
-      <Header title={name ?? 'Player'} onBack={() => navigation.goBack()} />
+      <Header title={displayName ?? 'Player'} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={{ padding: SPACING.lg }}>
         <View style={s.hero}>
@@ -71,11 +85,11 @@ export default function PlayerStatsScreen({ route, navigation }: any) {
           <View pointerEvents="none" style={[s.heroBlob, { backgroundColor: GRADIENTS.ocean[0], left: -30, top: -20 }]} />
           <View pointerEvents="none" style={[s.heroBlob, { backgroundColor: GRADIENTS.ocean[1], right: -30, top: 10 }]} />
           <View style={s.avatar}>
-            {photo
-              ? <Image source={{ uri: photo }} style={s.avatarImg} />
-              : <Text style={s.avatarText}>{(name ?? 'P').charAt(0).toUpperCase()}</Text>}
+            {displayPhoto
+              ? <Image source={{ uri: displayPhoto }} style={s.avatarImg} />
+              : <Text style={s.avatarText}>{(displayName ?? 'P').charAt(0).toUpperCase()}</Text>}
           </View>
-          <Text style={s.heroName} numberOfLines={2}>{name ?? 'Player'}</Text>
+          <Text style={s.heroName} numberOfLines={2}>{displayName ?? 'Player'}</Text>
           {stats ? <Text style={s.heroSub}>{stats.matches} match{stats.matches === 1 ? '' : 'es'} played</Text> : null}
         </View>
 
